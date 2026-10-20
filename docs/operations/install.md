@@ -59,7 +59,7 @@ Both commands must succeed: `ssh-keygen` prints `Good "vakr-release" signature`,
 sudo apt install ./vakr_${debver}_amd64.deb
 ```
 
-`apt` installs the dependencies: `ca-certificates`, `openssh-client` (which provides `ssh-keygen` for release verification), `openssl` (field-kit encryption), and `systemd`. It also installs the recommended `snmp` tools unless you pass `--no-install-recommends`.
+`apt` installs the dependencies: `ca-certificates`, `openssh-client` (which provides `ssh-keygen` for release verification), `openssl` (field-kit encryption), and `systemd`. It also installs the recommended `snmp` tools and `iputils-ping`, which the [field kit](field-data.md) uses, unless you pass `--no-install-recommends`.
 
 ## What the package installs
 
@@ -99,7 +99,12 @@ To give an operator administrative access to the local vakr API and TUI, add the
 sudo usermod -aG vakr-admin alice
 ```
 
-Collection services arrive in later milestones. When they do, `vakr setup` creates the first admin, sets the node role and position, and enables `vakr.target`, the unit that starts and stops all vakr services together.
+To start monitoring:
+
+1. Store the SNMP community in `/etc/vakr/secrets/credentials.toml` ([credentials](credentials.md)).
+2. List the devices in `/etc/vakr/inventory.toml`, then run `vakr inventory validate`, `vakr inventory plan`, and `sudo vakr inventory apply` ([inventory](inventory.md)).
+3. Enable the collector and `vakr.target`, the unit that starts and stops all vakr services together: `sudo systemctl enable --now vakr-collector.service vakr.target` ([collector](collector.md)).
+4. Watch the result with `vakr status` or `vakr tui` ([status and TUI](status-and-tui.md)).
 
 ## Automatic updates
 

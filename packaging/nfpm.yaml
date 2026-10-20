@@ -94,6 +94,8 @@ overrides:
     recommends:
       # snmpwalk for field-kit captures and operator troubleshooting.
       - snmp
+      # ping for the field kit's `paths` profile; vakr's own ICMP needs no program.
+      - iputils-ping
     scripts:
       postinstall: packaging/scripts/deb/postinst
       preremove: packaging/scripts/deb/prerm

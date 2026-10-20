@@ -25,6 +25,7 @@ Example:
 import ast
 import socket
 import ssl
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -347,3 +348,26 @@ def test_strict_confirmation_sends_nothing() -> None:
     }
     assert called.isdisjoint({"send", "sendall", "write", "makefile", "request"})
     assert {"wrap_socket", "close"} <= called
+
+
+def test_release_api_target_sees_pre_releases() -> None:
+    """FIELD-010: the GET target lists releases, as self-update does.
+
+    ``/releases/latest`` ignores pre-releases, so while every release is one
+    it answers 404 and the report reads like a failure on a healthy host.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    config = Path(fieldkit_egress.__file__).with_name("fieldkit.toml")
+    targets = tomllib.loads(config.read_text(encoding="utf-8"))["fieldkit"]["egress_get"]
+    assert targets
+    for url in targets:
+        assert not url.endswith("/releases/latest"), url
+        assert "/releases?" in url, url

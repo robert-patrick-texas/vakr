@@ -8,8 +8,13 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 - `vakr config new-options` lists new options by section, names only, so the summary self-update prints after an update stays short (43 options in about a dozen lines). `--describe` shows each option's type, reload behaviour, and description, as before.
 
+### Fixed
+
+- The field kit's GitHub reachability test got HTTP 404 from the release API, because it asked for `/releases/latest`, which ignores pre-releases. It now lists releases the way self-update does.
+
 ### Added
 
+- The package recommends `iputils-ping`, which the field kit's `paths` profile needs. Minimal images lack it.
 - `make github-update-test` (developers): after a release is published, installs the previous release from GitHub in a systemd container, self-updates to the new one, rolls back, and updates again through the timer unit, checking every step.
 
 ## 0.2.0 - 2026-10-20

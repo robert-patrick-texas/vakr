@@ -13,7 +13,9 @@ inbox_hint = "~/vakr-inbox/ on the development host"
 # Description keywords kept verbatim by --pseudonymize: Appendix E.15 (META-012) plus TRANSIT.
 keep_keywords = ["ISP", "WAN", "UPLINK", "TRANSIT"]
 # GitHub reachability test (FIELD-010): one GET of the release API, one HEAD of the releases page.
-egress_get = ["https://api.github.com/repos/robert-patrick-texas/vakr/releases/latest"]
+# The GET lists releases the way self-update does: /releases/latest answers 404
+# while every release is a pre-release.
+egress_get = ["https://api.github.com/repos/robert-patrick-texas/vakr/releases?per_page=1"]
 egress_head = ["https://github.com/robert-patrick-texas/vakr/releases"]
 
 [fieldkit.app]

@@ -1,8 +1,9 @@
 """Domain errors: broken rules that callers can explain to an operator.
 
 These exceptions describe *why* a request cannot be honoured: a record does
-not exist, someone else changed it first, a configuration file owns it, or a
-value breaks an invariant. Ports raise them instead of driver exceptions, so
+not exist, someone else changed it first, a configuration file owns it, a
+value breaks an invariant, or the storage itself cannot serve the request
+right now (``StorageError``). Ports raise them instead of driver exceptions, so
 the API and CLI can map each one to a stable error code (API-007) without
 knowing which database is behind the port (ARCH-001).
 
@@ -182,3 +183,36 @@ class OwnershipError(DomainError):
         self.key = str(key)
         self.owner = owner
         self.writer = writer
+
+
+# Appended by M2-meta (SQLite metadata adapter). The classes above are unchanged.
+
+
+class StorageError(DomainError):
+    """The storage backend could not complete an operation (busy, full, read-only, damaged).
+
+    Unlike the errors above, the request itself may be fine. Adapters raise
+    this instead of a driver exception, so no SQL, bound value, or driver
+    message reaches an operator, and callers report a storage condition,
+    never a target-down state (blueprint 4.3).
+
+    Attributes:
+        retryable: ``True`` when the same request may succeed shortly
+            (lock contention); ``False`` when an operator must act first.
+    """
+
+    def __init__(self, message: str, *, retryable: bool) -> None:
+        """Create the error.
+
+        Args:
+            message: Operator-readable explanation, naming the database, not its contents.
+            retryable: Whether retrying the same request may succeed.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        super().__init__(message)
+        self.retryable = retryable

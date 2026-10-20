@@ -1,0 +1,195 @@
+# vakr option catalog: the single source of truth for every configuration
+# option (CFGM-001, ADR-027). Validation, the packaged defaults written by
+# `vakr config defaults`, docs/operations/configuration.md, and
+# `vakr config new-options` are all generated from this file.
+#
+# Each [[options]] entry has:
+#   key          dotted key as operators write it: "update.channel" is
+#                `channel` in the [update] table
+#   type         str | int | float | bool | duration | enum | list[str] | list[table]
+#   default      packaged default; it must pass its own validation
+#   since        vakr release that introduced the option (SemVer)
+#   reload       live (applied on reload) | restart (needs a service restart)
+#   description  operator-facing explanation
+# Optional constraints: choices (enum), min and max (int, float, duration in
+# seconds), pattern (str regex), format (url | timezone | pattern), and
+# required_when = [key, value]. A list[table] option declares its fields as
+# [options.fields.<name>] tables and may set merge = "append" (entries from
+# every layer are concatenated) with defaults_switch naming a bool option that
+# drops the packaged entries when false.
+#
+# Adding an option: append an entry whose `since` is the release that ships
+# it, then regenerate docs/operations/configuration.md with
+# `vakr config defaults --markdown`. Renaming, moving, retyping, or removing an
+# option also needs a config migration in config-migrations.toml and a
+# config_version bump below (CFGM-002).
+#
+# This file is allowlisted by `make version`: `since` values name releases on
+# purpose, like changelog headings (VER-003).
+
+[catalog]
+config_version = 1
+
+[[options]]
+key = "profile.name"
+type = "enum"
+choices = ["lite", "compact", "hybrid-small", "standard", "enterprise"]
+default = "compact"
+since = "0.1.0"
+reload = "restart"
+description = "Deployment profile, which selects storage backends and sizing guidance. The MVP supports compact: SQLite metadata and telemetry for about 100 devices."
+
+[[options]]
+key = "node.role"
+type = "enum"
+choices = ["primary", "peer"]
+default = "primary"
+since = "0.1.0"
+reload = "restart"
+description = "Role of this node. A primary owns inventory and policy metadata; a peer pulls metadata from node.primary_url and keeps collecting while isolated (MPOS-003)."
+
+[[options]]
+key = "node.position"
+type = "str"
+default = ""
+since = "0.1.0"
+reload = "restart"
+description = "Label for this node's network vantage point, shown in the UI, for example east. vakr setup sets it on first install."
+
+[[options]]
+key = "node.primary_url"
+type = "str"
+format = "url"
+required_when = ["node.role", "peer"]
+default = ""
+since = "0.1.0"
+reload = "restart"
+description = "HTTPS URL of the primary node, for example https://vakr-east.example.net. Required when node.role is peer; ignored on a primary."
+
+[[options]]
+key = "time.timezone"
+type = "str"
+format = "timezone"
+default = ""
+since = "0.1.0"
+reload = "restart"
+description = "IANA timezone for displayed times and day boundaries, for example America/New_York. Empty means the host timezone."
+
+[[options]]
+key = "update.repository"
+type = "str"
+pattern = '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+default = "robert-patrick-texas/vakr"
+since = "0.1.0"
+reload = "live"
+description = "GitHub repository (owner/name) that vakr self-update checks for releases (UPD-001)."
+
+[[options]]
+key = "update.channel"
+type = "enum"
+choices = ["stable", "prerelease"]
+default = "prerelease"
+since = "0.1.0"
+reload = "live"
+description = "Release channel for self-update. MVP iterations are pre-releases, so prerelease is the default until MVP acceptance."
+
+[[options]]
+key = "update.hold_version"
+type = "str"
+pattern = '^(\d+\.\d+\.\d+(-rc\.\d+)?)?$'
+default = ""
+since = "0.1.0"
+reload = "live"
+description = "Pin the deployment to this release; timer-driven updates will not go past it (UPD-008). Empty means no hold."
+
+[[options]]
+key = "network.https_proxy"
+type = "str"
+format = "url"
+default = ""
+since = "0.1.0"
+reload = "restart"
+description = "Proxy for all outbound HTTPS, such as release checks and peer replication (EGRESS-001). Empty falls back to the HTTPS_PROXY environment variable. Never put credentials here; proxy credentials come from the credential provider."
+
+[[options]]
+key = "network.no_proxy"
+type = "list[str]"
+default = []
+since = "0.1.0"
+reload = "restart"
+description = "Hosts and domains that bypass network.https_proxy. Empty falls back to the NO_PROXY environment variable."
+
+[[options]]
+key = "telemetry.native_retention_days"
+type = "int"
+min = 1
+default = 30
+since = "0.1.0"
+reload = "live"
+description = "Days to keep full-resolution observations; older data survives only as rollups."
+
+[[options]]
+key = "telemetry.rollup_retention_days"
+type = "int"
+min = 1
+default = 400
+since = "0.1.0"
+reload = "live"
+description = "Days to keep rollups, which back long-range graphs."
+
+[[options]]
+key = "telemetry.rollup_interval"
+type = "duration"
+min = 60
+default = "15m"
+since = "0.1.0"
+reload = "restart"
+description = "Bucket width of historical rollups."
+
+[[options]]
+key = "interface_classification.use_default_keywords"
+type = "bool"
+default = true
+since = "0.1.0"
+reload = "live"
+description = "Include the packaged description keywords (ISP, WAN, UPLINK). Set to false to make the operator's keywords replace them instead of extending them (Appendix E.15)."
+
+[[options]]
+key = "interface_classification.keywords"
+type = "list[table]"
+merge = "append"
+defaults_switch = "interface_classification.use_default_keywords"
+default = [
+    { keyword = "ISP", tag = "isp", interest = "primary", wan_circuit = true },
+    { keyword = "WAN", tag = "wan", interest = "primary", wan_circuit = true },
+    { keyword = "UPLINK", tag = "uplink", interest = "primary", wan_circuit = false },
+]
+since = "0.1.0"
+reload = "live"
+description = "Interface description (ifAlias) keywords that classify interfaces (META-012). Matching is case-insensitive on whole tokens. Entries from every operator file extend the packaged list."
+
+[options.fields.keyword]
+type = "str"
+format = "pattern"
+required = true
+description = "Whole-token keyword, matched case-insensitively; prefix re: for a bounded regular expression (POLICY-005)."
+
+[options.fields.tag]
+type = "str"
+required = true
+description = "Tag applied to interfaces whose description contains the keyword."
+
+[options.fields.interest]
+type = "enum"
+choices = ["primary", "secondary"]
+description = "Interest class to assign (META-011). Omit it to leave interest to annotations and policy rules."
+
+[options.fields.wan_circuit]
+type = "bool"
+default = false
+description = "Mark matching interfaces as WAN circuits."
+
+[options.fields.sticky]
+type = "bool"
+default = false
+description = "Pin matching interfaces to the top of the device's interface list."

@@ -3873,3 +3873,36 @@ Decisions taken with the ADR-021 benchmark:
 - **Rollup counts use `COUNT(CASE …)`**, never `SUM(condition)`, so a bucket whose polls all failed records 0 available samples, not `NULL`.
 - **Dictionary keys are node-local.** Replication and the API carry UUIDs. Vocabulary codes are pinned in a `vocab_code` table and are append-only, like `Quality` bits.
 - **HC counters at or above 2^63** are stored as signed 64-bit integers (`v - 2**64`) and mapped back on read.
+
+### E.25 Scheduler (SCHED-001 to SCHED-018, 9.2, 9.9, 16.4)
+
+| Setting | Default | Allowed range |
+|---|---|---|
+| `polling.default_interval` | 60 s | 30 s – 1 h (the E.18 `polling_interval` limits) |
+| `polling.reachability_strategy` | `icmp_gated` | `icmp_gated`, `snmp_fallback`, `icmp_only`, `snmp_only` |
+| `scheduler.collector_name` | short hostname, lower-cased, DNS suffix removed | 1–63 of `A-Z a-z 0-9 . _ -`, starting with a letter or digit |
+| `scheduler.phase` / `scheduler.fixed_phase` | `hostname` / 0 s | `hostname` or `fixed` / 0 s – 1 h, taken modulo each interval |
+| `scheduler.device_order` | `common` | `common` or `hashed` |
+| `scheduler.workers` (concurrent polls) | 32 | 1 – 1,000 |
+| `scheduler.queue_capacity` (finished records awaiting the spool) | 1,000 | 16 – 100,000 |
+| `scheduler.late_after` | 5 s | 1 s – 5 min, and not above `max_start_delay` |
+| `scheduler.max_start_delay` | 30 s | 1 s – 10 min |
+| `scheduler.poll_deadline` | 90 s | 5 s – 1 h |
+| `scheduler.shutdown_grace` | 15 s | 0 s – 5 min |
+| Wall-clock step threshold (relabel `scheduled_at`) | 1 s | constant |
+| Event-loop lag probe interval / `DEGRADED` above | 1 s / 1 s | constants |
+| Latency percentile window (lateness, duration, completion) | last 4,096 started polls, nearest rank | constant |
+
+Rationale: 32 workers is about six times the ~5 concurrent polls the MVP workload needs on average (100 devices × ~3 s / 60 s). A 30 s start limit is half the default interval. A 90 s deadline means a hung poll costs at most one missed slot at 60 s. A 15 s grace covers the healthy p95 poll and leaves most of systemd's default 90 s stop timeout for flushing the spool.
+
+Decisions taken with the M3 scheduler:
+
+1. **Offsets.** `offset_us = (phase_us + hash64(order_input) mod I) mod I` with `I` the interval in microseconds; `phase_us` is `hash64(collector_name) mod I` (`hostname`) or `fixed_phase mod I` (`fixed`). E.11 names only the hashed-order input, so `common` order hashes the device UUID alone: every collector then visits devices in the same relative order. Slot `k` of a device is `k × I + offset_us` microseconds after the Unix epoch, so a device polls at the same offset past every interval boundary, and adding or removing other devices never moves it. Golden vectors for a Go collector are in `tests/unit/scheduler/golden_phase_vectors.json`.
+2. **Configuration names.** Section 11.3's enterprise example uses `[poller]` (`name`, `schedule_strategy`, `global_concurrency`); section 27.9 uses `[polling] default_interval` and `reachability_strategy`. The scheduler keeps `[polling]` for the per-device defaults, as 27.9 and the policy engine expect, and uses `[scheduler]` for its own controls. `schedule_strategy` becomes two keys, `phase` and `device_order`, because SCHED-002 makes them independent. Section 11.3 should be updated to match.
+3. **Plan timeline.** Waits, deadlines, lateness, and durations use the monotonic clock. The timeline's UTC origin is fixed when the scheduler starts. When the wall clock drifts from it by more than 1 s (an NTP step or `date -s`), later `scheduled_at` labels move with the wall clock once, while cadence is untouched: no burst, gap, or duplicate poll (SCHED-018). `completed_at` is `started_at` plus the monotonic duration, so it can never precede `started_at`.
+4. **Execution states.** `COMPLETE`: every step the strategy and gate called for answered fully; ICMP with 0 replies is a complete measurement. `PARTIAL`: some step produced evidence and a later one did not finish cleanly. `FAILED`: no step produced evidence. Misses: the previous poll still running is `MISSED_OVERRUN`; no worker within `max_start_delay`, a slot superseded by the device's next one while waiting, or a slot the scheduler itself reached too late is `NOT_ATTEMPTED`; shutdown before the start is `NOT_ATTEMPTED`. Every miss carries `NOT_ATTEMPTED` and no observations. Capacity misses, collector-side step errors, and polls cancelled by shutdown add `COLLECTOR_DEGRADED`. A device that is disabled or removed while a slot waits loses that slot without a record, because it is no longer scheduled (9.2).
+5. **`snmp_fallback`.** After 0–1 replies, or a collector-side ICMP failure, one Stage 1 request is made without retries and Stage 2 does not follow (`SnmpPlan.STAGE1_FALLBACK`, ICMP-013). Under `icmp_gated` a collector-side ICMP failure skips SNMP and the poll reads as unknown.
+6. **Backpressure.** A worker stays busy until the output queue accepts its record, so a full queue slows admission and turns later slots into recorded capacity misses instead of growing memory (6.4). Records are never dropped.
+7. **Collector state from the scheduler.** `OVERLOADED` when the period had capacity misses or producers are blocked on a full queue; `DEGRADED` when event-loop lag exceeded 1 s, a step failed on the collector side, or the scheduler is draining; otherwise `HEALTHY`.
+8. **Shutdown (16.4).** Stop admitting; give in-flight polls the grace period; cancel the rest and record them with the evidence their finished steps produced; then record waiting slots and slots that came due during the drain as `NOT_ATTEMPTED`.
+9. **Deferred.** Worker affinity and rebalancing (SCHED-014) wait for multiple worker processes; estimated-cost ordering (SCHED-015) and adaptive interval changes (ADAPT-002 to ADAPT-007) are post-MVP (27.4). Poll-health diagnostics are on.

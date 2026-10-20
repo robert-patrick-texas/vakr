@@ -211,3 +211,122 @@ description = "Mark matching interfaces as WAN circuits."
 type = "bool"
 default = false
 description = "Pin matching interfaces to the top of the device's interface list."
+
+# Scheduler and polling defaults (milestone M3, blueprint 8.11 and Appendix E.25).
+# A device's own interval and strategy take precedence over the [polling] defaults.
+
+[[options]]
+key = "polling.default_interval"
+type = "duration"
+min = 30
+max = 3600
+default = "60s"
+since = "0.1.1"
+reload = "live"
+description = "Poll interval for devices without their own interval (SCHED-010). Each poll is anchored to its intended slot, not to when the previous poll finished. The range matches the policy limits of Appendix E.18."
+
+[[options]]
+key = "polling.reachability_strategy"
+type = "enum"
+choices = ["icmp_gated", "snmp_fallback", "icmp_only", "snmp_only"]
+default = "icmp_gated"
+since = "0.1.1"
+reload = "live"
+description = "How ICMP gates SNMP for devices without their own strategy (ICMP-006 to ICMP-014). icmp_gated skips SNMP after 0 or 1 of 5 replies; snmp_fallback then makes one low-cost Stage 1 attempt; icmp_only never uses SNMP; snmp_only never pings."
+
+[[options]]
+key = "scheduler.collector_name"
+type = "str"
+pattern = '^([A-Za-z0-9][A-Za-z0-9._-]{0,62})?$'
+default = ""
+since = "0.1.1"
+reload = "restart"
+description = "Name of this collector; the hostname phase is hashed from it (SCHED-001, Appendix E.11). Empty means the host's short name, lower-cased, without its DNS suffix. Changing it moves every device's poll time."
+
+[[options]]
+key = "scheduler.phase"
+type = "enum"
+choices = ["hostname", "fixed"]
+default = "hostname"
+since = "0.1.1"
+reload = "restart"
+description = "Where this collector's polling cycle starts within each interval (SCHED-002 to SCHED-004). hostname derives it from scheduler.collector_name, so two collectors watching the same devices do not probe them at the same instant; fixed uses scheduler.fixed_phase."
+
+[[options]]
+key = "scheduler.fixed_phase"
+type = "duration"
+min = 0
+max = 3600
+default = "0s"
+since = "0.1.1"
+reload = "restart"
+description = "Cycle start offset when scheduler.phase is fixed (SCHED-004), taken modulo each device's interval."
+
+[[options]]
+key = "scheduler.device_order"
+type = "enum"
+choices = ["common", "hashed"]
+default = "common"
+since = "0.1.1"
+reload = "restart"
+description = "How devices are placed after the phase (SCHED-005, SCHED-006). common hashes the device UUID, so every collector visits devices in the same relative order; hashed also hashes the collector name, giving each collector its own order. Hashing spreads polls across the interval; it does not guarantee that two devices never start together (SCHED-007)."
+
+[[options]]
+key = "scheduler.workers"
+type = "int"
+min = 1
+max = 1000
+default = 32
+since = "0.1.1"
+reload = "restart"
+description = "Polls that may run at once (SCHED-016). The MVP workload needs about 5 on average. When every worker is busy, a due poll waits up to scheduler.max_start_delay and is then recorded as not attempted, which shows as unknown, never as a device outage (SCHED-017)."
+
+[[options]]
+key = "scheduler.queue_capacity"
+type = "int"
+min = 16
+max = 100000
+default = 1000
+since = "0.1.1"
+reload = "restart"
+description = "Finished poll records held between the scheduler and the spool (section 6.4), about 10 minutes of polls at the MVP workload. When it is full, polling slows and the collector reports itself overloaded; records are never dropped."
+
+[[options]]
+key = "scheduler.late_after"
+type = "duration"
+min = 1
+max = 300
+default = "5s"
+since = "0.1.1"
+reload = "restart"
+description = "A poll that starts more than this after its slot counts as late in health metrics (section 4.2 asks for 99% within about 5s). Must not exceed scheduler.max_start_delay."
+
+[[options]]
+key = "scheduler.max_start_delay"
+type = "duration"
+min = 1
+max = 600
+default = "30s"
+since = "0.1.1"
+reload = "restart"
+description = "A due poll that cannot start within this time, because every worker is busy or the collector stalled, is recorded as not attempted instead of running late (SCHED-017). A device still being polled at its next slot gets that slot recorded as missed (overrun) at once (SCHED-012)."
+
+[[options]]
+key = "scheduler.poll_deadline"
+type = "duration"
+min = 5
+max = 3600
+default = "90s"
+since = "0.1.1"
+reload = "restart"
+description = "A poll still running after this long is stopped. Steps that already finished keep their results, and the poll is recorded as partial or failed. At the 60s default interval a hung poll costs at most one missed slot."
+
+[[options]]
+key = "scheduler.shutdown_grace"
+type = "duration"
+min = 0
+max = 300
+default = "15s"
+since = "0.1.1"
+reload = "restart"
+description = "On shutdown, how long running polls get to finish before they are cancelled; every cancelled poll is still recorded, with the results of its finished steps (section 16.4). Keep it well below the service's systemd stop timeout."

@@ -3758,3 +3758,34 @@ Operators add keywords in `[[interface_classification.keywords]]`. Setting `inte
 | Maximum bundle size / maximum member size | 256 MiB / 32 MiB |
 | Journal lines collected by the `vakr` profile | 5000 |
 | Egress test timeout | 15 s |
+
+### E.17 Interpretations adopted with the M2 measurement logic
+
+Building `vakr.logic` exposed edge cases the text above doesn't settle. The decisions below were accepted by the architect on 2026-10-20 and are explained in operator language in `docs/architecture/quality-states.md`. Each has a test.
+
+| # | Rule | Decision |
+|---|---|---|
+| 1 | E.7 rounding | ICMP summaries are computed with exact arithmetic and rounded once, half to even. This is deterministic even for near-ties where float64 differs. |
+| 2 | E.1, one reply | A single reply is always `IMPAIRED`, whatever the loss threshold, because SNMP is skipped and a green device without SNMP data would mislead. |
+| 3 | E.5 wrap edges | Continuity is judged on the 2^32 circle. An uptime no longer than the gap is a restart even if the expected value has wrapped. A wall clock that steps backwards gives `UNKNOWN` with `CLOCK_UNSYNCED`. |
+| 4 | E.2 rows 4–5 | A `PARTIAL` SNMP reply counts as answered (SNMP-013), so it is never Down. |
+| 5 | E.2 row 3 | Also covers "no reachability result at all": a device is never green without evidence (UI-015). |
+| 6 | E.2 strategy skips | For `icmp_only` and `snmp_only`, the other protocol's *conditions* are dropped rather than whole rows, so an unreachable `icmp_only` device is still Down. Under `snmp_only`: TIMEOUT is Down, ERROR is "SNMP failing", SKIPPED or UNKNOWN is Unknown. |
+| 7 | Composite (MPOS-007) | A position whose own status is Unknown is ignored for "most severe" whenever another position has evidence, so a collector outage cannot turn every device amber. If admin states disagree, row 1 wins. |
+| 8 | E.4 wrap window | The 32-bit wrap check uses the *line rate* (the largest of the override, `ifHighSpeed`, and `ifSpeed`), not a smaller contracted rate. Accepting a wrap requires a known line rate. For packet and error counters the bound is one octet per packet. RATE-009 flagging still uses the effective capacity. |
+| 9 | RATE-008 normalisation | A saturated `ifSpeed` (4,294,967,295) or a speed of 0 is never a denominator. Below 20 Mb/s an unsaturated `ifSpeed` is preferred over the whole-Mb/s `ifHighSpeed`, so T1/E1 utilization is exact. |
+| 10 | RATE-003 | A discontinuity-time value that appears or disappears counts as a change. `UNKNOWN` uptime continuity, including a missing `sysUpTime`, invalidates the baseline. Non-positive elapsed time sets `BASELINE_ELAPSED_INVALID` (quality bit 23). |
+| 11 | Missing counters | A missing counter blanks only its own metric. The sample-level `BASELINE_*` flags are set only when every metric is unavailable. |
+| 12 | E.6 lifecycle | An oper status of `unknown`, or a missing one, changes nothing. `testing` counts as not up/up. Rediscovery without status reactivates only interfaces that had gone missing. A restored interface starts `INACTIVE`. Evidence older than the current state is ignored. `STALE` keeps the reason it became inactive. |
+| 13 | Rankings | In and out p95 are computed separately; on a tie the inbound direction is reported. Errors per million packets is shown only when every counted sample has packet deltas. Interfaces with zero errors still rank, at the bottom. p95 is nearest-rank (`vakr.logic.stats.p95`), and rollups (RET-004) must use the same function. |
+| 14 | E.3 freshness | A negative age (a future timestamp) is not stale and gets no flag. A clock-skew threshold would be a new default and is deferred. |
+
+These configuration keys arrive with M3, when the collector uses them. Until then the defaults above apply in code:
+
+- `icmp.impaired_loss_percent` and `icmp.impaired_rtt_ms`;
+- `status.recent_restart_window`;
+- `lifecycle.stale_after`;
+- the freshness multiplier and minimum margin;
+- the rate maximum-gap multiplier and plausibility factor.
+
+M3 validation must also require at least 2 ICMP probes under `icmp_gated`; otherwise SNMP would never run.

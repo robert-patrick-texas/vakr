@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 IF_SPEED_MAX = 2**32 - 1  # Gauge32 ceiling; ifSpeed reads this on faster links
+PRECISE_BELOW_MBPS = 20  # below this, ifSpeed (bit/s) is more precise than ifHighSpeed
 BPS_PER_MBPS = 1_000_000
 
 
@@ -153,6 +154,11 @@ def effective_capacity(inputs: CapacityInputs) -> Capacity | None:
     contracted = _known(inputs.contracted_bps) if inputs.contracted_is_denominator else None
     high_speed = _known(inputs.if_high_speed_mbps)
     if_speed = _known(inputs.if_speed_bps)
+    # ifHighSpeed counts whole Mb/s, so a 1.544 Mb/s T1 reads 1 or 2. Below
+    # PRECISE_BELOW_MBPS an unsaturated ifSpeed is the exact rate and wins:
+    # this is the "normalised" ifHighSpeed of RATE-008 (Appendix E.17).
+    if high_speed and high_speed < PRECISE_BELOW_MBPS and if_speed and if_speed != IF_SPEED_MAX:
+        high_speed = None
     candidates = (
         (_known(inputs.override_bps), CapacitySource.OVERRIDE),
         (contracted, CapacitySource.CONTRACTED),

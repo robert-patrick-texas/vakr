@@ -67,6 +67,29 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | SNMP-002 | Implemented | `src/vakr/credentials/{model,vocabulary,entry}.py` | `test_model.py`, `test_provider.py` | `docs/operations/credentials.md` | v3 passphrases need at least 8 characters (RFC 3414). |
 | SNMP-003 | In progress | `src/vakr/credentials/model.py` (`is_recommended`) | `test_model.py`, `test_credentials_cli.py` | `docs/operations/credentials.md` | Security posture is reported, not enforced. SNMPv3 polling comes after MVP. |
 
+## Measurement logic
+
+Code lives in `src/vakr/logic/` and tests in `tests/unit/logic/`. Rules and the interpretations behind them are in `docs/architecture/quality-states.md` and blueprint Appendix E.17. `vakr.logic` has 100% statement and branch coverage.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| ICMP-003/004/008 | In progress | `icmp.py` (`ProbeGroup`, `ProbeGroup.from_raw`, `summarise_probes`), `stats.py` | `test_logic_icmp.py` (ICMP-T01..T04) | `quality-states.md` | Storage of these results is still to come. |
+| ICMP-005/006/007/010 | Implemented | `icmp.py` (`snmp_plan`), `stats.py` (`pstdev_half_even`) | ICMP-T01..T04, `test_snmp_plan_per_strategy`, `test_pstdev_matches_decimal_reference` | `quality-states.md` | The collector must call `snmp_plan`. |
+| ICMP-013/014 | In progress | `icmp.py`, `status_table.py` | `test_snmp_plan_per_strategy`, `test_strategy_skips` | `quality-states.md` | E.17 #6. ICMP-T05 integration is pending. |
+| UPTIME-002/004/005 | Implemented | `uptime.py` | `test_logic_uptime.py` (UP-T01..T03, property tests) | `quality-states.md` | E.17 #3 |
+| UPTIME-003 | In progress | `uptime.py` (evidence text) | `test_reset_evidence_names_the_agent_not_the_chassis` | `quality-states.md` | UI wording is pending. |
+| RATE-001/003/004/005/006/007/009 | Implemented | `baseline.py`, `rates.py`, `ranking_errors.py` | `test_logic_rates.py` (RATE-T01..T07, T09), `test_logic_rates_property.py` | `quality-states.md` | E.17 #8, #10, #11 |
+| RATE-002 | In progress | `rates.py` (`RateResult`) | RATE-T01 | `quality-states.md` | Storage is pending. |
+| RATE-008/010 | In progress | `capacity.py` | `test_logic_capacity.py` (RATE-T08) | `quality-states.md` | E.17 #9 (precise `ifSpeed` below 20 Mb/s). The UI label is pending. |
+| TIME-005/006 | In progress | `freshness.py` | `test_logic_freshness.py` | `quality-states.md` | Config keys arrive in M3. |
+| LIFE-001/003/004/006 | In progress | `lifecycle_model.py`, `lifecycle.py` | `test_logic_lifecycle.py` (LIFE-T01) | `quality-states.md` | E.17 #12. The scheduler and persistence still need to use it. |
+| MPOS-007 | In progress | `status.py` (`composite_status`) | `test_logic_status.py::test_composite` | `quality-states.md` | E.17 #7. The UI is pending. |
+| OBS-003 | In progress | `icmp.py`, `status_table.py` (row 3) | `test_collector_context`, `test_e2_rows` | `quality-states.md` | |
+| UI-005 | In progress | `status.py` (`device_sort_key`) | `test_device_list_order` | `quality-states.md` | WEB-T01 covers the logic only. |
+| DASH-003/004/005 | In progress | `ranking.py`, `ranking_errors.py`, `stats.py` | `test_logic_ranking.py` (DASH-T01..T03) | `quality-states.md` | E.17 #13. The query and UI are pending. |
+| RET-004 | In progress | `stats.py` (`p95`) | `test_logic_stats.py::test_nearest_rank` | `quality-states.md` | Rollups must import `p95` from here. |
+| QG-006 | In progress | `vakr.logic` | `--cov-branch` 100% | | Not yet enforced as a CI gate. |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

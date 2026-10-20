@@ -34,3 +34,6 @@ credentials.toml
 
 # Claude Code agent worktrees and local session state
 .claude/
+
+# Hypothesis example database (property tests run derandomized)
+.hypothesis/

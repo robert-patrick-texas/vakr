@@ -220,3 +220,28 @@ def test_negative_capacity_is_rejected() -> None:
     """
     with pytest.raises(ValueError, match="negative"):
         CapacityInputs(if_speed_bps=-1)
+
+
+def test_slow_links_prefer_exact_if_speed_over_rounded_if_high_speed() -> None:
+    """A T1 reports ifHighSpeed 2 (rounded) but ifSpeed 1544000 (exact); use the exact one.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    from vakr.logic.capacity import CapacityInputs, CapacitySource, effective_capacity
+
+    t1 = effective_capacity(CapacityInputs(if_high_speed_mbps=2, if_speed_bps=1_544_000))
+    assert t1 is not None
+    assert (t1.bps, t1.source) == (1_544_000, CapacitySource.IF_SPEED)
+    fast = effective_capacity(CapacityInputs(if_high_speed_mbps=1000, if_speed_bps=1_000_000_000))
+    assert fast is not None
+    assert fast.source is CapacitySource.IF_HIGH_SPEED
+    no_if_speed = effective_capacity(CapacityInputs(if_high_speed_mbps=2, if_speed_bps=None))
+    assert no_if_speed is not None
+    assert (no_if_speed.bps, no_if_speed.source) == (2_000_000, CapacitySource.IF_HIGH_SPEED)

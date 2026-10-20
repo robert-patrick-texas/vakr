@@ -47,11 +47,13 @@ Before it discovers or polls anything, the collector checks that it can run safe
 | `credentials` | `/etc/vakr/secrets/credentials.toml` has unsafe permissions or is invalid. | Run `vakr credentials check`. See [credentials](credentials.md). |
 | `identity` | This node's collector identity conflicts with the metadata database (see below). | Follow the message. |
 | `spool` | Another collector process holds this collector's spool, or the spool settings are invalid. | Stop the other process. Two collectors on one host each need their own `scheduler.collector_name`. |
+| `icmp` | This host does not let the collector send ICMP Echo: `net.ipv4.ping_group_range` excludes the `vakr` group, and no `CAP_NET_RAW` drop-in is installed. It runs first, before any database is opened. | Apply the fix that `vakr doctor` prints, then `sudo systemctl restart vakr-collector`. See [ICMP](icmp.md). |
 
-Two conditions only produce a warning, because collection still works:
+If the host stops allowing ping while the collector runs, the collector logs `collector.icmp_refused` and stops with status 78 too.
+
+One condition only produces a warning, because collection still works:
 
 - **No credentials file yet.** ICMP runs, and every SNMP poll is recorded as a collector-side credential problem, never as the device being down.
-- **`ping_group_range` excludes the collector.** No ICMP probe can be sent. SNMP still runs for `icmp_gated` devices, and ICMP results show as unknown, never as loss. Apply the fix that `vakr doctor` prints. See [ICMP](icmp.md).
 
 ## What the collector does while it runs
 
@@ -101,6 +103,7 @@ $ journalctl -u vakr-collector | grep 'collector.preflight_failed'
 | `collector.started` | The startup checks passed and polling began. |
 | `collector.preflight_failed` | A startup check failed. The line names the check and the fix. |
 | `collector.preflight_warning` | A startup condition that does not stop collection, such as no credentials file. |
+| `collector.icmp_refused` | The host refused ICMP Echo while the collector ran; it stopped with status 78 until the sysctl is fixed. |
 | `collector.replanned` | Inventory changed: how many devices are planned, added, removed, and kept. |
 | `collector.reloaded`, `collector.reload_refused` | `systemctl reload` applied the new configuration, or refused an invalid one. |
 | `collector.inventory_unavailable` | The metadata database could not be read. Polling continues with the last plan. |

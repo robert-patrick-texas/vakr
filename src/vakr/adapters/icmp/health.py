@@ -7,10 +7,11 @@ account) it is this process's groups, and the check also opens an ICMP
 socket to prove it. When the range excludes the group, the summary carries
 the exact fix: a sysctl.d drop-in line and ``sysctl --system``.
 
-The result is WARNING, not CRITICAL. A wrong sysctl is a host setting that
-a rollback cannot fix, and ``check health`` gates self-update (UPD-006): a
-CRITICAL here would roll back every update on a host that has not applied
-the fix yet. Devices still show UNKNOWN, never down, while it is wrong.
+A host that cannot ping is misconfigured, and the collector refuses to
+start on it (owner decision 2026-10-20, ICMP-012), so the result is
+CRITICAL. It is a host setting, not a fault of the release: when self-update
+runs ``check health`` it counts this check as a warning, because rolling an
+update back cannot fix a sysctl (``HOST_CHECKS``, UPD-006).
 
 Dependencies:
     os, pwd, socket: Identity lookup and the socket test.
@@ -127,6 +128,25 @@ def socket_problem() -> str | None:
     return None
 
 
+def raw_socket_problem() -> str | None:
+    """Try to open a raw ICMP socket, which needs ``CAP_NET_RAW`` (the fallback drop-in).
+
+    Args:
+        None
+
+    Returns:
+        str | None: The error, or ``None`` when the socket opened.
+
+    Raises:
+        None
+    """
+    try:
+        socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP).close()
+    except OSError as exc:
+        return exc.strerror or type(exc).__name__
+    return None
+
+
 def evaluate(
     current: sysctl.GroupRange, who: Identity, root: Path, probe: Callable[[], str | None]
 ) -> CheckResult:
@@ -140,7 +160,7 @@ def evaluate(
 
     Returns:
         CheckResult: OK when allowed (or the raw-socket fallback is
-        installed); WARNING with the exact fix otherwise.
+        installed); CRITICAL with the exact fix otherwise.
 
     Raises:
         None
@@ -153,14 +173,14 @@ def evaluate(
             summary = f"unprivileged ICMP allowed for {who.label} (GID {allowed[0]} in {shown})"
             return CheckResult("icmp", Status.OK, summary)
         summary = f"{shown} admits GID {allowed[0]}, but an ICMP socket failed: {problem}"
-        return CheckResult("icmp", Status.WARNING, summary)
+        return CheckResult("icmp", Status.CRITICAL, summary)
     excluded = f"{who.label} (GID {who.gids[0]}) is outside {shown}"
     if (dropin := fallback_dropin(root)) is not None:
         summary = f"{excluded}; using the CAP_NET_RAW fallback from {dropin}"
         return CheckResult("icmp", Status.OK, summary)
     fix = sysctl.plan_fix(current, who.gids[0], root)
     summary = f"unprivileged ICMP refused: {excluded}; fix: {fix.text()}"
-    return CheckResult("icmp", Status.WARNING, summary)
+    return CheckResult("icmp", Status.CRITICAL, summary)
 
 
 def check_icmp(root: Path = Path("/")) -> CheckResult:
@@ -171,7 +191,7 @@ def check_icmp(root: Path = Path("/")) -> CheckResult:
             relocated by ``VAKR_ROOT``).
 
     Returns:
-        CheckResult: OK, WARNING with the fix, or UNKNOWN when the sysctl
+        CheckResult: OK, CRITICAL with the fix, or UNKNOWN when the sysctl
         cannot be read.
 
     Raises:

@@ -39,7 +39,9 @@ def health_hook(new_vakr: str, settle_seconds: int) -> Hook:
 
     Returns:
         Hook: Runs ``check health``. WARNING and UNKNOWN count as success,
-        because only CRITICAL means the new release is broken.
+        because only CRITICAL means the new release is broken; the retry
+        variable also tells ``check health`` to count host-setting checks
+        (ICMP permission) as warnings, which a rollback could not fix.
 
     Raises:
         None

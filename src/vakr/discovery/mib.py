@@ -18,6 +18,7 @@ Example:
     (1, 3, 6, 1, 2, 1, 2, 2, 1, 8, 3)
 """
 
+from vakr.logic.capacity import PORT_TYPES
 from vakr.ports.snmp import Oid
 
 SYSTEM = (1, 3, 6, 1, 2, 1, 1)
@@ -116,7 +117,7 @@ DISCOVERY_IFX_COLUMNS = (
 )
 """ifXTable columns discovery walks; the last three probe capabilities (SNMP-010)."""
 
-PHYSICAL_TYPES = frozenset({6, 7, 18, 19, 22, 30, 39, 62, 69, 71, 117})
+PHYSICAL_TYPES = PORT_TYPES
 """IANAifType values that are ports: Ethernet, DS1/E1/DS3, serial, SONET, Wi-Fi."""
 LOGICAL_TYPES = frozenset({24, 53, 131, 135, 136, 150, 161, 166})
 """IANAifType values that are not: loopback, SVI, tunnel, VLAN subinterface, LAG, MPLS."""

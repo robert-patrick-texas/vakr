@@ -103,6 +103,9 @@ testpaths = ["tests", "tools", "packaging/tests"]
 # Portable tools import their sibling modules the way their scripts do at runtime.
 pythonpath = ["tools/md2html", "tools/check-loc", "tools/check-version", "tools/check-docstrings", "tools/check-updates", "tools/fieldkit", "tools/release", "tools/snmpsim"]
 addopts = ["-ra", "--strict-markers", "--import-mode=importlib"]
+markers = [
+    "real_icmp_preflight: keep the collector's ICMP startup check even on a host that cannot ping",
+]
 
 [tool.coverage.run]
 source = ["vakr"]

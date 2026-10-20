@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (amendment 1). Amended by the M2 adapter: key, rollup rows and precision, retention, details (amendments 2-5; amendment 3 needs an owner decision) |
+| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (amendment 1). Amended by the M2 adapter: key, rollup rows and precision, retention, details (amendments 2-5; the owner approved amendment 3's float32 rollups on 2026-10-20) |
 | Date | 2026-10-20 |
 | Decides | Physical layout of Compact-profile telemetry in SQLite: tables, keys, partitions, PRAGMAs, batching, idempotency, rollups, retention |
 | Requirements | Blueprint 5.1, 5.3, 10.1-10.6, 27.2-27.5, Appendix E.8 and E.10; STORE-009, STORE-010, STORE-011, RET-001..RET-009, DASH-003, DASH-004, STATE-001..STATE-004, MVP-ACC-05 |
@@ -292,7 +292,9 @@ The telemetry contract that every backend passes (`tests/contract/contract_telem
 * The UUID was already stored in every row. In a `WITHOUT ROWID` table it moves into the key, so leaf records do not grow; only interior cells do. The adapter measured 156.6 bytes per interface row, against 154.5 in the benchmark.
 * **Limitation, flagged for the owner.** The port also says a *different* observation reusing an existing UUID is a duplicate. Inside one batch the adapter enforces that. Across batches it would need the UUID index this ADR rejected (+39 B/row), so a reused UUID at another instant or series is stored. Only a collector bug can produce one; the envelope checksum and the spool make replays byte-identical.
 
-## Amendment 3: packed rollup rows at float32 precision (2026-10-20, M2 adapter); flagged for the owner
+## Amendment 3: packed rollup rows at float32 precision (2026-10-20, M2 adapter); approved by the owner 2026-10-20
+
+The owner accepted single-precision interface rollup values, keeping the per-node worst case at 40.1 GB (lossless rollups would need about 52 GB).
 
 The rollup sketch above kept six aggregates per interface bucket. The `RollupRepository` port stores a `RollupBucket` per **metric**: expected, sample, and valid counts, minimum, mean, nearest-rank p95, maximum, and quality. MVP-ACC-02 requires traffic, packet, *and* error graphs at 400 days, so all six interface metrics (in/out bit, packet, and error rates) and all three ICMP metrics are kept through day 400. RET-005 would allow dropping packets and errors after native retention; that is not used, because it would break MVP-ACC-02.
 

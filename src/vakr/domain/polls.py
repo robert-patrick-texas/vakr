@@ -30,7 +30,9 @@ from vakr.domain.quality import Quality
 from vakr.domain.timestamps import require_optional_utc, require_utc
 
 _NOT_STARTED = {PollExecution.SCHEDULED, PollExecution.NOT_ATTEMPTED, PollExecution.MISSED_OVERRUN}
-_FINISHED = {PollExecution.COMPLETE, PollExecution.PARTIAL, PollExecution.FAILED}
+_FINISHED = {
+    PollExecution.COMPLETE, PollExecution.PARTIAL, PollExecution.FAILED, PollExecution.CANCELLED
+}  # fmt: skip
 
 
 @dataclass(frozen=True, slots=True)

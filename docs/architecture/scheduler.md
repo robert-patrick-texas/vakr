@@ -85,7 +85,8 @@ A poll that runs longer than `scheduler.poll_deadline` (90 s) is stopped. Steps 
 | `complete` | | Every step the strategy called for answered fully. A device with 0 of 5 ping replies under `icmp_gated` is a complete poll of an unreachable device. | Read the ICMP and SNMP results. |
 | `partial` | | Some evidence arrived, then a later step did not finish cleanly: an SNMP timeout after good pings, a partial counter walk, or the poll deadline. | The device answered something; check the SNMP results and the device's agent. |
 | `failed` | | No step produced evidence, for example an `snmp_only` device whose agent did not answer. | Check the device, its address, and its SNMP credential. |
-| `partial` or `failed` | `COLLECTOR_DEGRADED` | A step failed inside vakr (a socket error, a bug), or shutdown cut the poll short. | Look at collector health, not at the device. |
+| `partial` or `failed` | `COLLECTOR_DEGRADED` | A step failed inside vakr (a socket error, a bug). | Look at collector health, not at the device. |
+| `cancelled` | | Shutdown (a restart or an upgrade) cut the poll short. The steps that finished keep their evidence; the device reads as unknown until the next poll. | Nothing; expected during restarts and upgrades. |
 | `missed_overrun` | `NOT_ATTEMPTED` | The previous poll of this device was still running at this slot, so vakr did not start a second session (SCHED-012). | Repeated overruns mean the device is slow to answer; check its agent. |
 | `not_attempted` | `NOT_ATTEMPTED`, `COLLECTOR_DEGRADED` | The collector had no capacity: no worker within `max_start_delay`, the slot was superseded by the next one, or the scheduler itself was stalled. | Collector overload: look at collector health, workers, and the spool. Never a device fault. |
 | `not_attempted` | `NOT_ATTEMPTED` | The collector was shutting down before the poll could start. | Nothing; expected during restarts and upgrades. |

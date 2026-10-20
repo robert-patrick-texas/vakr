@@ -12,6 +12,14 @@ at 4,294,967,295 and only ``ifHighSpeed`` is meaningful (RFC 2863), so a
 saturated ``ifSpeed`` is never used as a denominator. Zero means the agent
 does not know the speed, so it counts as missing.
 
+Reported speeds are a denominator only where they are a link's capacity:
+physical ports and port-channels (whose speed is the sum of their member
+links). A tunnel's, loopback's, VLAN interface's, or subinterface's
+``ifSpeed`` is a configured or nominal number (IOS XE reports 100 kb/s for
+many tunnels), so there only an operator's override or contracted rate is
+used, and traffic is shown without a percentage (owner decision 2026-10-20,
+Appendix E.17 #15).
+
 Line rate is a separate question: the fastest the hardware can count, used
 to judge 32-bit counter wraps (E.4). A contracted rate below the port speed
 does not stop the counter from moving at port speed, so line rate ignores
@@ -34,6 +42,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 IF_SPEED_MAX = 2**32 - 1  # Gauge32 ceiling; ifSpeed reads this on faster links
+PORT_TYPES = frozenset({6, 7, 18, 19, 22, 30, 39, 62, 69, 71, 117})
+"""IANAifType values of physical ports: Ethernet, DS1/E1/DS3, serial, SONET, Wi-Fi."""
+LAG_TYPE = 161  # ieee8023adLag: a port-channel, whose speed is its members' sum
 PRECISE_BELOW_MBPS = 20  # below this, ifSpeed (bit/s) is more precise than ifHighSpeed
 BPS_PER_MBPS = 1_000_000
 
@@ -67,6 +78,8 @@ class CapacityInputs:
             as the utilization denominator.
         if_high_speed_mbps: ``ifHighSpeed`` as reported, in Mb/s.
         if_speed_bps: ``ifSpeed`` as reported, in b/s.
+        link_speed: True when the reported speeds are the link's capacity
+            (``reports_link_capacity``); False makes them no denominator.
     """
 
     override_bps: int | None = None
@@ -74,6 +87,7 @@ class CapacityInputs:
     contracted_is_denominator: bool = False
     if_high_speed_mbps: int | None = None
     if_speed_bps: int | None = None
+    link_speed: bool = True
 
     def __post_init__(self) -> None:
         """Reject negative rates, which no agent or config can mean.
@@ -152,8 +166,9 @@ def effective_capacity(inputs: CapacityInputs) -> Capacity | None:
         None
     """
     contracted = _known(inputs.contracted_bps) if inputs.contracted_is_denominator else None
-    high_speed = _known(inputs.if_high_speed_mbps)
-    if_speed = _known(inputs.if_speed_bps)
+    reported = inputs.link_speed
+    high_speed = _known(inputs.if_high_speed_mbps) if reported else None
+    if_speed = _known(inputs.if_speed_bps) if reported else None
     # ifHighSpeed counts whole Mb/s, so a 1.544 Mb/s T1 reads 1 or 2. Below
     # PRECISE_BELOW_MBPS an unsaturated ifSpeed is the exact rate and wins:
     # this is the "normalised" ifHighSpeed of RATE-008 (Appendix E.17).
@@ -169,6 +184,26 @@ def effective_capacity(inputs: CapacityInputs) -> Capacity | None:
         if bps:
             return Capacity(bps, source)
     return None
+
+
+def reports_link_capacity(if_type: int | None, if_name: str | None) -> bool:
+    """Whether an interface's reported speed is its link capacity (E.17 #15).
+
+    Args:
+        if_type: IANAifType number, if reported.
+        if_name: ``ifName``; a dot marks a subinterface of a port.
+
+    Returns:
+        bool: True for a physical port that is not a subinterface, for a
+        port-channel, and when the agent reported no type (nothing says the
+        speed is nominal); False for every other type.
+
+    Raises:
+        None
+    """
+    if if_type is None or if_type == LAG_TYPE:
+        return True
+    return if_type in PORT_TYPES and not (if_name and "." in if_name)
 
 
 def line_rate_bps(inputs: CapacityInputs) -> int | None:

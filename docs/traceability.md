@@ -206,7 +206,7 @@ The port is `src/vakr/ports/icmp.py` (raw result types in `ports/icmp_types.py`)
 | ICMP-011 | Implemented | `adapters/icmp/{pool,sockets}.py`, `cycle.py` | ICMP-T06 in `test_icmp_transport.py`, `test_icmp_loopback.py` | `icmp.md` | IPv4 and IPv6, optional source binding. |
 | ICMP-012 | Implemented | `adapters/icmp/{sockets,pool,sysctl,health}.py`, `packaging/examples/vakr-collector.service.d/50-icmp-cap-net-raw.conf` | `test_icmp_preflight.py`, `test_icmp_faults.py`, `test_icmp_packaging.py` (ICMP-T07, static half) | `icmp.md` | ADR-023. The runtime half of ICMP-T07 needs the service units. |
 | OBS-001/002/003 (ICMP) | In progress | `IcmpCounters`, `CollectorFault`, `cycle.collector_state` | `test_icmp_faults.py`, `test_icmp_errqueue.py` | ADR-023 | Collector trouble is never target loss; metrics export comes later. |
-| 16.3 preflight (ICMP) | Implemented | `adapters/icmp/health.check_icmp` in `CHECKS` | `test_icmp_preflight.py` | `icmp.md` | WARNING, not CRITICAL, so self-update is not rolled back on an unfixed host. |
+| 16.3 preflight (ICMP) | Implemented | `adapters/icmp/health.check_icmp` in `CHECKS` | `test_icmp_preflight.py` | `icmp.md` | CRITICAL: a host that cannot ping is a hard stop (owner decision). The self-update gate counts it as a warning (`HOST_CHECKS`), because a rollback cannot fix the host; see E.22. Earlier: WARNING, so self-update is not rolled back on an unfixed host. |
 
 ## SNMP collection and discovery (M3)
 
@@ -251,6 +251,16 @@ Code is in `src/vakr/ingest/` and `src/vakr/health/spool_check.py`, with tests i
 | 6.4 backpressure | Implemented (spool side) | `capacity.py`, `Spool.admits_new_work` | `test_spool_capacity::*`, `test_spool_health::test_spool_t07_*` | `spool.md` | The scheduler must consult `admits_new_work()` (M3 wiring). |
 | OBS-001/003/007, OPS-001 (spool) | In progress | `status.py`, `inspect.py`, `health/spool_check.py` | `test_spool_health::*` | `spool.md` | No Prometheus metrics yet (OBS-005). |
 | SPOOL-T01..T08, QUEUE-T01, INGEST-T01..T03 | Verified | as above | `test_spool_t0N_*`, `test_queue_t01_*`, `test_ingest_t0N_*` | | INGEST-T04 is an Enterprise benchmark, not MVP. |
+
+## Owner decisions of 2026-10-20 (pre-0.2.0)
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| ICMP-012 (hard stop) | Implemented | `app/collector/preflight.check_icmp_capability`, `icmp_step.on_permission_lost`, `service._ping_refused`, `adapters/icmp/health.py` (CRITICAL) | `test_col_icmp_hard_stop.py` (start refused, either socket suffices, permission lost while running, update gate) | `icmp.md`, `collector.md`, ADR-023, E.22 | Exit 78; `HOST_CHECKS` keep self-update from rolling back for a host setting (UPD-006). |
+| RATE-008/010 (E.17 #15) | Implemented | `logic/capacity.reports_link_capacity`, `CapacityInputs.link_speed`, `query/interface_capacity.py`, `app/collector/capacity.py` | `test_e17_15_only_link_speeds_are_denominators`, `test_tunnels_show_traffic_without_a_percentage` | E.17 #15 | Percent only on ports and port-channels; an override restores it. |
+| SVC-003, 16.4 (cancelled polls) | Implemented | `PollExecution.CANCELLED`, `scheduler/records.finished_result`, telemetry vocabulary code 8, `query/evidence._CUT_SHORT` | `test_shutdown_records_waiting_cancelled_and_due_slots`, `test_shutdown_lets_short_polls_finish_and_keeps_partial_evidence`, `test_finished_record_times_and_flags` | E.25 #4 and #8, `scheduler.md` | Reads as unknown, never down. |
+| RET-004 (rollup precision) | Approved | `adapters/sqlite/telemetry/rollup_codec.py` | `test_e21_*` | ADR-021 amendment 3, E.21 | float32 interface rollup values; 40.1 GB per node. |
+| E.27 #7 | Approved | collector | | E.27 | Down interfaces get no traffic records. |
 
 ## Scheduler and poll planning (M3)
 
@@ -316,7 +326,7 @@ The composition root is `src/vakr/app/collector/`, wired to `InventoryService` t
 | 6.2 inventory and poll plans | Implemented | `inventory.py`, `inventory_service.py`, `replan.py` | `test_collector_uses_the_inventory_service_and_reloads_its_rules` | E.27 | Re-plans when the metadata change counter moves (read every 5 s) and on SIGHUP. |
 | CONF-003, TEST-008 | Implemented (collector) | `reload.py`, `service/signals.py` | `test_reload_refuses_an_invalid_candidate_and_applies_a_valid_one` | `collector.md` | |
 | 6.4, SPOOL-T07, SCHED-T10 | Implemented | `scheduler/dispatch.py` admission hook, `pipeline.py` | `test_col_admission.py` | E.27 #3 | A full spool records slots as not attempted (`MissReason.STORAGE_FULL`). |
-| ICMP-007/012/013 (runtime) | Implemented | `icmp_step.py`, `snmp_parts.py` | `test_col_steps.py`, `systemd-test.sh` | E.27 #8-10 | E.25 #5: a collector-side ICMP failure lets SNMP run. |
+| ICMP-007/012/013 (runtime) | Implemented | `icmp_step.py`, `snmp_parts.py` | `test_col_steps.py`, `systemd-test.sh` | E.27 #8-10 | E.25 #5: a transient collector-side ICMP failure lets SNMP run; ping refused by the host stops the collector (exit 78, `test_col_icmp_hard_stop.py`). |
 | OBS-001/003 (collector) | Partial | `health.py`, `timers.py` | `test_registration_and_health_cadence` | E.27 #14 | Health every poll interval; Prometheus export (OBS-005) is later. |
 | PKG-003 | Implemented | `nfpm.yaml`, `prerm` | `test_package_spec.py`, `systemd-test.sh` | `install.md`, `collector.md` | |
 | STORE-006 (spool open race) | Fixed at merge | `ingest/spool.py`, `writer_thread.py`, `cursor.py` | `test_spool_open_race.py::test_store006_ingester_started_at_once_stores_every_record` | E.24 | `Spool.open()` waits for the first segment's header; a reader never renames a segment the writer may still be appending to. |

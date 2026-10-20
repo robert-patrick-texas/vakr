@@ -9,13 +9,15 @@ Every slot the plan produces ends as exactly one ``PollResult`` wrapping a
   cleanly (partial answer, no response, error, deadline, or shutdown).
 * ``FAILED``: no step produced evidence, for example ``snmp_only`` with a
   Stage 1 timeout.
+* ``CANCELLED``: shutdown cut the poll short (16.4); the evidence its
+  finished steps produced is kept, and it reads as unknown, never as down.
 
 An occurrence that never started is ``MISSED_OVERRUN`` (the previous poll
 still ran, SCHED-012) or ``NOT_ATTEMPTED`` (capacity, stall, or shutdown,
 SCHED-017), always with the ``NOT_ATTEMPTED`` flag and no observations, so
 it reads as unknown and never as a device outage. Capacity misses also carry
-``COLLECTOR_DEGRADED``; so do polls hit by a collector-side step error or
-cancelled by shutdown, because the collector, not the target, cut them short.
+``COLLECTOR_DEGRADED``; so do polls hit by a collector-side step error,
+because the collector, not the target, cut them short.
 
 Dependencies:
     vakr.domain.polls: ``DevicePoll``.
@@ -172,13 +174,13 @@ def finished_result(started: StartedPoll, progress: PollProgress, end_us: int) -
     quality = progress.quality
     if ctx.target.maintenance:
         quality |= Quality.MAINTENANCE
-    if any(step.status is StepStatus.CANCELLED for step in steps):
-        quality |= Quality.COLLECTOR_DEGRADED
+    cancelled = any(step.status is StepStatus.CANCELLED for step in steps)
+    execution = PollExecution.CANCELLED if cancelled else execution_of(steps)
     duration = max(0, end_us - started.start_us)
     poll = DevicePoll(
         new_id(ObservationId), ctx.poll_id, ctx.collector_id, ctx.target.device_id,
         ctx.scheduled_at, ctx.target.configured_interval_s, ctx.target.effective_interval_s,
-        ctx.target.strategy, execution_of(steps), quality, started.worker_id,
+        ctx.target.strategy, execution, quality, started.worker_id,
         started.started_at, started.started_at + timedelta(microseconds=duration),
     )  # fmt: skip
     lateness = started.start_us - started.slot_us

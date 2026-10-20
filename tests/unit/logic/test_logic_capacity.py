@@ -245,3 +245,49 @@ def test_slow_links_prefer_exact_if_speed_over_rounded_if_high_speed() -> None:
     no_if_speed = effective_capacity(CapacityInputs(if_high_speed_mbps=2, if_speed_bps=None))
     assert no_if_speed is not None
     assert (no_if_speed.bps, no_if_speed.source) == (2_000_000, CapacitySource.IF_HIGH_SPEED)
+
+
+@pytest.mark.parametrize(
+    ("if_type", "if_name", "link"),
+    [
+        (6, "GigabitEthernet0/0/0", True),  # a port
+        (117, "Gi1/0/1", True),  # gigabitEthernet
+        (161, "Port-channel1", True),  # a LAG: the sum of its member links
+        (6, "GigabitEthernet0/0/0.100", False),  # a subinterface of a port
+        (131, "Tunnel10", False),  # IOS XE reports 100 kb/s on many tunnels
+        (24, "Loopback0", False),
+        (136, "Vlan100", False),
+        (1, "Null0", False),
+        (None, "Gi9/9", True),  # no type reported: nothing says the speed is nominal
+    ],
+)
+def test_e17_15_only_link_speeds_are_denominators(
+    if_type: int | None, if_name: str, link: bool
+) -> None:
+    """E.17 #15 (owner decision): a percentage needs a port's or port-channel's speed.
+
+    Args:
+        if_type: IANAifType.
+        if_name: ``ifName``.
+        link: Whether the reported speed is a link capacity.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    from vakr.logic.capacity import (
+        CapacityInputs,
+        CapacitySource,
+        effective_capacity,
+        reports_link_capacity,
+    )
+
+    assert reports_link_capacity(if_type, if_name) is link
+    reported = CapacityInputs(if_speed_bps=100_000, link_speed=link)
+    assert (effective_capacity(reported) is not None) is link
+    override = replace(reported, override_bps=50_000_000)
+    capacity = effective_capacity(override)
+    assert capacity is not None  # an override always gives a percentage
+    assert capacity.source is CapacitySource.OVERRIDE

@@ -25,7 +25,7 @@ Example:
 
 from vakr.domain.ids import DeviceId, InterfaceId
 from vakr.domain.paging import MAX_PAGE_LIMIT, PageRequest
-from vakr.logic.capacity import CapacityInputs
+from vakr.logic.capacity import CapacityInputs, reports_link_capacity
 from vakr.ports.metadata import InterfaceFilter, MetadataUnitOfWorkFactory
 
 MAX_PAGES = 20
@@ -61,6 +61,7 @@ def load_capacity(
                     contracted_bps=note.contracted_bps,
                     if_high_speed_mbps=record.if_high_speed,
                     if_speed_bps=record.if_speed,
+                    link_speed=reports_link_capacity(record.if_type, record.if_name),
                 )
             cursor = page.next_cursor
             if cursor is None:

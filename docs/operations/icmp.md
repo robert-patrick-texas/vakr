@@ -36,7 +36,7 @@ The package creates the `vakr` service group with a system GID below 1000. syste
 ```console
 $ vakr doctor
 ...
-[WARNING ] icmp: unprivileged ICMP refused: the vakr service user (GID 987) is outside net.ipv4.ping_group_range 1000 9999; fix: echo 'net.ipv4.ping_group_range = 987 9999' | sudo tee /etc/sysctl.d/99-vakr-icmp.conf && sudo sysctl --system
+[CRITICAL] icmp: unprivileged ICMP refused: the vakr service user (GID 987) is outside net.ipv4.ping_group_range 1000 9999; fix: echo 'net.ipv4.ping_group_range = 987 9999' | sudo tee /etc/sysctl.d/99-vakr-icmp.conf && sudo sysctl --system
 ```
 
 Run the printed fix as shown. It widens the range just enough to include the `vakr` group and never removes access for anyone who has it today. The drop-in is named so that it is read after the usual local files. If another file read later still sets the key, for example `/etc/sysctl.conf` (which `sysctl --system` reads last), the check names that file and line, and you edit it instead. To check by hand:
@@ -50,7 +50,9 @@ vakr:x:987:
 
 You may prefer systemd's default, `0 2147483647`, which lets every group use ping sockets. That is a site policy choice; vakr only needs its own group included.
 
-The check reports WARNING rather than CRITICAL. A host setting cannot be fixed by rolling back an update, and `check health` decides whether a self-update is kept. While the setting is wrong, ICMP devices show Unknown, and under the default `icmp_gated` strategy their SNMP is skipped too. Fix it promptly.
+A host that cannot ping is misconfigured, and vakr treats it as a hard stop. The check reports CRITICAL to CheckMK and Nagios, and the collector refuses to start until the fix is applied: it exits with status 78, which systemd does not restart. If the range is narrowed while the collector runs, it stops the same way at the next refused probe. After applying the fix, start it again with `sudo systemctl restart vakr-collector`.
+
+Self-update is not blocked by it. Rolling a release back cannot fix a host setting, so when self-update runs `check health`, this one check counts as a warning and the update is kept.
 
 The package never changes this sysctl itself, because doing so would silently override a hardening decision someone made on purpose.
 

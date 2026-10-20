@@ -223,8 +223,8 @@ def test_finished_record_times_and_flags() -> None:
     assert (result.lateness_us, result.duration_us) == (2 * S, 3 * S)
     assert result.poll.completed_at is not None
     assert (result.poll.completed_at - result.poll.started_at).total_seconds() == 3  # ty: ignore[unsupported-operator]
-    assert result.poll.execution is PollExecution.PARTIAL
-    expected = Quality.PARTIAL_LOSS | Quality.MAINTENANCE | Quality.COLLECTOR_DEGRADED
+    assert result.poll.execution is PollExecution.CANCELLED  # its own state (16.4)
+    expected = Quality.PARTIAL_LOSS | Quality.MAINTENANCE
     assert result.poll.quality == expected
     assert result.observations == ("icmp",)
     assert result.poll.poll_id == ctx.poll_id

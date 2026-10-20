@@ -226,6 +226,7 @@ async def build_parts(
     config = await asyncio.to_thread(preflight.check_config, paths.config_dir)
     sched, icmp, snmp = _settings(config)
     await asyncio.to_thread(preflight.check_state_dir, paths.state_dir)
+    await asyncio.to_thread(preflight.check_icmp_capability)  # a host that cannot ping stops here
     async with contextlib.AsyncExitStack() as undo:
         metadata = await asyncio.to_thread(preflight.open_metadata, paths.state_dir)
         undo.push_async_callback(asyncio.to_thread, metadata.close)
@@ -237,7 +238,6 @@ async def build_parts(
         collector = await _identity(uow_factory, config, paths.state_dir, sched.rule.collector_name)
         spool = await _open_spool(config, paths, collector)
         undo.push_async_callback(spool.close)
-        warnings += filter(None, [await asyncio.to_thread(preflight.check_icmp_capability)])
         path = checkpoint_path(paths.state_dir, collector.id)
         baselines = await asyncio.to_thread(load_baselines, path, collector.id)
         context = InventoryContext(config, uow_factory, collector, clock, paths.config_dir)

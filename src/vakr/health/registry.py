@@ -85,6 +85,10 @@ CHECKS: tuple[Check, ...] = (
 )
 
 
+HOST_CHECKS: frozenset[str] = frozenset({"icmp"})
+"""Checks of host settings that rolling an update back cannot fix (UPD-006, E.14)."""
+
+
 def run_checks(checks: tuple[Check, ...] = CHECKS) -> tuple[CheckResult, ...]:
     """Evaluate every check, converting unexpected exceptions into UNKNOWN.
 

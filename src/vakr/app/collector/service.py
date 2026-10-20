@@ -48,7 +48,7 @@ from vakr.app.collector.shutdown import shut_down
 from vakr.app.collector.snmp_step import CollectorSnmpStep
 from vakr.app.collector.tally import FaultTally
 from vakr.app.collector.timers import health_loop, repeat, write_checkpoint
-from vakr.app.collector.timings import ServiceTimings
+from vakr.app.collector.timings import EX_PREFLIGHT, ServiceTimings
 from vakr.collectors.icmp.cycle import IcmpCollector
 from vakr.domain.ids import WorkerId, new_id
 from vakr.ingest import Ingester
@@ -94,6 +94,7 @@ class CollectorService:
         self.ids = SchedulerIds(parts.collector.id, new_id(WorkerId))
         self.tally, self.plans, self.baselines = FaultTally(), PlanBook(), parts.baselines
         self.icmp_step = CollectorIcmpStep(IcmpCollector(parts.prober, parts.icmp), self.tally)
+        self.icmp_step.on_permission_lost = self._ping_refused
         self.snmp_step = CollectorSnmpStep(parts.snmp_factory, parts.snmp, self.plans,
                                            self.baselines, clock, self.tally,
                                            parts.boot_id)  # fmt: skip
@@ -115,6 +116,7 @@ class CollectorService:
         self.discovery.on_plan = self.replanner.refresh_capacity
         self.upkeep = TelemetryUpkeep(parts.telemetry, clock, self.timings, rollups)
         self.failed: str | None = None
+        self.exit_code: int | None = None  # set by a hard stop; overrides 0 or 1
         self._stop, self.loops_stop = asyncio.Event(), asyncio.Event()
         self.reloads: set[asyncio.Task[bool]] = set()
 
@@ -131,6 +133,27 @@ class CollectorService:
             None
         """
         self._stop.set()
+
+    def _ping_refused(self) -> None:
+        """Stop for good when the host no longer lets vakr ping (ICMP-012).
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        if self.exit_code is None:
+            _LOG.error(
+                "the host refused ICMP Echo (net.ipv4.ping_group_range); stopping until it "
+                "is fixed: run `vakr doctor` for the fix",
+                extra={"event_id": "collector.icmp_refused"},
+            )
+            self.exit_code = EX_PREFLIGHT
+        self.request_stop()
 
     def request_reload(self) -> None:
         """Reload the configuration in the background (SIGHUP, CONF-003).
@@ -155,7 +178,8 @@ class CollectorService:
             None
 
         Returns:
-            int: 0 after a requested stop, 1 when a component stopped unexpectedly.
+            int: 0 after a requested stop, 1 when a component stopped unexpectedly,
+                78 when the host stopped letting vakr ping (no automatic restart).
 
         Raises:
             None
@@ -194,6 +218,8 @@ class CollectorService:
                     extra={"event_id": "collector.component_failed"},
                 )
         await shut_down(self, tasks)
+        if self.exit_code is not None:
+            return self.exit_code
         return 0 if self.failed is None else 1
 
     def _start_tasks(self) -> dict[str, asyncio.Task[None]]:

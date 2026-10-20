@@ -85,7 +85,7 @@ def test_icmp_012_dev_host_default_install_gets_a_later_drop_in(tmp_path: Path) 
         },
     )
     result = evaluate(sysctl.read_range(root), SERVICE, root, no_socket_problem)
-    assert result.status is Status.WARNING
+    assert result.status is Status.CRITICAL  # a host that cannot ping is a hard stop
     assert "the vakr service user (GID 987) is outside net.ipv4.ping_group_range 1000 9999" in (
         result.summary
     )
@@ -284,7 +284,7 @@ def test_development_identity_also_opens_a_socket(tmp_path: Path) -> None:
     ok = evaluate(sysctl.read_range(root), me, root, no_socket_problem)
     refused = evaluate(sysctl.read_range(root), me, root, lambda: "Permission denied")
     assert ok.status is Status.OK
-    assert refused.status is Status.WARNING
+    assert refused.status is Status.CRITICAL
     assert refused.summary.endswith("an ICMP socket failed: Permission denied")
 
 

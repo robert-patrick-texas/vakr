@@ -30,6 +30,7 @@ Example:
 import asyncio
 import ipaddress
 import socket
+from collections.abc import Callable
 
 from vakr.app.collector.tally import FaultTally
 from vakr.collectors.icmp.cycle import IcmpCollector
@@ -39,6 +40,7 @@ from vakr.domain.enums import AddressFamily, ReachabilityStrategy
 from vakr.domain.inventory import Device
 from vakr.domain.quality import Quality
 from vakr.logic.icmp import SnmpPlan
+from vakr.ports.icmp_types import CollectorFault
 from vakr.scheduler.steps import IcmpResult, PollContext
 
 RESOLVE_TIMEOUT_S = 2.0
@@ -105,6 +107,8 @@ class CollectorIcmpStep:
         """
         self.collector = collector
         self._tally = tally
+        # Called when the host stops letting vakr ping: a hard stop (ICMP-012).
+        self.on_permission_lost: Callable[[], None] | None = None
 
     async def icmp(self, ctx: PollContext) -> IcmpResult:
         """Probe the device once and report the cycle.
@@ -130,6 +134,8 @@ class CollectorIcmpStep:
         if cycle.observation is None:
             self._tally.fault("icmp_not_sent")
             fault = cycle.result.fault
+            if fault is CollectorFault.PERMISSION_DENIED and self.on_permission_lost is not None:
+                self.on_permission_lost()
             raise IcmpNotSentError("unknown" if fault is None else fault.value)
         observations: list[object] = [cycle.observation]
         if strategy is ReachabilityStrategy.ICMP_GATED and cycle.snmp is SnmpPlan.SKIP:

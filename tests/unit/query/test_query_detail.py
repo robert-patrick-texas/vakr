@@ -161,6 +161,41 @@ def test_utilization_is_never_computed_against_an_unknown_capacity(
         assert row.in_util.value is not None
 
 
+def test_tunnels_show_traffic_without_a_percentage() -> None:
+    """E.17 #15 (owner decision): a tunnel's nominal speed gives no percentage; an override does.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    fleet = Fleet()
+    d = fleet.device("rtr1")
+    tunnel = fleet.interface(d, "Tunnel10", if_type=131, if_speed=100_000)
+    pinned = fleet.interface(
+        d,
+        "Tunnel20",
+        if_type=131,
+        if_speed=100_000,
+        annotation=InterfaceAnnotation(capacity_override_bps=10_000_000),
+    )
+    for i in (tunnel, pinned):
+        fleet.sample(i, in_bps=2_000_000.0)
+    rows = by_name(detail(fleet, "rtr1"))
+    t10, t20 = rows["Tunnel10"], rows["Tunnel20"]
+    assert t10.in_rate.value == 2_000_000.0  # the traffic is shown
+    assert t10.in_util.value is None
+    assert t10.in_util.reason is not None
+    assert "logical interface" in t10.in_util.reason
+    assert t10.capacity.text == "—"
+    assert t20.in_util.value == pytest.approx(20.0)
+    assert "capacity override" in t20.capacity.text
+
+
 @pytest.mark.parametrize(
     ("quality", "reason"),
     [

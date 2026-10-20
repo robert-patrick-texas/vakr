@@ -71,6 +71,8 @@ class PollExecution(StrEnum):
     MISSED_OVERRUN = "missed_overrun"
     FAILED = "failed"
     NOT_ATTEMPTED = "not_attempted"
+    # Appended: shutdown cut a running poll short; finished steps' evidence is kept (16.4).
+    CANCELLED = "cancelled"
 
 
 class PersistenceState(StrEnum):

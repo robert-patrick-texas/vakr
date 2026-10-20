@@ -65,8 +65,8 @@ def test_shutdown_records_waiting_cancelled_and_due_slots() -> None:
     assert_every_slot_recorded(records)
     hung = next(r for r in records if r.poll.device_id == device_id(0) and r.miss is None)
     assert [s.status for s in hung.steps] == [StepStatus.CANCELLED]
-    assert hung.poll.execution is PollExecution.FAILED
-    assert hung.poll.quality & Quality.COLLECTOR_DEGRADED  # shutdown, not the device
+    assert hung.poll.execution is PollExecution.CANCELLED  # shutdown, not the device
+    assert not hung.poll.quality & Quality.COLLECTOR_DEGRADED  # the state says why
     draining = [r for r in records if r.miss is MissReason.DRAINING]
     assert draining
     assert all(r.poll.execution is PollExecution.NOT_ATTEMPTED for r in draining)
@@ -97,7 +97,7 @@ def test_shutdown_lets_short_polls_finish_and_keeps_partial_evidence() -> None:
     finished = {r.poll.device_id: r for r in records if r.miss is None}
     short, long_ = finished[device_id(0)], finished[device_id(1)]
     assert short.poll.execution is PollExecution.COMPLETE
-    assert long_.poll.execution is PollExecution.PARTIAL
+    assert long_.poll.execution is PollExecution.CANCELLED
     assert [s.status for s in long_.steps] == [StepStatus.OK, StepStatus.OK, StepStatus.CANCELLED]
     assert [o[0] for o in long_.observations] == ["icmp", "s1"]  # ty: ignore[not-subscriptable]
     assert abs(clock.monotonic() - began - stop_at - 15) < 0.01

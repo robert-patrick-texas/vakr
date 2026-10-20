@@ -31,7 +31,7 @@ Example:
 import os
 from pathlib import Path
 
-from vakr.adapters.icmp.health import check_icmp
+from vakr.adapters.icmp.health import check_icmp, raw_socket_problem, socket_problem
 from vakr.adapters.sqlite.metadata import METADATA_FILE, SqliteMetadataStore
 from vakr.adapters.sqlite.telemetry import TELEMETRY_FILE, SqliteTelemetryStore, retention_policy
 from vakr.config.cross_checks import first_problem
@@ -44,7 +44,6 @@ from vakr.credentials import (
     FileCredentialProvider,
 )
 from vakr.domain.errors import StorageError
-from vakr.health.model import Status
 from vakr.ports.migrations import MigrationError, SchemaTooNewError
 
 MAX_ISSUES = 5
@@ -248,17 +247,24 @@ def open_credentials(
     return provider, check_credentials(provider)
 
 
-def check_icmp_capability() -> str | None:
-    """Check that the collector may open unprivileged ICMP sockets (ICMP-012).
+def check_icmp_capability() -> None:
+    """Refuse to start on a host where this process cannot ping (ICMP-012).
+
+    A host that cannot send ICMP Echo is misconfigured, and collecting on it
+    would show every device as unknown, so it is a hard stop (owner decision
+    2026-10-20). The test is what this process can open: an unprivileged
+    ping socket, or a raw socket when the ``CAP_NET_RAW`` drop-in is in place.
 
     Args:
         None
 
     Returns:
-        str | None: The check's summary, with the fix, when it is not OK.
+        None
 
     Raises:
-        None
+        PreflightError: If neither socket can be opened; the message carries
+            the exact ``ping_group_range`` fix.
     """
-    result = check_icmp()
-    return None if result.status is Status.OK else result.summary
+    if socket_problem() is None or raw_socket_problem() is None:
+        return
+    raise PreflightError("icmp", f"this host cannot send ICMP Echo: {check_icmp().summary}")

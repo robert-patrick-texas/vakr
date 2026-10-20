@@ -8,7 +8,11 @@ Self-update also runs it through the newly installed binary as its final
 post-install step. Services that were just restarted can briefly look
 CRITICAL, so ``--retry-for`` (or ``VAKR_HEALTH_RETRY_FOR``, which older
 releases ignore) keeps re-checking while the result is CRITICAL, instead of
-triggering a needless rollback (UPD-006).
+triggering a needless rollback (UPD-006). Every self-update sets that
+variable, so its presence also marks the update gate: there a CRITICAL from
+a host-setting check (``HOST_CHECKS``, such as ICMP permission) counts as a
+warning, because rolling the release back cannot fix the host. Monitoring
+agents never set it and see the CRITICAL.
 
 Dependencies:
     vakr.health: Shared checks and Nagios rendering.
@@ -30,7 +34,7 @@ from collections.abc import Callable
 
 from vakr.cli.common import SubParsers
 from vakr.health.model import CheckResult, Status, nagios_line, worst
-from vakr.health.registry import run_checks
+from vakr.health.registry import HOST_CHECKS, run_checks
 
 RETRY_ENV = "VAKR_HEALTH_RETRY_FOR"
 """Environment variable self-update uses to pass the settle window."""
@@ -111,6 +115,28 @@ def settle(
     return results
 
 
+def for_update(results: tuple[CheckResult, ...]) -> tuple[CheckResult, ...]:
+    """Count host-setting failures as warnings, for the self-update gate.
+
+    Args:
+        results: One evaluation of all checks.
+
+    Returns:
+        tuple[CheckResult, ...]: The results, with each CRITICAL host check
+        reported as WARNING and saying why.
+
+    Raises:
+        None
+    """
+    note = " (a host setting: an update rollback cannot fix it)"
+    return tuple(
+        CheckResult(r.name, Status.WARNING, r.summary + note, r.perfdata)
+        if r.name in HOST_CHECKS and r.status is Status.CRITICAL
+        else r
+        for r in results
+    )
+
+
 def run_health(args: argparse.Namespace) -> int:
     """Print the Nagios plugin line and return the plugin exit code.
 
@@ -123,6 +149,22 @@ def run_health(args: argparse.Namespace) -> int:
     Raises:
         None
     """
-    results = settle(retry_window(getattr(args, "retry_for", None), os.environ))
+
+    def check() -> tuple[CheckResult, ...]:
+        """Evaluate the checks, gated for self-update when it is the caller.
+
+        Args:
+            None
+
+        Returns:
+            tuple[CheckResult, ...]: The results.
+
+        Raises:
+            None
+        """
+        results = run_checks()
+        return for_update(results) if RETRY_ENV in os.environ else results
+
+    results = settle(retry_window(getattr(args, "retry_for", None), os.environ), check)
     print(nagios_line(results))
     return worst(results).exit_code

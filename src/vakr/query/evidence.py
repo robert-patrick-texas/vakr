@@ -59,6 +59,9 @@ from vakr.logic.status import (
 from vakr.logic.status_table import ROW_SEVERITY, StatusEvidence
 from vakr.query.settings import QuerySettings
 
+_CUT_SHORT = frozenset({PollExecution.NOT_ATTEMPTED, PollExecution.CANCELLED})
+"""Last polls that read as unknown: never started, or cut short by shutdown."""
+
 TELEMETRY_UNAVAILABLE = "Unknown — telemetry unavailable"
 
 
@@ -203,7 +206,7 @@ def judge(
         admin=device.admin_state,
         strategy=strategy,
         collector=collector,
-        not_attempted=poll is not None and poll.execution is PollExecution.NOT_ATTEMPTED,
+        not_attempted=poll is not None and poll.execution in _CUT_SHORT,
         last_reset_at=last_reset,
         icmp_impairments=impairments,
         interval_s=float(interval),

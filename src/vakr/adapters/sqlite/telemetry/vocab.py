@@ -60,6 +60,7 @@ CODES: dict[type[Enum], dict[str, int]] = {
         "missed_overrun": 5,
         "running": 6,
         "scheduled": 7,
+        "cancelled": 8,
     },
     ReachabilityStrategy: {"icmp_gated": 1, "snmp_fallback": 2, "icmp_only": 3, "snmp_only": 4},
     SnmpState: {

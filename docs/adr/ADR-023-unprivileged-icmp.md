@@ -63,7 +63,7 @@ Every outcome is one of `REPLY`, `TIMEOUT`, `UNREACHABLE` (evidence about the ta
 unprivileged ICMP refused: the vakr service user (GID 987) is outside net.ipv4.ping_group_range 1000 9999; fix: echo 'net.ipv4.ping_group_range = 987 9999' | sudo tee /etc/sysctl.d/99-vakr-icmp.conf && sudo sysctl --system
 ```
 
-The result is **WARNING**, not CRITICAL. `check health` gates self-update (UPD-006), and a CRITICAL would roll back every update on a host that has not applied the fix yet, while a rollback cannot fix a host setting. Devices show UNKNOWN, never down, while the setting is wrong. When the `CAP_NET_RAW` drop-in is installed, the check is OK and names it.
+The result is **CRITICAL** (amended 2026-10-20 by owner decision: a host that cannot ping is a hard stop). The collector refuses to start when it can open neither a ping socket nor, with the drop-in, a raw socket (exit 78), and stops the same way if permission is withdrawn while it runs. Because a rollback cannot fix a host setting, the self-update gate counts this host check as a warning (`HOST_CHECKS`, UPD-006). When the `CAP_NET_RAW` drop-in is installed, the check is OK and names it.
 
 **The package does not change the sysctl.** A packaged sysctl.d file would silently override an administrator's deliberate hardening: `99-vakr.conf` from `/usr/lib/sysctl.d` sorts after `/etc/sysctl.d/99-allow-ping.conf` and would win. The operator applies the one-line fix that `vakr doctor` prints.
 
@@ -96,7 +96,7 @@ The collector's measurement must not depend on how busy the event loop is, and i
 * **A shared receive buffer** can overflow under a large reply burst. It is detected (`RECEIVE_OVERFLOW`) and never reported as loss, but those cycles carry less information. At 1,000+ targets per collector, raise `net.core.rmem_max` so the 1 MiB request is granted.
 * **Compact storage holds five RTT columns** (ADR-021). `icmp.probes` is therefore capped at 5. A cycle with unsent probes stores fewer than five RTTs, so the telemetry adapter must not fill missing columns with `-1`, which would read as loss (see Compatibility).
 * **The raw fallback is exercised only by unit tests** with a fake socket; no CI host grants `CAP_NET_RAW`.
-* **`icmp_gated` when ICMP cannot run.** If the collector cannot probe at all, `vakr.logic.icmp.snmp_plan` sees 0 replies and skips SNMP, so a misconfigured host collects nothing until the sysctl is fixed. The doctor WARNING says so. Whether SNMP should run when ICMP was not attempted is an open owner question.
+* **A host that cannot ping does not collect.** The owner decided this is a hard stop (2026-10-20): the collector refuses to start, and CheckMK sees the CRITICAL `icmp` check. Transient collector-side faults (overload, socket errors) still let SNMP run under `icmp_gated` (E.25 #5).
 
 ## Security impact
 

@@ -8,12 +8,13 @@ the operator's ``display_rank``; then the name in natural order
 total. ``ifIndex`` never decides anything (invariant 6).
 
 Utilization is shown only against a known effective capacity, and the row
-names the denominator (RATE-008); without one it is "—, speed unknown",
-never a guess (RATE-010). A rate that could not be derived says why: an
-agent restart, a counter discontinuity, a first sample (RATE-004, 18.3).
+names the denominator (RATE-008); without one it is "—" with the reason,
+never a guess (RATE-010, ``vakr.query.interface_capacity``). A rate that
+could not be derived says why: an agent restart, a counter discontinuity,
+a first sample (RATE-004, 18.3).
 
 Dependencies:
-    vakr.logic.capacity, vakr.logic.natural: Denominator and name order.
+    vakr.query.interface_capacity, vakr.logic.natural: Denominator and name order.
     vakr.query.labels, text, views: Words, formats, and models.
 
 Safety:
@@ -31,11 +32,12 @@ from vakr.domain.enums import Freshness, InterestClass
 from vakr.domain.interfaces import Interface
 from vakr.domain.quality import Quality
 from vakr.domain.state import CurrentInterfaceState
-from vakr.logic.capacity import Capacity, CapacityInputs, effective_capacity
+from vakr.logic.capacity import Capacity
 from vakr.logic.natural import natural_key
 from vakr.query.detail_views import InterfaceRow
+from vakr.query.interface_capacity import capacity_of, no_capacity_reason, utilization
 from vakr.query.labels import if_state_text, mark_stale, rate_gap_reason
-from vakr.query.text import age_text, bits_per_second, packets_per_second, percent
+from vakr.query.text import age_text, bits_per_second, packets_per_second
 from vakr.query.views import DASH, Reading, missing
 
 type OrderKey = tuple[bool, bool, bool, tuple[int, int], tuple[tuple[str | int, ...], str], str]
@@ -78,54 +80,6 @@ def order_key(interface: Interface) -> OrderKey:
         natural_key(display_name(interface)),
         str(interface.id),
     )
-
-
-def capacity_of(interface: Interface) -> Capacity | None:
-    """Choose the utilization denominator in RATE-008 order.
-
-    A contracted rate is never the denominator yet: no setting can declare
-    it one (E.29 decision 7).
-
-    Args:
-        interface: The interface with its annotation and reported speeds.
-
-    Returns:
-        Capacity | None: The denominator, or ``None`` when speed is unknown.
-
-    Raises:
-        None
-    """
-    a = interface.annotation
-    return effective_capacity(
-        CapacityInputs(
-            override_bps=a.capacity_override_bps,
-            contracted_bps=a.contracted_bps,
-            if_high_speed_mbps=interface.if_high_speed,
-            if_speed_bps=interface.if_speed,
-        )
-    )
-
-
-def utilization(bps: float | None, capacity_bps: int | None, reason: str = "") -> Reading:
-    """Return a utilization reading; unavailable without both a rate and a capacity.
-
-    Args:
-        bps: The rate, if derivable.
-        capacity_bps: The effective capacity, if known.
-        reason: Why the rate is missing, when it is.
-
-    Returns:
-        Reading: Percent of capacity, or "—" with the reason.
-
-    Raises:
-        None
-    """
-    if capacity_bps is None:
-        return missing("speed unknown")
-    if bps is None:
-        return missing(reason or "rate not available")
-    value = 100.0 * bps / capacity_bps
-    return Reading(percent(value), value)
 
 
 def _rate(value: float | None, unit: str, reason: str) -> Reading:
@@ -183,12 +137,15 @@ class _Measured(NamedTuple):
     age: Reading
 
 
-def _measured(state: CurrentInterfaceState, cap: Capacity | None) -> _Measured:
+def _measured(
+    state: CurrentInterfaceState, cap: Capacity | None, interface: Interface
+) -> _Measured:
     """Return the sampled columns of a row with a current sample.
 
     Args:
         state: The sample.
         cap: The effective capacity, if known.
+        interface: The interface, for why it may have no capacity.
 
     Returns:
         _Measured: Readings, each marked stale when the sample is stale.
@@ -200,7 +157,10 @@ def _measured(state: CurrentInterfaceState, cap: Capacity | None) -> _Measured:
     why = rate_gap_reason(o.quality)
     cap_bps = cap.bps if cap else None
     over = Quality.RATE_EXCEEDS_CAPACITY in o.quality
-    in_util, out_util = (_over(utilization(v, cap_bps, why), over) for v in (o.in_bps, o.out_bps))
+    no_cap = no_capacity_reason(interface)
+    in_util, out_util = (
+        _over(utilization(v, cap_bps, why, no_cap), over) for v in (o.in_bps, o.out_bps)
+    )
     if_state = if_state_text(o.admin_status, o.oper_status)
     age = state.age.total_seconds()
     readings = _Measured(
@@ -259,7 +219,7 @@ def interface_row(
     if state is None:
         m = _Measured(*([missing(f"no sample from {position}")] * len(_Measured._fields)))
     else:
-        m = _measured(state, cap)
+        m = _measured(state, cap, interface)
     return InterfaceRow(
         interface_id=interface.id,
         name=display_name(interface),
@@ -268,7 +228,7 @@ def interface_row(
         lifecycle=interface.lifecycle,
         capacity=Reading(f"{bits_per_second(cap.bps)} ({cap.label})", cap.bps)
         if cap
-        else missing("speed unknown"),
+        else missing(no_capacity_reason(interface)),
         state=m.state,
         in_rate=m.in_rate,
         out_rate=m.out_rate,

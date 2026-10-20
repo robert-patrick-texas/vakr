@@ -72,7 +72,7 @@ INSERT INTO vocab_code (vocab, value, code) VALUES
     ('PollExecution', 'complete', 1), ('PollExecution', 'partial', 2),
     ('PollExecution', 'failed', 3), ('PollExecution', 'not_attempted', 4),
     ('PollExecution', 'missed_overrun', 5), ('PollExecution', 'running', 6),
-    ('PollExecution', 'scheduled', 7),
+    ('PollExecution', 'scheduled', 7), ('PollExecution', 'cancelled', 8),
     ('ReachabilityStrategy', 'icmp_gated', 1), ('ReachabilityStrategy', 'snmp_fallback', 2),
     ('ReachabilityStrategy', 'icmp_only', 3), ('ReachabilityStrategy', 'snmp_only', 4),
     ('RollupSlot.roll_icmp', 'rtt_median_us', 1), ('RollupSlot.roll_icmp', 'loss_pct', 2),

@@ -13,16 +13,19 @@ Documentation in a repository is written for a Git forge, where ``.md`` links
 and heading anchors just work. md2html renders each ``*.md`` under SRC_DIR to
 HTML at the same relative path in OUT_DIR, adds ``index.html`` for directory
 READMEs and an ``all-docs.html`` listing, and wraps every page in the
-responsive light/dark ``template.html``, so the docs can be published (for
-example on GitHub Pages) without a site framework. With ``--check`` it also
-validates every internal link and ``#fragment``, so the same command doubles
-as a documentation link test. This module assembles the site and owns the
-command line; ``md2html_render.py`` renders individual pages. Neither imports
-anything from the project that vendors md2html.
+responsive light/dark ``template.html`` with a sidebar index of every page,
+so the docs can be published (for example on GitHub Pages) without a site
+framework. With ``--check`` it also validates every internal link and
+``#fragment``, so the same command doubles as a documentation link test. This
+module assembles the site and owns the command line; ``md2html_render.py``
+renders individual pages and ``md2html_nav.py`` the sidebar. None of them
+imports anything from the project that vendors md2html.
 
 Dependencies:
     md2html_render: Sibling module with the Markdown parser configuration,
         GitHub-compatible heading slugs and link resolution.
+    md2html_nav: Sibling module with the per-page sidebar index and the
+        top-bar repository link.
     markdown-it-py, mdit-py-plugins: Pinned in the inline script metadata
         above so ``uv run`` builds a matching environment on demand.
 
@@ -48,6 +51,7 @@ from pathlib import Path, PurePosixPath
 from string import Template
 from urllib.parse import quote
 
+from md2html_nav import Folder, build_tree, render_nav, repo_link
 from md2html_render import Page, make_parser, ref_ok, render_page
 
 ALWAYS_EXCLUDED = frozenset({".git", ".venv", "node_modules", "_site"})
@@ -153,14 +157,15 @@ def output_map(pages: list[Page], index: Page) -> dict[str, Page]:
     return outputs
 
 
-def fill(template: Template, name: str, page: Page, args: argparse.Namespace) -> str:
-    """Wrap a page body in the HTML template.
+def fill(template: Template, name: str, page: Page, args: argparse.Namespace, tree: Folder) -> str:
+    """Wrap a page body in the HTML template with the top bar and sidebar.
 
     Args:
         template (Template): Template loaded from ``template.html``.
         name (str): Output path relative to OUT_DIR, for relative nav links.
         page (Page): Page whose title and body are inserted.
         args (argparse.Namespace): Options from ``parse_args``.
+        tree (Folder): Every page, from ``build_tree``, for the sidebar.
 
     Returns:
         str: The complete HTML document.
@@ -177,6 +182,8 @@ def fill(template: Template, name: str, page: Page, args: argparse.Namespace) ->
         site=html.escape(args.title),
         home=f"{up}index.html",
         all_docs=f"{up}all-docs.html",
+        repo=repo_link(args.repo_url),
+        nav=render_nav(tree, page.rel, up),
         body=page.body,
         footer=f"Source: {source}" if page.rel.endswith(".md") else "",
     )
@@ -246,11 +253,11 @@ def main(argv: list[str] | None = None) -> int:
     md, template = make_parser(), Template(TEMPLATE_PATH.read_text(encoding="utf-8"))
     sources = discover(args.src, args.out, args.exclude)
     pages = [render_page(md, rel, args.src, args.blob) for rel in sources]
-    outputs = output_map(pages, listing(pages))
+    outputs, tree = output_map(pages, listing(pages)), build_tree(pages)
     for name, page in outputs.items():
         dest = args.out / name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(fill(template, name, page, args), encoding="utf-8", newline="\n")
+        dest.write_text(fill(template, name, page, args, tree), encoding="utf-8", newline="\n")
     for image in sorted({i for p in pages for i in p.images if (args.src / i).is_file()}):
         (args.out / image).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(args.src / image, args.out / image)

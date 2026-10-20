@@ -103,3 +103,11 @@ branch = true
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+# Docstring sections required by blueprint sections 17.3-17.4 (QG-003),
+# enforced by `make docstrings` (tools/check-docstrings).
+[tool.check-docstrings]
+module-sections = ["Dependencies", "Example"]
+function-sections = ["Args", "Returns", "Raises"]
+include-tests = true
+exclude = []

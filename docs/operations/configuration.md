@@ -81,3 +81,25 @@ Packaged entries:
 | `"ISP"` | `"isp"` | `"primary"` | `true` | `false` |
 | `"WAN"` | `"wan"` | `"primary"` | `true` | `false` |
 | `"UPLINK"` | `"uplink"` | `"primary"` | `false` | `false` |
+
+### `[polling]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `polling.default_interval` | duration, >= 30s, <= 3600s | `"60s"` | live | v0.1.1 | Poll interval for devices without their own interval (SCHED-010). Each poll is anchored to its intended slot, not to when the previous poll finished. The range matches the policy limits of Appendix E.18. |
+| `polling.reachability_strategy` | enum: icmp_gated \| snmp_fallback \| icmp_only \| snmp_only | `"icmp_gated"` | live | v0.1.1 | How ICMP gates SNMP for devices without their own strategy (ICMP-006 to ICMP-014). icmp_gated skips SNMP after 0 or 1 of 5 replies; snmp_fallback then makes one low-cost Stage 1 attempt; icmp_only never uses SNMP; snmp_only never pings. |
+
+### `[scheduler]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `scheduler.collector_name` | str | `""` | restart | v0.1.1 | Name of this collector; the hostname phase is hashed from it (SCHED-001, Appendix E.11). Empty means the host's short name, lower-cased, without its DNS suffix. Changing it moves every device's poll time. |
+| `scheduler.phase` | enum: hostname \| fixed | `"hostname"` | restart | v0.1.1 | Where this collector's polling cycle starts within each interval (SCHED-002 to SCHED-004). hostname derives it from scheduler.collector_name, so two collectors watching the same devices do not probe them at the same instant; fixed uses scheduler.fixed_phase. |
+| `scheduler.fixed_phase` | duration, >= 0s, <= 3600s | `"0s"` | restart | v0.1.1 | Cycle start offset when scheduler.phase is fixed (SCHED-004), taken modulo each device's interval. |
+| `scheduler.device_order` | enum: common \| hashed | `"common"` | restart | v0.1.1 | How devices are placed after the phase (SCHED-005, SCHED-006). common hashes the device UUID, so every collector visits devices in the same relative order; hashed also hashes the collector name, giving each collector its own order. Hashing spreads polls across the interval; it does not guarantee that two devices never start together (SCHED-007). |
+| `scheduler.workers` | int, >= 1, <= 1000 | `32` | restart | v0.1.1 | Polls that may run at once (SCHED-016). The MVP workload needs about 5 on average. When every worker is busy, a due poll waits up to scheduler.max_start_delay and is then recorded as not attempted, which shows as unknown, never as a device outage (SCHED-017). |
+| `scheduler.queue_capacity` | int, >= 16, <= 100000 | `1000` | restart | v0.1.1 | Finished poll records held between the scheduler and the spool (section 6.4), about 10 minutes of polls at the MVP workload. When it is full, polling slows and the collector reports itself overloaded; records are never dropped. |
+| `scheduler.late_after` | duration, >= 1s, <= 300s | `"5s"` | restart | v0.1.1 | A poll that starts more than this after its slot counts as late in health metrics (section 4.2 asks for 99% within about 5s). Must not exceed scheduler.max_start_delay. |
+| `scheduler.max_start_delay` | duration, >= 1s, <= 600s | `"30s"` | restart | v0.1.1 | A due poll that cannot start within this time, because every worker is busy or the collector stalled, is recorded as not attempted instead of running late (SCHED-017). A device still being polled at its next slot gets that slot recorded as missed (overrun) at once (SCHED-012). |
+| `scheduler.poll_deadline` | duration, >= 5s, <= 3600s | `"90s"` | restart | v0.1.1 | A poll still running after this long is stopped. Steps that already finished keep their results, and the poll is recorded as partial or failed. At the 60s default interval a hung poll costs at most one missed slot. |
+| `scheduler.shutdown_grace` | duration, >= 0s, <= 300s | `"15s"` | restart | v0.1.1 | On shutdown, how long running polls get to finish before they are cancelled; every cancelled poll is still recorded, with the results of its finished steps (section 16.4). Keep it well below the service's systemd stop timeout. |

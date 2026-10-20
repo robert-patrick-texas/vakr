@@ -58,7 +58,7 @@ License: Apache-2.0
 License: PSF-2.0
  Python Software Foundation License Version 2. The complete text, with the
  history of the software and the licenses of earlier Python releases, is in
- /opt/vakr/python/lib/python3.15/LICENSE.txt.
+ LICENSE.txt in the bundled standard library, /opt/vakr/python/lib/python3.*/.
 
 License: BSD-3-Clause
  The 3-clause BSD license. The complete text for each component is in its

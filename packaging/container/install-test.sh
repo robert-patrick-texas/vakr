@@ -8,8 +8,10 @@
 #   DEB_N, DEB_N1         package files for release N and test release N+1
 #   DEBVER_N, DEBVER_N1   their dpkg versions
 #   PEP_N, PEP_N1         the `vakr --version` each must report (PEP 440 form)
+#   PYTHON_MINOR          the bundled interpreter's version (.python-version)
 set -euo pipefail
 : "${DEB_N:?}" "${DEB_N1:?}" "${DEBVER_N:?}" "${DEBVER_N1:?}" "${PEP_N:?}" "${PEP_N1:?}"
+: "${PYTHON_MINOR:?}"
 # shellcheck source=packaging/container/testlib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/testlib.sh"
 
@@ -52,8 +54,10 @@ check_layout() {
         equals "$(unexpected_paths)" ""
     check "/usr/bin/vakr links to /opt/vakr/venv/bin/vakr" \
         equals "$(readlink /usr/bin/vakr)" /opt/vakr/venv/bin/vakr
-    check "venv runs the bundled Python 3.15, not the system one" /opt/vakr/venv/bin/python3 -c \
-        'import sys; assert sys.version_info[:2] == (3, 15); assert sys.base_prefix == "/opt/vakr/python"'
+    check "venv runs the bundled Python $PYTHON_MINOR, not the system one" \
+        /opt/vakr/venv/bin/python3 -c 'import sys
+assert "%d.%d" % sys.version_info[:2] == sys.argv[1]
+assert sys.base_prefix == "/opt/vakr/python"' "$PYTHON_MINOR"
     check "no dpkg conffiles (CFGM-005)" equals "$(dpkg-query -W -f='${Conffiles}' vakr)" ""
     local dep
     for dep in ca-certificates openssh-client openssl systemd; do

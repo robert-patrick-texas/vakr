@@ -58,26 +58,34 @@ test_env=(
     --env DEB_N="/debs/n/$deb_n" --env DEB_N1="/debs/n1/$deb_n1"
     --env DEBVER_N="$debver_n" --env DEBVER_N1="$debver_n1"
     --env PEP_N="$(version_as pep440 "$version_n")" --env PEP_N1="$(version_as pep440 "$version_n1")"
+    --env PYTHON_MINOR="$(tr -d '[:space:]' <.python-version)"
 )
 mounts=(--volume "$PWD/$work:/debs:ro" --volume "$PWD/packaging/container:/test:ro")
 
 echo "package-test: install, remove, reinstall, upgrade, purge in ubuntu:26.04"
 docker run --rm "${mounts[@]}" "${test_env[@]}" ubuntu:26.04 bash /test/install-test.sh
 
+# Global, not local: the EXIT trap runs after run_systemd_test has returned.
+systemd_container=vakr-systemd-test-$$
+
+remove_systemd_container() {
+    docker rm --force "$systemd_container" >/dev/null 2>&1 || true
+}
+
 run_systemd_test() {
-    local image=vakr-systemd-test name=vakr-systemd-test-$$ state=""
+    local image=vakr-systemd-test state=""
     docker build --quiet --tag "$image" - <packaging/container/Dockerfile.systemd >/dev/null
+    trap remove_systemd_container EXIT
     # systemd as PID 1 needs a privileged container with its own cgroup tree.
-    docker run --detach --name "$name" --privileged --cgroupns=private \
+    docker run --detach --name "$systemd_container" --privileged --cgroupns=private \
         --tmpfs /run --tmpfs /run/lock "${mounts[@]}" "$image" >/dev/null
-    trap 'docker rm --force "$name" >/dev/null 2>&1 || true' EXIT
     for _ in $(seq 60); do
-        state=$(docker exec "$name" systemctl is-system-running 2>/dev/null || true)
+        state=$(docker exec "$systemd_container" systemctl is-system-running 2>/dev/null || true)
         case $state in running | degraded) break ;; esac
         sleep 1
     done
     echo "package-test: container systemd state: $state"
-    docker exec "${test_env[@]}" "$name" bash /test/systemd-test.sh
+    docker exec "${test_env[@]}" "$systemd_container" bash /test/systemd-test.sh
 }
 
 if [ "${PACKAGE_TEST_SYSTEMD:-1}" = 1 ]; then

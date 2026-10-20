@@ -20,8 +20,8 @@ export PYTHONHASHSEED=0 PYTHONDONTWRITEBYTECODE=1
 export UV_PYTHON_INSTALL_DIR=/build/python UV_NO_PROGRESS=1 UV_LINK_MODE=copy
 
 OPT=/opt/vakr
-PYVER=3.15
 PY=$OPT/python/bin/python3
+PYVER=""  # from .python-version, so the bundled interpreter follows it (TOOLS-003)
 SRC=/build/src
 DEB=/build/out/vakr_${VAKR_DEB_VERSION}_amd64.deb
 
@@ -37,6 +37,8 @@ unpack_source() {
         printf '%s\n' "$VAKR_VERSION" >VERSION
     fi
     [ "$(cat VERSION)" = "$VAKR_VERSION" ] || die "VERSION is not $VAKR_VERSION"
+    PYVER=$(tr -d '[:space:]' <.python-version)
+    [[ $PYVER =~ ^3\.[0-9]+$ ]] || die ".python-version must be MAJOR.MINOR, not '$PYVER'"
 }
 
 install_python() {
@@ -97,7 +99,7 @@ install_venv() {
     # uv bookkeeping and would make two builds of one commit differ.
     local info
     info=$(echo "$OPT"/venv/lib/python"$PYVER"/site-packages/vakr-*.dist-info)
-    rm -f "$info/uv_cache.json"
+    rm -f "$info/uv_cache.json" "$OPT/venv/.lock"
     sed -i '/\/uv_cache\.json,/d' "$info/RECORD"
 }
 

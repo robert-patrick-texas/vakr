@@ -22,7 +22,7 @@ _site/
 
 # Field bundles and secrets must never be committed
 inbox/
-*.age
+*.p7m
 *.gpg
 secrets/
 credentials.toml

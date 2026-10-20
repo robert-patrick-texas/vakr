@@ -1,6 +1,6 @@
 # Copyright 2026 Robert Patrick
 # SPDX-License-Identifier: Apache-2.0
-"""Tests for md2html, the portable Markdown-to-HTML site builder.
+r"""Tests for md2html, the portable Markdown-to-HTML site builder.
 
 Published docs are only trustworthy if table-of-contents anchors resolve as
 on GitHub and the link check fails the Pages build on a broken file link or
@@ -210,9 +210,7 @@ def test_check_reports_broken_file_link_and_anchor(
     ]
 
 
-def test_check_passes_on_valid_tree(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_check_passes_on_valid_tree(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A tree whose links all resolve passes ``--check`` silently (DOCPUB-002).
 
     Args:
@@ -259,7 +257,8 @@ def test_images_exclusions_and_deterministic_output(tmp_path: Path) -> None:
     _, out = build(tmp_path, files, "--exclude", "drafts")
     assert first == {p: p.read_bytes() for p in sorted(out.rglob("*")) if p.is_file()}
     assert (out / "img/logo.svg").read_bytes() == files["img/logo.svg"].encode()
-    assert not (out / "drafts").exists() and not (out / "node_modules").exists()
+    assert not (out / "drafts").exists()
+    assert not (out / "node_modules").exists()
 
 
 def test_page_template_and_github_features(tmp_path: Path) -> None:
@@ -275,10 +274,7 @@ def test_page_template_and_github_features(tmp_path: Path) -> None:
         AssertionError: If template parts or Markdown features are missing.
     """
     (tmp_path / ".git").mkdir()
-    text = (
-        "# Ops *guide*\n\n|a|b|\n|-|-|\n|1|2|\n\n- [ ] todo\n\n~~old~~\n\n"
-        "```toml\nk = 1\n```\n"
-    )
+    text = "# Ops *guide*\n\n|a|b|\n|-|-|\n|1|2|\n\n- [ ] todo\n\n~~old~~\n\n```toml\nk = 1\n```\n"
     files = {"docs/sub/g.md": text, "docs/README.md": "# Docs\n"}
     make_tree(tmp_path, files)
     repo = ["--repo-url", "https://github.com/o/r/", "--branch", "dev"]
@@ -297,4 +293,5 @@ def test_page_template_and_github_features(tmp_path: Path) -> None:
         f'Source: <a href="{blob}">docs/sub/g.md</a>',
     ]:
         assert part in page
-    assert "http://" not in page and "//cdn" not in page
+    assert "http://" not in page
+    assert "//cdn" not in page

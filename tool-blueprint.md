@@ -702,7 +702,8 @@ Within a bucket, sort by severity, then most recent state change, then natural d
 | META-009 | Deleting an inventory record shall be a soft lifecycle operation by default; historical telemetry and identity history shall remain available. |
 | META-010 | Bulk import/export shall support validated CSV and TOML for device inventory and interface annotations, using stable UUIDs where supplied and deterministic dry-run output. |
 | META-011 | Every interface shall have an interest class: `primary` (interfaces of interest such as uplinks and primary-path transit, viewed often) or `secondary` (default; viewed occasionally for one-off questions). `primary` is the same flag as the high-priority annotation, not a second concept; `high_priority = true` is accepted as an alias. Both classes are collected and retained identically. |
-| META-012 | Collection policy rules may assign the interest class, sticky flag, and WAN-circuit flag by match (for example `ifAlias` patterns such as `*UPLINK*`), so operators need not annotate every uplink by hand. Explicit per-interface annotations override policy-assigned values, and the explain output (POLICY-004) shows which applied. |
+| META-012 | Interface descriptions (`ifAlias`) are the first source of classification, because NetOps already put labels such as ISP, WAN, and Uplink in them. vakr shall extract keyword tags from descriptions using a configurable keyword list (defaults in Appendix E.15). Matching is case-insensitive and on whole tokens: a description is split on every non-alphanumeric character, so `WAN-ISP_Carrier` matches `WAN` and `ISP` but `SWANSEA` matches nothing. A `re:` keyword uses the bounded regex rules of POLICY-005. Each keyword maps to a tag and may also set interest `primary`, `is_wan_circuit`, or `sticky`. Description-derived tags are labeled as such and follow the description when it changes. Precedence is: explicit vakr annotation, then description keyword, then policy rule, then the default (`secondary`). The explain output (POLICY-004) shows which source applied. |
+| META-013 | Interfaces whose descriptions carry no keyword shall be classifiable in vakr itself: bulk select-and-tag in the web UI, CSV/TOML import, and `vakr interface tag`. Tags added in vakr are stored apart from description-derived tags, and a later description change never removes them. Device pages and the interface list offer a "not yet classified" filter (no annotation and no keyword match), so NetOps can work through the remainder or decide to update device descriptions instead. |
 
 ### 8.3 Discovery requirements
 
@@ -718,6 +719,7 @@ Within a bucket, sort by severity, then most recent state change, then natural d
 | DISC-008 | Discovery results shall record completeness and per-subtable quality; one failed subtable shall not erase successful discovery data. |
 | DISC-009 | Rediscovery shall update capability knowledge so unsupported counters are not repeatedly requested, while allowing capability re-probe on a configured interval or manual action. |
 | DISC-010 | A manual rediscovery shall be asynchronous from the web request, expose progress/result, and never block the API worker for the duration of SNMP collection. |
+| DISC-011 | `ifAlias`, `ifName`, and `ifDescr` for known interfaces shall be refreshed with exact GETs every `discovery.alias_refresh_interval` (default 1 h), so description edits on a device reach classification (META-012) within an hour without a full rediscovery. A manual rediscovery applies them immediately. |
 
 ### 8.4 Collection policy requirements
 
@@ -1473,12 +1475,16 @@ A prior planning estimate is roughly 380 GB logical ClickHouse footprint using c
 /var/log/vakr/            # optional file sink; journald is default
 /run/vakr/
 /run/vakr/api.sock        # local API socket for the TUI and CLI
-/opt/vakr/                # packaged interpreter, virtual environment, and assets (read-only)
-/usr/share/vakr/defaults/ # packaged built-in defaults for every option (read-only, CFGM-001)
+/etc/vakr/tls/ca.d/       # extra trusted CA certificates, e.g. an enterprise TLS-inspection CA (EGRESS-002)
+/opt/vakr/                # everything the package installs (read-only; PKG-002)
+/opt/vakr/python/         #   bundled CPython interpreter
+/opt/vakr/venv/           #   locked virtual environment containing vakr
+/opt/vakr/share/defaults/ #   built-in defaults for every option (CFGM-001)
+/opt/vakr/share/release-signers  # trusted release signing keys (UPD-001)
 /var/cache/vakr/updates/  # downloaded and previous packages for self-update/rollback
 ```
 
-Operator files under `/etc/vakr/` hold only the settings an operator has changed. Every option's default ships in `/usr/share/vakr/defaults/`, so a new release's new options take effect with documented defaults without editing operator files (section 28.4).
+Operator files under `/etc/vakr/` hold only the settings an operator has changed. Every option's default ships in `/opt/vakr/share/defaults/`, so a new release's new options take effect with documented defaults without editing operator files (section 28.4).
 
 ### 11.2 File versus API ownership
 
@@ -3301,10 +3307,16 @@ native_retention_days = 30
 rollup_retention_days = 400
 rollup_interval = "15m"
 
-[[interface_policy.rules]]
-name = "uplinks-are-primary"
-match_ifalias_patterns = ["*UPLINK*", "*TRANSIT*", "*WAN*"]
-set_interest = "primary"
+# Description keywords (META-012). The packaged defaults already cover ISP, WAN,
+# and UPLINK; this adds a site-specific keyword.
+[[interface_classification.keywords]]
+keyword = "TRANSIT"
+tag = "transit"
+interest = "primary"
+
+[network]
+# https_proxy = "http://proxy.example.net:3128"   # or use HTTPS_PROXY in the unit environment
+# Enterprise TLS-inspection CA: install with `vakr tls trust-ca` (EGRESS-003)
 
 [update]
 repository = "robert-patrick-texas/vakr"
@@ -3328,7 +3340,7 @@ development host                                   production site
 code -> tools/release -> GitHub Release  --HTTPS-->  vakr self-update -> apt install .deb
                          (.deb, SHA256SUMS, .sig)     (optional daily timer)
 
-inbox/ <- tools/field-inbox <-- HTTPS URL or scp <--  vakr field collect -> bundle.tar.gz.age
+inbox/ <- tools/field-inbox <-- HTTPS URL or scp <--  vakr field collect -> bundle.tar.gz.p7m
 ```
 
 ### 28.2 Single version source
@@ -3347,7 +3359,7 @@ inbox/ <- tools/field-inbox <-- HTTPS URL or scp <--  vakr field collect -> bund
 | UPD-001 | `vakr self-update`, run as root, shall find the newest release in the configured repository and channel and download its `.deb`, `SHA256SUMS`, and `SHA256SUMS.sig`. It verifies the signature against the release signers file shipped in the installed package, then the checksum. Any failure stops the update before the system changes. |
 | UPD-002 | After verification, self-update shall: <br>1. back up the metadata database, operator configuration, and unit drop-ins; <br>2. cache the currently installed package for rollback; <br>3. install the new package with `apt-get install`, so dependencies resolve; <br>4. run `vakr config upgrade` (section 28.4) and the database migrations; <br>5. restart services and run post-update health checks; <br>6. print a summary with a changelog excerpt and the new configuration options. |
 | UPD-003 | An optional `vakr-update.timer`, disabled by default and enabled with `systemctl enable --now vakr-update.timer`, shall run `vakr self-update --yes --if-newer` daily with a randomized delay of up to 4 hours. |
-| UPD-004 | Other modes: <br>• `vakr self-update --check` only reports whether an update exists. <br>• `--version X` installs a specific release. <br>• `--file PKG --sums SUMS --sig SIG` installs verified artifacts that were transferred by hand to a host without GitHub access. <br>HTTPS proxies are honoured through the standard environment variables and `[update] https_proxy`. |
+| UPD-004 | Other modes: <br>• `vakr self-update --check` only reports whether an update exists. <br>• `--version X` installs a specific release. <br>• `--file PKG --sums SUMS --sig SIG` installs verified artifacts that were transferred by hand to a host without GitHub access. <br>Proxies and extra trusted CAs follow EGRESS-001 and EGRESS-002. |
 | UPD-005 | `vakr self-update --rollback` shall reinstall the cached previous package and restore the pre-update metadata backup and configuration. Telemetry migrations during the MVP shall be additive, so rollback needs no telemetry restore. Any exception is flagged in the release notes and blocks timer-driven updates. |
 | UPD-006 | If post-update health checks fail, self-update shall: <br>• leave services in their previous state where possible; <br>• report the failure clearly and exit non-zero; <br>• record the outcome where `vakr check health` reports it. <br>The timer shall not retry a failed version until a newer release appears or an operator intervenes. |
 | UPD-007 | A lock prevents concurrent updates. Every step emits structured journald events with stable IDs, and secrets never appear in update logs. |
@@ -3361,11 +3373,31 @@ inbox/ <- tools/field-inbox <-- HTTPS URL or scp <--  vakr field collect -> bund
 | UPD-T04 | Offline | `--file` install of verified artifacts with no network | Succeeds | UPD-004 |
 | UPD-T05 | Timer | Timer enabled; newer release present, then absent, then beyond `hold_version` | Updates exactly once, then no-ops, and respects the hold | UPD-003, UPD-008 |
 
+### 28.3.1 Outbound HTTPS, proxies, and enterprise TLS inspection
+
+Production hosts reach GitHub either directly or through an enterprise proxy. Some enterprises decrypt outbound traffic and re-sign it with their own CA, so vakr must be able to trust that CA. Verification is never turned off.
+
+| ID | Requirement |
+|---|---|
+| EGRESS-001 | All outbound HTTPS shall use one shared client configuration. That covers release checks and downloads, the field kit's reachability test, and peer replication. Proxies come from `[network] https_proxy` and `no_proxy`, falling back to the standard `HTTPS_PROXY` and `NO_PROXY` environment variables. Proxy credentials come from the credential provider and never from plain configuration. |
+| EGRESS-002 | The trust store shall be the OS store plus every PEM certificate in `/etc/vakr/tls/ca.d/`. The OS store is `/etc/ssl/certs/ca-certificates.crt` on Ubuntu and `/etc/pki/tls/certs/ca-bundle.crt` on the RHEL family. The bundled interpreter shall not rely on its compiled-in CA paths. |
+| EGRESS-003 | `vakr tls trust-ca FILE [--name NAME] [--system]` shall: <br>• check that the file is a PEM X.509 certificate with `basicConstraints CA:TRUE` that is within its validity period; <br>• print its subject, SHA-256 fingerprint, and expiry so the operator can compare them with an out-of-band source; <br>• after confirmation (or `--yes`), install it into `/etc/vakr/tls/ca.d/` as root-owned, mode `0644`. <br>`--system` also adds it to the OS store (`update-ca-certificates` or `update-ca-trust`). `vakr tls list` and `vakr tls remove NAME` manage installed CAs. Every change is audited. |
+| EGRESS-004 | There shall be no configuration key, flag, or environment variable that disables certificate or hostname verification. |
+| EGRESS-005 | `vakr doctor` and `vakr self-update --check` shall diagnose egress step by step: DNS, proxy connect, TLS handshake, and the GitHub API and release-asset hosts. When the presented certificate's issuer is untrusted, the output names that issuer and suggests `vakr tls trust-ca`. |
+| EGRESS-006 | A trusted CA expiring within 30 days shall make `vakr check health` report WARNING; an expired one reports CRITICAL. |
+
+| Test ID | Layer | Scenario | Required pass condition | Primary requirements |
+|---|---|---|---|---|
+| EGRESS-T01 | Integration | A TLS-intercepting proxy re-signs traffic with a test CA | Update check fails with an issuer-naming diagnosis, then succeeds after `vakr tls trust-ca` | EGRESS-002, EGRESS-003, EGRESS-005 |
+| EGRESS-T02 | Security | Leaf, expired, or non-PEM certificate given to `trust-ca` | Rejected with a clear reason; nothing installed | EGRESS-003 |
+| EGRESS-T03 | Unit | Proxy settings from config, environment, and `no_proxy` | Precedence and bypass match documentation | EGRESS-001 |
+| EGRESS-T04 | Static | Search for code that disables verification (`CERT_NONE`, `check_hostname = False`, `verify=False`) | None found outside tests that prove rejection | EGRESS-004 |
+
 ### 28.4 Configuration layering and upgrade merge
 
 | ID | Requirement |
 |---|---|
-| CFGM-001 | Every option's default shall ship in `/usr/share/vakr/defaults/` as documented, read-only, package-owned TOML. Operator files under `/etc/vakr/` hold only overrides, so options added in a new release take effect with their documented defaults without operator action. |
+| CFGM-001 | Every option's default shall ship in `/opt/vakr/share/defaults/` as documented, read-only, package-owned TOML. Operator files under `/etc/vakr/` hold only overrides, so options added in a new release take effect with their documented defaults without operator action. |
 | CFGM-002 | Operator files carry `config_version`. Each release ships ordered, declarative config migrations: rename, move, remove, change type or units, split, and value transforms. `vakr config upgrade` applies them in order, keeps the operator's comments and formatting, writes a timestamped backup, and prints a diff. Self-update runs it automatically. |
 | CFGM-003 | `vakr config upgrade --dry-run` shows the diff without writing. Any migration or validation failure leaves operator files untouched and aborts the update before services restart. |
 | CFGM-004 | `vakr config new-options [--since VERSION]` lists options added since the deployment's previous version, with defaults and descriptions. `--annotate` appends them as commented-out entries to the relevant operator file, so operators find them where they edit. |
@@ -3392,9 +3424,10 @@ Whenever development needs information from production, a collection tool is bui
 | FIELD-003 | The output shall be one bundle, `vakr-field-<host>-<UTC timestamp>.tar.gz`. Its `manifest.json` lists the tool version, profiles, non-secret parameters, timings, and errors, plus a SHA-256 for every member. |
 | FIELD-004 | SNMP communities and other credentials shall be read from a protected local file or an interactive prompt, never from command-line arguments, and shall never be written into the bundle. A redaction test corpus proves this. |
 | FIELD-005 | `--pseudonymize` shall replace IP addresses, MAC addresses, hostnames, `sysContact`, `sysLocation`, and free-text descriptions with consistent pseudonyms. It uses a keyed HMAC whose key stays on the production host, and it preserves structure so captures remain valid simulator fixtures. |
-| FIELD-006 | `--encrypt`, the default when the `age` tool is present, shall encrypt the bundle to the development host's `age` public key, which ships with the tool, producing `*.tar.gz.age`. Only the development host can decrypt it, so the transfer location does not need to be trusted. |
+| FIELD-006 | Bundles are encrypted by default to the development host's recipient certificate, which ships with the tool. The output is a standard CMS AuthEnvelopedData file (RFC 5083) named `*.tar.gz.p7m`, using AES-256-GCM content encryption (RFC 5084) and an RSA-3072 recipient key with RSA-OAEP/SHA-256 key transport. Encryption runs `openssl cms`, called with an argument list; OpenSSL 3.0 or newer is required and preflight checks for it. Only the development host can decrypt the bundle, so the transfer location doesn't need to be trusted, and GCM authentication means a modified bundle fails to decrypt. `--no-encrypt` exists only for bundles that stay on the production host. |
 | FIELD-007 | For transfer, the operator either places the encrypted bundle at any HTTPS URL this host can reach (`tools/field-inbox fetch <url>`) or copies it with `scp` into `~/vakr-inbox/` on this host. |
-| FIELD-008 | `tools/field-inbox` shall decrypt with the identity stored outside the repository (`~/.config/vakr-field/identity.txt`), verify the manifest checksums, extract into the git-ignored `inbox/<bundle-id>/`, and print a summary. |
+| FIELD-008 | `tools/field-inbox` shall decrypt with the recipient private key stored outside the repository (`~/.config/vakr-field/recipient-key.pem`, mode `0600`), verify the manifest checksums, extract into the git-ignored `inbox/<bundle-id>/`, and print a summary. It rejects archive members with absolute paths, `..` components, or links. |
+| FIELD-010 | The field kit's GitHub reachability test (FIELD-002 `host` profile) shall accept the same proxy and CA options as vakr (`--proxy`, `--ca-file`). It shall report the issuer of the certificate presented for `github.com`, so the development side learns whether an enterprise TLS-inspection proxy is in the path before vakr is installed. |
 | FIELD-009 | The field kit shall change nothing on the production host, finish within bounded time, and end by printing one line that names the output file and the next step. |
 
 ### 28.6 Packaging
@@ -3402,7 +3435,7 @@ Whenever development needs information from production, a collection tool is bui
 | ID | Requirement |
 |---|---|
 | PKG-001 | The MVP shall ship as `vakr_<version>_amd64.deb` for Ubuntu 26.04 LTS, built with nfpm from a packaging spec that will also produce the later `.rpm`. |
-| PKG-002 | The package installs: <br>• under `/opt/vakr`, a relocatable CPython build of the project's pinned Python version and a locked virtual environment; <br>• a `/usr/bin/vakr` entry point; <br>• systemd units under `/usr/lib/systemd/system`; <br>• defaults under `/usr/share/vakr/defaults`; <br>• release signers under `/usr/share/vakr/release-signers`; <br>• documentation under `/usr/share/doc/vakr`. |
+| PKG-002 | The package installs its files under `/opt/vakr`: a relocatable CPython build of the project's pinned Python version (`python/`), a locked virtual environment (`venv/`), defaults (`share/defaults/`), release signers (`share/release-signers`), unit-file sources (`share/systemd/`), and documentation (`share/doc/`). The only files outside `/opt/vakr` are the integration points the OS requires to be in system paths: systemd units in `/usr/lib/systemd/system/`, `sysusers.d` and `tmpfiles.d` entries in `/usr/lib/`, and the `/usr/bin/vakr` symlink. Operator configuration (`/etc/vakr`), state (`/var/lib/vakr`), and cache (`/var/cache/vakr`) are created by the package but never overwritten by it. |
 | PKG-003 | Maintainer scripts create the `vakr` system user and group, `/var/lib/vakr`, `/var/cache/vakr`, and `/etc/vakr` with `secrets/` at mode `0750`. On first install, collection does not start until `vakr setup` has created the first admin and set the node role and position. On upgrade, only services that were running are restarted. |
 | PKG-004 | Package builds are reproducible from the lockfile in a clean `ubuntu:26.04` container and produce no `lintian` errors. |
 | PKG-005 | `apt remove` keeps configuration and data. `apt purge` removes configuration but keeps the telemetry history in `/var/lib/vakr`, and prints a notice. Deleting that history requires `vakr data purge`. |
@@ -3530,13 +3563,15 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | ADR-022 | MVP walking-skeleton milestone order (section 27.8) supersedes the phase order until MVP acceptance | Accepted 2026-10-19 |
 | ADR-023 | Unprivileged ICMP datagram sockets; no `CAP_NET_RAW` by default | Accepted 2026-10-19 |
 | ADR-024 | Multi-position: independent full nodes, metadata primary, pull replication of observations | Proposed; validate in milestone M5 |
-| ADR-025 | Packaging with `nfpm` and a bundled relocatable Python interpreter under `/opt/vakr` | Proposed; validate in milestone M1 |
+| ADR-025 | Packaging with `nfpm`; all installed files under `/opt/vakr` (bundled relocatable interpreter, venv, defaults, signers), with only OS integration points outside it | Accepted 2026-10-20 (owner: install under `/opt/vakr`); validate in milestone M1 |
 | ADR-026 | Release trust: `SHA256SUMS` signed with an SSH signing key held off GitHub, verified with `ssh-keygen -Y verify` | Proposed; validate in milestone M1 |
 | ADR-027 | Configuration layering and upgrade merge (overrides-only operator files, packaged defaults, versioned config migrations) | Accepted 2026-10-19 |
-| ADR-028 | Field data bundles: stdlib-only collector, `age` encryption to the development host, HTTPS or scp transfer | Proposed; validate in milestone M1 |
+| ADR-028 | Field data bundles: stdlib-only collector; CMS AuthEnvelopedData with AES-256-GCM and RSA-OAEP via `openssl cms`; transfer over HTTPS or scp. The Python `cryptography` module was evaluated: its PKCS#7 API (50.0.2) supports only AES-CBC EnvelopedData, so it cannot produce or read GCM CMS. vakr uses it for certificate inspection (EGRESS-003) instead. | Accepted 2026-10-20 (owner: openssl cms / cryptography instead of age) |
 | ADR-029 | Single `VERSION` file as the only version source | Accepted 2026-10-19 |
 | ADR-030 | Portable scaffolding tools and their reuse boundary (section 29) | Accepted 2026-10-19 |
 | ADR-031 | Compatibility policy: breaking changes accepted until post-MVP enterprise readiness; config and data migrations remain mandatory | Accepted 2026-10-19 |
+| ADR-032 | Outbound HTTPS through enterprise proxies and TLS-inspection CAs; verification never disabled (section 28.3.1) | Accepted 2026-10-20 |
+| ADR-033 | Interface classification from description keywords, with vakr-side tags for the rest (META-012, META-013) | Accepted 2026-10-20 |
 
 ## Appendix D. Recommended first implementation milestone
 
@@ -3687,3 +3722,13 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | Update timer | Disabled; when enabled, runs daily with `RandomizedDelaySec=4h` |
 | Channel | `prerelease` until MVP acceptance, then `stable` |
 | Cached previous packages for rollback | 2 |
+
+### E.15 Interface description keywords (META-012)
+
+| Keyword | Tag | Interest | WAN circuit |
+|---|---|---|---|
+| `ISP` | `isp` | primary | yes |
+| `WAN` | `wan` | primary | yes |
+| `UPLINK` | `uplink` | primary | no |
+
+Operators add keywords in `[[interface_classification.keywords]]`. Setting `interface_classification.use_default_keywords = false` replaces the defaults instead of extending them. Keywords match whole tokens case-insensitively; `re:`-prefixed keywords follow POLICY-005.

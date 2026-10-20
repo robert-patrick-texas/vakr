@@ -104,11 +104,7 @@ def github_slug(text: str) -> str:
     Raises:
         None.
     """
-    keep = (
-        c
-        for c in text.lower()
-        if c in " -" or unicodedata.category(c).startswith(SLUG_KEEP)
-    )
+    keep = (c for c in text.lower() if c in " -" or unicodedata.category(c).startswith(SLUG_KEEP))
     return "".join(keep).replace(" ", "-")
 
 
@@ -134,9 +130,7 @@ def make_parser() -> MarkdownIt:
         "table_open",
         lambda r, t, i, o, e: '<div class="table-wrap">\n' + r.renderToken(t, i, o, e),
     )
-    md.add_render_rule(
-        "table_close", lambda r, t, i, o, e: r.renderToken(t, i, o, e) + "</div>\n"
-    )
+    md.add_render_rule("table_close", lambda r, t, i, o, e: r.renderToken(t, i, o, e) + "</div>\n")
     return md
 
 
@@ -166,9 +160,7 @@ def resolve_ref(page: Page, href: str, line: int, src: Path, blob: str | None) -
         return href
     path, new = unquote(parts.path), parts.path
     base = "" if path.startswith("/") else posixpath.dirname(page.rel)
-    target = (
-        posixpath.normpath(posixpath.join(base, path.lstrip("/"))) if path else page.rel
-    )
+    target = posixpath.normpath(posixpath.join(base, path.lstrip("/"))) if path else page.rel
     page.refs.append(Ref(line, href, target, unquote(parts.fragment)))
     inside = target != ".." and not target.startswith("../")
     if path.startswith("/"):
@@ -181,11 +173,7 @@ def resolve_ref(page: Page, href: str, line: int, src: Path, blob: str | None) -
         page.images.add(target)
     elif inside and blob and path and (src / target).is_file():
         new = blob + quote(target)
-    return (
-        href
-        if new == parts.path
-        else urlunsplit(("", "", new, parts.query, parts.fragment))
-    )
+    return href if new == parts.path else urlunsplit(("", "", new, parts.query, parts.fragment))
 
 
 def render_page(md: MarkdownIt, rel: str, src: Path, blob: str | None) -> Page:
@@ -209,9 +197,7 @@ def render_page(md: MarkdownIt, rel: str, src: Path, blob: str | None) -> Page:
     for index, token in enumerate(tokens):
         if token.type == "heading_open" and token.tag == "h1" and not page.title:
             words = tokens[index + 1].children or []
-            text = "".join(
-                w.content for w in words if w.type in ("text", "code_inline")
-            )
+            text = "".join(w.content for w in words if w.type in ("text", "code_inline"))
             page.title = text.strip()
         if token.type != "inline":
             continue
@@ -220,9 +206,7 @@ def render_page(md: MarkdownIt, rel: str, src: Path, blob: str | None) -> Page:
         for child in token.children or []:
             line += child.type in ("softbreak", "hardbreak")
             if attr := REF_ATTRS.get(child.type):
-                child.attrSet(
-                    attr, resolve_ref(page, str(child.attrs[attr]), line, src, blob)
-                )
+                child.attrSet(attr, resolve_ref(page, str(child.attrs[attr]), line, src, blob))
     page.title = page.title or rel
     page.body = md.renderer.render(tokens, md.options, env)
     page.anchors = {html.unescape(a) for a in ANCHOR_ATTR.findall(page.body)}

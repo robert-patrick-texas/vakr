@@ -1,0 +1,107 @@
+[build-system]
+requires = ["hatchling>=1.32.4"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vakr"
+dynamic = ["version"]  # read from the root VERSION file only (VER-001)
+description = "Network performance and reachability monitor: MRTG/SmokePing successor with SNMP discovery, persistent interface identity, web UI, and TUI."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+requires-python = ">=3.15"
+authors = [{ name = "Robert Patrick" }]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+    "cryptography>=50.0.2",  # certificate inspection for enterprise CAs (EGRESS-003)
+    "tomlkit>=0.15.2",       # comment-preserving TOML edits for config upgrades (CFGM-002)
+]
+
+[project.urls]
+Homepage = "https://robert-patrick-texas.github.io/vakr/"
+Source = "https://github.com/robert-patrick-texas/vakr"
+
+[project.scripts]
+vakr = "vakr.cli.main:main"
+
+[dependency-groups]
+dev = [
+    "coverage>=7.16.2",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
+    "ty>=0.0.89",
+]
+# Dependencies of the portable tools under tools/, so ty and pytest can resolve them.
+tools = [
+    "markdown-it-py>=4.2.0",
+    "mdit-py-plugins>=0.6.1",
+]
+
+[tool.uv]
+default-groups = ["dev", "tools"]
+
+[tool.hatch.version]
+path = "VERSION"
+pattern = "^(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+(?:-rc\\.[0-9]+)?)\\s*$"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vakr"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/vakr", "tests", "VERSION", "LICENSE", "NOTICE", "README.md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py315"
+extend-exclude = ["_site"]
+# Portable tools must also run on older system Pythons (fieldkit on RHEL 3.12).
+per-file-target-version = { "tools/**/*.py" = "py312" }
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "S", "D", "C90",
+    "PLR", "PLE", "PLW", "RUF", "PTH", "PT", "TRY", "BLE", "RET", "ARG",
+]
+ignore = [
+    "TRY003",   # long messages in exceptions are how we give operators actionable errors
+    "PLR2004",  # protocol constants (OIDs, port numbers) are clearer inline with a comment
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10  # blueprint section 17.2
+
+[tool.ruff.lint.pylint]
+max-statements = 50  # proxy for the 50-line function guideline (section 17.2)
+max-args = 8
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR0913"]
+"tools/**/test_*.py" = ["S101", "PLR0913"]
+
+[tool.ty.environment]
+python-version = "3.15"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "tools"]
+# Portable tools import their sibling modules the way their scripts do at runtime.
+pythonpath = ["tools/md2html", "tools/check-loc", "tools/check-version"]
+addopts = ["-ra", "--strict-markers", "--import-mode=importlib"]
+
+[tool.coverage.run]
+source = ["vakr"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

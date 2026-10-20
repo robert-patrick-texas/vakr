@@ -69,9 +69,7 @@ def is_excluded(rel: str, globs: list[str]) -> bool:
         None.
     """
     path = PurePosixPath(rel)
-    return any(
-        path.full_match(g) or PurePosixPath(path.name).full_match(g) for g in globs
-    )
+    return any(path.full_match(g) or PurePosixPath(path.name).full_match(g) for g in globs)
 
 
 def discover(src: Path, out: Path, globs: list[str]) -> list[str]:
@@ -119,9 +117,7 @@ def listing(pages: list[Page]) -> Page:
     body = ["<h1>All docs</h1>"]
     ordered = sorted(pages, key=lambda p: (posixpath.dirname(p.rel), p.rel))
     for folder, group in groupby(ordered, key=lambda p: posixpath.dirname(p.rel)):
-        body.append(
-            f"<h2>{html.escape(folder + '/' if folder else 'Top level')}</h2>\n<ul>"
-        )
+        body.append(f"<h2>{html.escape(folder + '/' if folder else 'Top level')}</h2>\n<ul>")
         body += [
             f'<li><a href="{quote(p.rel[:-3])}.html">{html.escape(p.title)}</a>'
             f" <code>{html.escape(p.rel)}</code></li>"
@@ -204,12 +200,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="md2html.py", description="Render a Markdown tree as a static HTML site."
     )
-    parser.add_argument(
-        "src", type=Path, metavar="SRC_DIR", help="tree to search for *.md"
-    )
-    parser.add_argument(
-        "out", type=Path, metavar="OUT_DIR", help="where to write the site"
-    )
+    parser.add_argument("src", type=Path, metavar="SRC_DIR", help="tree to search for *.md")
+    parser.add_argument("out", type=Path, metavar="OUT_DIR", help="where to write the site")
     parser.add_argument("--title", help="site title (default: SRC_DIR name)")
     parser.add_argument(
         "--exclude",
@@ -231,9 +223,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     root = next((p for p in (here, *here.parents) if (p / ".git").exists()), here)
     args.prefix = "" if root == here else here.relative_to(root).as_posix() + "/"
     repo = (args.repo_url or "").rstrip("/")
-    args.blob = (
-        f"{repo}/blob/{quote(args.branch)}/{quote(args.prefix)}" if repo else None
-    )
+    args.blob = f"{repo}/blob/{quote(args.branch)}/{quote(args.prefix)}" if repo else None
     return args
 
 
@@ -260,12 +250,8 @@ def main(argv: list[str] | None = None) -> int:
     for name, page in outputs.items():
         dest = args.out / name
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(
-            fill(template, name, page, args), encoding="utf-8", newline="\n"
-        )
-    for image in sorted(
-        {i for p in pages for i in p.images if (args.src / i).is_file()}
-    ):
+        dest.write_text(fill(template, name, page, args), encoding="utf-8", newline="\n")
+    for image in sorted({i for p in pages for i in p.images if (args.src / i).is_file()}):
         (args.out / image).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(args.src / image, args.out / image)
     print(

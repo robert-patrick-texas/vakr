@@ -28,6 +28,7 @@ COMMAND_MODULES: tuple[str, ...] = (
     "vakr.cli.cmd_doctor",
     "vakr.cli.cmd_check",
     "vakr.cli.cmd_config",
+    "vakr.cli.cmd_credentials",
     "vakr.cli.cmd_selfupdate",
     "vakr.cli.cmd_tls",
     "vakr.cli.cmd_field",

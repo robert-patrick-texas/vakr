@@ -1,0 +1,28 @@
+# Example /etc/vakr/policies.toml (POLICY-001..007), used by the explain tests
+# and by docs/operations/policies.md.
+
+# Global: SVIs, loopbacks, and tunnels are not graphed unless a later rule says so.
+[[interface_policy.rules]]
+name = "no-logical-noise"
+exclude_ifname_patterns = ["Loopback*", "Vlan*", "Tunnel*", "Null*"]
+
+# Group: on access switches, user ports and blank descriptions are not graphed.
+[[interface_policy.rules]]
+name = "access-user-ports"
+groups = ["access-switches"]
+action = "exclude"
+match.ifalias = ["exact:", "user port"]
+
+# Tag: interfaces tagged wan or isp (by description keywords) are polled every 30 s.
+[[interface_policy.rules]]
+name = "wan-fast-poll"
+tags = ["wan", "isp"]
+settings.polling_interval = "30s"
+annotations.sticky = true
+
+# Interface override: the management SVI on the edge router is graphed after all.
+[[interface_policy.rules]]
+name = "edge-mgmt-svi"
+devices = ["edge-rtr1"]
+interfaces = ["exact:Vlan100"]
+action = "include"

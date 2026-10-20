@@ -68,7 +68,7 @@ Useful commands: `vakr config show-effective --sources` prints every effective v
 
 | Field | Type | Presence | Description |
 |---|---|---|---|
-| `keyword` | str (pattern) | required | Whole-token keyword, matched case-insensitively; prefix re: for a bounded regular expression (POLICY-005). |
+| `keyword` | str (pattern) | required | One word of letters and digits, matched case-insensitively against whole description tokens; prefix exact: to match case, or re: for a bounded regular expression that must match one whole token (POLICY-005). |
 | `tag` | str | required | Tag applied to interfaces whose description contains the keyword. |
 | `interest` | enum: primary \| secondary | optional | Interest class to assign (META-011). Omit it to leave interest to annotations and policy rules. |
 | `wan_circuit` | bool | default false | Mark matching interfaces as WAN circuits. |

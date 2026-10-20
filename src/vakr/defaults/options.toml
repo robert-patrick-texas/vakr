@@ -190,7 +190,7 @@ description = "Interface description (ifAlias) keywords that classify interfaces
 type = "str"
 format = "pattern"
 required = true
-description = "Whole-token keyword, matched case-insensitively; prefix re: for a bounded regular expression (POLICY-005)."
+description = "One word of letters and digits, matched case-insensitively against whole description tokens; prefix exact: to match case, or re: for a bounded regular expression that must match one whole token (POLICY-005)."
 
 [options.fields.tag]
 type = "str"

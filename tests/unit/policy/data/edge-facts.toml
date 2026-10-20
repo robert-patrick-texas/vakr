@@ -1,0 +1,37 @@
+# Interface facts for `vakr policy explain --facts` (CFG-009). One Cisco IOS XE
+# edge router and one access switch, as discovery would report them. Fixture
+# data only: no credentials, documentation-range addresses (RFC 5737).
+
+[[interfaces]]
+device = { name = "edge-rtr1", address = "192.0.2.1", site = "nyc01", groups = ["wan-routers"] }
+interface = { ifindex = 1, ifname = "GigabitEthernet0/0/0", ifdescr = "GigabitEthernet0/0/0", ifalias = "ISP: Carrier-X 1G ckt ABC12345", iftype = 6, physical = true, admin_status = "up", oper_status = "up", addresses = ["198.51.100.2/30"] }
+circuit = { provider = "Carrier-X", circuit_id = "ABC12345", contracted_bps = 1000000000 }
+
+[[interfaces]]
+device = { name = "edge-rtr1", address = "192.0.2.1", site = "nyc01", groups = ["wan-routers"] }
+interface = { ifindex = 2, ifname = "GigabitEthernet0/0/1", ifalias = "[WAN] MPLS primary", iftype = 6, physical = true, admin_status = "up", oper_status = "up" }
+
+[[interfaces]]
+device = { name = "edge-rtr1", address = "192.0.2.1", site = "nyc01", groups = ["wan-routers"] }
+interface = { ifindex = 20, ifname = "Vlan100", ifalias = "", iftype = 53, physical = false, admin_status = "up", oper_status = "up" }
+
+[[interfaces]]
+device = { name = "edge-rtr1", address = "192.0.2.1", site = "nyc01", groups = ["wan-routers"] }
+interface = { ifindex = 21, ifname = "Loopback0", ifalias = "", iftype = 24, physical = false, admin_status = "up", oper_status = "up", addresses = ["192.0.2.255/32"] }
+
+[[interfaces]]
+device = { name = "edge-rtr1", address = "192.0.2.1", site = "nyc01", groups = ["wan-routers"] }
+interface = { ifindex = 22, ifname = "Tunnel10", ifalias = "", iftype = 131, physical = false, admin_status = "up", oper_status = "lowerLayerDown" }
+
+[[interfaces]]
+device = { name = "acc-sw7", address = "192.0.2.17", site = "nyc01", groups = ["access-switches"] }
+interface = { ifindex = 1, ifname = "TenGigabitEthernet1/1/1", ifalias = "UPLINK to core-sw1 Te1/0/1", iftype = 6, physical = true, admin_status = "up", oper_status = "up" }
+
+[[interfaces]]
+device = { name = "acc-sw7", address = "192.0.2.17", site = "nyc01", groups = ["access-switches"] }
+interface = { ifindex = 1007, ifname = "GigabitEthernet1/0/7", ifalias = "user port", iftype = 6, physical = true, admin_status = "up", oper_status = "down" }
+
+[[interfaces]]
+device = { name = "acc-sw7", address = "192.0.2.17", site = "nyc01", groups = ["access-switches"] }
+interface = { ifindex = 1008, ifname = "GigabitEthernet1/0/8", ifalias = "printer room 2", iftype = 6, physical = true, admin_status = "up", oper_status = "up" }
+annotations = { tags = ["printers"] }

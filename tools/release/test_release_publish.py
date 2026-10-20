@@ -130,8 +130,9 @@ def test_dry_run_executes_nothing(
         AssertionError: If a command runs or is not shown.
     """
     fake = fake_runner(tmp_path, {("git",): "", ("gh",): ""})
-    publish(fake, [["git", "push", "origin", "refs/tags/v1.0.0"]], dry_run=True)
+    publish(fake, [["git", "tag", "v1.0.0", "--message", "pkg 1.0.0"]], dry_run=True)
     assert fake.calls == []
-    assert "would run: git push origin refs/tags/v1.0.0" in capsys.readouterr().out
+    # Quoted, so a printed command can be pasted into a shell as is.
+    assert "would run: git tag v1.0.0 --message 'pkg 1.0.0'" in capsys.readouterr().out
     publish(fake, [["gh", "release", "create", "v1.0.0"]], dry_run=False)
     assert fake.calls == [["gh", "release", "create", "v1.0.0"]]

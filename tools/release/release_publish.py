@@ -9,7 +9,7 @@ order and stops at the first failure. Release notes come from the matching
 the repository records (VER-004).
 
 Dependencies:
-    re: Finds the changelog section for one version.
+    re, shlex: Find the changelog section; quote commands for display.
     release_proc: Runs ``git`` and ``gh`` with argument lists.
 
 Safety:
@@ -22,6 +22,7 @@ Example:
 """
 
 import re
+import shlex
 from pathlib import Path
 
 from release_config import ReleaseConfig
@@ -110,7 +111,7 @@ def publish(runner: Runner, commands: list[list[str]], *, dry_run: bool) -> None
     """
     for argv in commands:
         if dry_run:
-            print(f"  would run: {' '.join(argv)}")
+            print(f"  would run: {shlex.join(argv)}")
         else:
-            print(f"  running: {' '.join(argv[:4])} ...")
+            print(f"  running: {shlex.join(argv[:4])} ...")
             runner.run(argv, capture=False)

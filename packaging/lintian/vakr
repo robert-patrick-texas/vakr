@@ -31,6 +31,11 @@ vakr: hardening-no-pie [opt/vakr/python/bin/python3.*]
 # /opt/vakr interpreter, never /usr/bin/python3, so they need no python3
 # dependency and their interpreter path is intentionally not /usr/bin/python3.
 vakr: python3-script-but-no-python3-dep /opt/vakr/venv/bin/python3 * [opt/vakr/venv/bin/*]
+# The field kit zipapp keeps its portable `#!/usr/bin/env python3` line because
+# the same file is a release asset operators run with `uv run --python 3.15`.
+# Inside the package it is only ever run by `vakr field collect` with the
+# bundled interpreter, so it needs no python3 dependency.
+vakr: python3-script-but-no-python3-dep python3 * [opt/vakr/share/fieldkit/vakr-fieldkit.pyz]
 vakr: wrong-path-for-interpreter /opt/vakr/venv/bin/python3 != /usr/bin/python3 [opt/vakr/venv/bin/*]
 
 # Bundled interpreter: the standard library and venv ship bytecode compiled

@@ -103,17 +103,11 @@ def validate(args: argparse.Namespace) -> int:
     if result.issues:
         _report(result.issues, "configuration invalid")
         return 1
-    # The portable catalog only checks that a re: keyword compiles; vakr's
-    # policy package also rejects unsafe (backtracking) patterns (POLICY-005).
-    from vakr.policy.errors import PolicyError
-    from vakr.policy.keywords import keywords_from_config
+    # Lazy import: vakr.policy imports vakr.config.loader (POLICY-005 keyword safety).
+    from vakr.config.keyword_check import keyword_problems
 
-    try:
-        keywords_from_config(EffectiveConfig(result.nested(), result.sources))
-    except PolicyError as exc:
-        for issue in exc.issues:
-            print(f"{issue.path}: {issue.reason}")
-        print("configuration invalid: unsafe or invalid interface keyword")
+    if problems := keyword_problems(EffectiveConfig(result.nested(), result.sources)):
+        print("\n".join([*problems, "configuration invalid: unsafe or invalid interface keyword"]))
         return 1
     current = project.catalog().config_version
     for path, version in result.versions.items():

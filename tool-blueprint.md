@@ -4009,3 +4009,33 @@ Decisions taken with the M3 scheduler:
 7. **Collector state from the scheduler.** `OVERLOADED` when the period had capacity misses or producers are blocked on a full queue; `DEGRADED` when event-loop lag exceeded 1 s, a step failed on the collector side, or the scheduler is draining; otherwise `HEALTHY`.
 8. **Shutdown (16.4).** Stop admitting; give in-flight polls the grace period; cancel the rest and record them with the evidence their finished steps produced; then record waiting slots and slots that came due during the drain as `NOT_ATTEMPTED`.
 9. **Deferred.** Worker affinity and rebalancing (SCHED-014) wait for multiple worker processes; estimated-cost ordering (SCHED-015) and adaptive interval changes (ADAPT-002 to ADAPT-007) are post-MVP (27.4). Poll-health diagnostics are on.
+
+### E.29 Status CLI and TUI (TUI-001 to TUI-008, 7.7, 13, STATE-003, TIME-005)
+
+| Setting or bound | Default | Allowed range |
+|---|---|---|
+| `tui.refresh_interval` (`vakr tui --refresh`) | 10 s | 2 s – 10 min |
+| Device-list page size, default / maximum | 100 / 500 (E.19) | 1 – 500 |
+| Devices one list reads | 5,000 | constant; more are reported as truncated |
+| Interfaces counted for the list's active/total column | 20,000 | constant; more show "—, too many interfaces to count" |
+| Interfaces one device view reads | 2,000 | constant; more are reported as truncated |
+| SNMP observations read to find a restart within `status.recent_restart_window` | 500 per device | constant |
+| Search text | 256 characters | constant |
+| Collector health report stale after | E.3 at `polling.default_interval`: 150 s at 60 s | follows E.3 |
+
+Rationale: at the 60 s default interval, a 10 s refresh shows a new poll within seconds and costs about one bounded read per collector plus one inventory scan per refresh, which is trivial at the MVP's 100 devices and 1,600 interfaces. 5,000 devices covers the 4,000-device enterprise design point (4.1) in one list; 2,000 interfaces covers the largest chassis switch.
+
+Decisions taken with the M3 status views:
+
+1. **List order (7.7).** Bucket (Attention, Active, Offline), then E.2 severity (`vakr.logic.status_table.ROW_SEVERITY`), then most recent state change, then natural display name, then device UUID, so the order is total. State changes are not recorded yet, so that key is the same for every device and the name decides; the key is kept so the order does not change meaning when state-change events arrive. Other sorts: `name`; `site` (devices without a site last); `age` (never observed first, then oldest newest evidence first). Each ends with name and UUID.
+2. **Evidence from one poll.** `CurrentDeviceState` carries the newest ICMP and the newest SNMP evidence separately. Only evidence from the same poll as the newest evidence counts for E.2; the other protocol is `UNKNOWN` for that poll. Otherwise an `icmp_gated` device that stopped answering pings, so that SNMP is skipped, would combine with an hour-old SNMP reply and read "ICMP lost, SNMP OK" instead of Down.
+3. **Recent restart (row 9).** A restart is "detected" when the newest SNMP observation has `RESET_DETECTED`, or when `sysUpTime` is shorter than the restart window and an SNMP observation within the window has `RESET_DETECTED` (one bounded history read, only for such devices).
+4. **Collector condition (row 3).** The collector's latest health report gives its state. A report older than the E.3 threshold at `polling.default_interval` makes it `UNAVAILABLE`. A collector that has never reported counts as healthy for E.2, because evidence freshness still applies, and the header says "no health report yet". `COLLECTOR_DEGRADED` on the newest poll or its evidence makes the condition `DEGRADED` for that device. The collector should write a health report at least once per poll interval; a slower cadence would show its devices as "Unknown — collector unavailable".
+5. **Telemetry unavailable.** When the telemetry store is missing or raises `StorageError`, rows 1–2 still apply from inventory, and every other device is "Unknown — telemetry unavailable" (row 3, amber), never Down.
+6. **Interface order (TUI-006).** Sticky first (the `sticky` keyword means "pin to the top"), then WAN circuits, then interest class `primary` (the high-priority annotation, META-011), then `display_rank` (lower first, unset last), then natural name, then interface UUID. TUI-006 lists sticky, high-priority, and WAN together; this order makes all three come before ordinary interfaces and fixes their order among themselves.
+7. **Utilization denominator (RATE-008).** No setting yet declares a contracted rate as the denominator, so the contracted rate is never used; an override, `ifHighSpeed`, or `ifSpeed` is.
+8. **`vakr status` exit codes** follow Nagios: 0 nothing listed needs attention; 1 something listed is in Attention; 3 unknown (no data yet, a database that cannot be read, telemetry unavailable, an empty inventory, or no such device). 2 is argparse's usage error; Nagios CRITICAL (2) is not used, so red and amber are both 1.
+9. **Narrow terminals (TUI-008, 13.4).** Columns have priorities. Priority 0 always shows: on the device list, state, name, and age; on the interface table, name, admin/oper state, in/out rate, and age. Other columns are added in priority order while they fit the terminal, sized to their content up to a per-column cap, and shown in their natural order.
+10. **Data path (TUI-007, 13.1).** Until the M4 API exists, `vakr status` and `vakr tui` use `vakr.query.StatusQueries` in-process over the metadata and telemetry ports, which TUI-007 allows. Section 13.1's default of a protected local API applies once the API exists. `--api-url` is refused until then.
+
+Gaps recorded for later milestones: E.2 row 8's "incomplete discovery" and "pending identity review" are not evaluated because no port exposes discovery completeness or pending reviews yet (row 8 still matches a partial SNMP reply). `sysDescr`, `sysObjectID`, `sysName`, `sysLocation`, and `sysContact` (12.4) are not stored in inventory, so the device screen says so instead. The SQLite stores have no read-only mode, so these commands open read-write connections that only read.

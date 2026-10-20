@@ -4,6 +4,12 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Added
+
+- Durable observation spool and batched ingestion (`vakr.ingest`, STORE-004 to STORE-011): collectors hand observations to an fsynced, append-only spool under `/var/lib/vakr/spool/<collector UUID>/`, and ingestion writes them to the telemetry database in idempotent batches. Losses are recorded as telemetry-loss incidents (STORE-007). See [the spool guide](docs/operations/spool.md).
+- `[spool]` options (`directory`, `max_size_mib`, `segment_size_mib`, `fsync_interval`, `fsync_records`, `queue_capacity`, `warning_pct`, `critical_pct`, `exhausted_pct`, `ingest_interval`, `ingest_max_rows`). Their defaults apply without any edit.
+- A `spool` check in `vakr check health` and `vakr doctor`: fill level, backlog age, database write failures, recent loss incidents, and quarantined files.
+
 ## 0.1.1 - 2026-10-20
 
 Second pre-release, cut to prove the self-update path from `0.1.0` on production hosts.

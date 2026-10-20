@@ -3873,3 +3873,36 @@ Decisions taken with the ADR-021 benchmark:
 - **Rollup counts use `COUNT(CASE …)`**, never `SUM(condition)`, so a bucket whose polls all failed records 0 available samples, not `NULL`.
 - **Dictionary keys are node-local.** Replication and the API carry UUIDs. Vocabulary codes are pinned in a `vocab_code` table and are append-only, like `Quality` bits.
 - **HC counters at or above 2^63** are stored as signed 64-bit integers (`v - 2**64`) and mapped back on read.
+
+### E.24 Spool and ingestion (STORE-004 to STORE-011, 6.4, E.8)
+
+| Setting | Default |
+|---|---|
+| Spool location | `spool.directory`, default `/var/lib/vakr/spool`; each collector writes `<root>/<collector UUID>/` (6.2) |
+| Size limit | `spool.max_size_mib` = 4,096 MiB, quarantined files included. The MVP workload writes about 1,900 observations a minute at about 990 bytes a frame, roughly 108 MB an hour, so the default rides out about 40 hours of telemetry-database outage. |
+| Segment size | `spool.segment_size_mib` = 64 MiB (E.8). The limit must hold at least four segments. |
+| Group commit | `spool.fsync_interval` = 1 s, `spool.fsync_records` = 1,000 (E.8) |
+| Timed-fsync lead | The timed fsync starts 10% of the interval plus twice the recent fsync duration early, at most half the interval, so the fsync *completes* within the interval |
+| Memory queue | `spool.queue_capacity` = 10,000 observations: about 5 minutes of the MVP workload and about 20 MB of memory. A full queue makes producers wait. |
+| Capacity thresholds | `spool.warning_pct` / `critical_pct` / `exhausted_pct` = 70 / 85 / 95 (6.4) |
+| Ingest batches | `spool.ingest_interval` = 10 s (E.21); `spool.ingest_max_rows` = 50,000 (E.19), lowered to the backend's `max_batch_rows` |
+| Write retries | At most 5 attempts per ingest cycle, backoff doubling from 1 s to a 60 s cap with ±20% jitter. A failed batch stays in memory and in the spool and is retried in the next cycle; it is never abandoned. |
+| Record bound | 1 MiB per envelope; a frame header is 40 bytes |
+| Incident log | `incidents.jsonl`, rotated at 1 MiB with one older generation kept; up to 100 incidents held in memory when the disk is full |
+| Loss estimate without data | 1,064 bytes per record (a 40-byte frame header and about 1 KB of envelope) |
+| Health: recent loss | WARNING for 24 h after a telemetry-loss incident |
+| Health: ingestion behind | WARNING when the oldest unacknowledged record is older than 6 ingest intervals (60 s) |
+| Health: collector silent | WARNING when `status.json` is older than max(3 ingest intervals, 60 s) and the last stop was not clean |
+
+Decisions taken with the M3 spool:
+
+- **Record payload: the M2 envelope, not MessagePack.** Section 6.3 and ADR-014 call for length-delimited MessagePack records. The spool instead stores the envelope's canonical JSON bytes (`vakr.domain.envelope`) unchanged inside a binary length-delimited frame. That keeps one envelope format for golden fixtures, cross-process transport, and the spool (ARCH-002), and adds no dependency. MessagePack would save some bytes per record. ADR-014 remains "Proposed; validate in Phase 10", and changing the payload needs a segment format version bump and a reader for version-1 segments (6.3).
+- **Frame checksum: CRC-32 (IEEE).** CRC-32C is in neither the standard library nor `cryptography`, so each frame carries `zlib.crc32` over its length, header fields, and payload. Go reads it with `hash/crc32.ChecksumIEEE`. The envelope's SHA-256 (E.19) remains the end-to-end check.
+- **Sequence numbers and append times.** Besides the batch UUID, each frame carries a sequence number that is contiguous across the spool, and its append time. Contiguity is what makes a lost range detectable and its count exact.
+- **Durable hand-off.** `Spool.append()` is a coroutine that returns only after the fsync covering all of its records returns. File I/O runs in a dedicated writer thread fed through the bounded queue, and the event loop never blocks on disk.
+- **A full spool.** At EXHAUSTED `admits_new_work()` turns false and the scheduler stops new normal polling. Appends still succeed up to 100%, so observations already in flight are kept. Past 100%, or on `ENOSPC`, `append` raises `SpoolFullError`, any partial write is truncated away, and a `rejected_full` incident records the exact count, classes, and time range.
+- **Torn or damaged.** Only in the newest segment, a bad final frame that is incomplete, zero-filled, or one complete frame ending exactly at the end of the file counts as a torn write: it is truncated and reported. Anything else is damage. The file is renamed `.damaged`, the records before the damage are still ingested, the rest are reported lost (exactly, when the next segment shows where numbering resumed), and the file moves to `quarantine/` once its good records are stored. vakr never deletes a damaged file.
+- **Unclean stop.** A missing clean-stop marker means the last run died. The loss is estimated by the records written in the final fsync interval before the last durable record, at most `spool.fsync_records`. Records that reached the page cache before a process kill survive, and recovery fsyncs them.
+- **Whole-batch acknowledgement.** The durable consumer offset advances only to the last record whose append batch is entirely stored. The `batch_id` passed to `write_batch` is the first record's batch UUID; it is used for diagnostics only.
+- **Records that cannot be stored.** An envelope that fails to decode, or a batch the backend rejects as invalid (`ValidationError`), is copied verbatim into `quarantine/` in spool format with an exact incident and then acknowledged, so one bad record never stalls ingestion.
+- **No write timeout of its own.** The ingester relies on the adapter's bounds (E.20: 5 s busy timeout, 10 s writer-gate wait) instead of abandoning a database call in a worker thread.

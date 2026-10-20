@@ -81,3 +81,14 @@ Packaged entries:
 | `"ISP"` | `"isp"` | `"primary"` | `true` | `false` |
 | `"WAN"` | `"wan"` | `"primary"` | `true` | `false` |
 | `"UPLINK"` | `"uplink"` | `"primary"` | `false` | `false` |
+
+### `[icmp]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `icmp.probes` | int, >= 2, <= 5 | `5` | live | v0.1.1 | ICMP Echo probes sent to each device per reachability cycle (ICMP-001). At least 2: under the default icmp_gated strategy SNMP runs only after two replies, and a single probe can never show a device as reachable (Appendix E.17). At most 5, the per-probe RTT columns of Compact storage (ADR-021). |
+| `icmp.spacing` | duration, >= 0.02s, <= 5s | `"200ms"` | live | v0.1.1 | Time between the starts of consecutive probes to one device (ICMP-002). Probes go out on a fixed schedule from the start of the cycle, so a late probe does not delay the next one. |
+| `icmp.timeout` | duration, >= 0.1s, <= 5s | `"1s"` | live | v0.1.1 | How long to wait for each probe's reply before counting that probe as lost (Appendix E.9). With the defaults a cycle finishes within about 2 seconds. |
+| `icmp.impaired_loss_percent` | float, >= 1, <= 100 | `40.0` | live | v0.1.1 | Packet loss, in percent of the probes sent, at or above which a device that still answers is shown as impaired instead of reachable (Appendix E.1). The default 40 tolerates one lost probe in five, which Control Plane Policing causes routinely. |
+| `icmp.impaired_rtt_ms` | float, >= 0, <= 5000 | `0.0` | live | v0.1.1 | Median round-trip time, in milliseconds, above which a device is shown as impaired (Appendix E.1). 0, the default, turns the latency check off. |
+| `icmp.max_in_flight` | int, >= 16, <= 16384 | `1024` | restart | v0.1.1 | Most ICMP probes the collector waits on at once, across all devices (Appendix E.22). A probe that cannot be sent in time is recorded as collector overload, never as packet loss. 1,024 is about twice what 100 unreachable devices need. |

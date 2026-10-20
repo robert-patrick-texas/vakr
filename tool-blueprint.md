@@ -3873,3 +3873,29 @@ Decisions taken with the ADR-021 benchmark:
 - **Rollup counts use `COUNT(CASE …)`**, never `SUM(condition)`, so a bucket whose polls all failed records 0 available samples, not `NULL`.
 - **Dictionary keys are node-local.** Replication and the API carry UUIDs. Vocabulary codes are pinned in a `vocab_code` table and are append-only, like `Quality` bits.
 - **HC counters at or above 2^63** are stored as signed 64-bit integers (`v - 2**64`) and mapped back on read.
+
+### E.22 ICMP adapter (ADR-023, ICMP-001..012)
+
+| Setting | Default |
+|---|---|
+| Socket | One unprivileged ping socket (`SOCK_DGRAM`, `IPPROTO_ICMP`/`IPPROTO_ICMPV6`) per address family and pinned source, shared by all targets; a raw socket only when the collector-only `CAP_NET_RAW` drop-in is installed |
+| `icmp.probes` | 5, allowed 2–5: at least 2 for `icmp_gated` (E.17), at most the 5 RTT columns of Compact storage (ADR-021) |
+| `icmp.spacing` / `icmp.timeout` ranges | 20 ms–5 s / 100 ms–5 s, so a cycle always fits the 30 s minimum polling interval (E.18) |
+| Per-cycle deadline | (probes − 1) × spacing + timeout + 200 ms, 2.0 s by default; a probe is sent only if its whole timeout fits before it |
+| `icmp.max_in_flight` | 1,024 (16–16,384): 100 unreachable devices need 500 |
+| Pending-reply table | per socket, at most `icmp.max_in_flight`; finished probes remembered for late and duplicate detection: twice that |
+| Open sockets | at most 8; an idle socket is closed to make room |
+| Receive buffer | 1 MiB requested (`SO_RCVBUF`, capped by `net.core.rmem_max`) |
+| Datagrams read per wakeup | 256 |
+| Echo payload | 12 bytes: `vakr` plus an 8-byte random token |
+| Send retries after a stale queued ICMP error | 2 |
+| `vakr icmp probe` bounds | 1–100 probes, spacing 0–60 s, timeout 1 ms–60 s, name resolution 2 s |
+| `ping_group_range` fix | widen the range just enough to include the `vakr` GID, in `/etc/sysctl.d/99-vakr-icmp.conf`, then `sysctl --system`; never applied automatically |
+
+Decisions taken with the M3 ICMP adapter:
+
+- **Matching.** A reply counts only if its sequence number, payload token, and source address match a waiting probe, because ping sockets rewrite the Echo identifier. Late, duplicate, and foreign replies are counted and dropped.
+- **RTT.** Monotonic time from just before `sendto` to the kernel's arrival stamp (`SO_TIMESTAMPNS`), or to the read when no stamp is available. A reply arriving after its timeout is late, so no RTT exceeds the timeout.
+- **Collector evidence.** Some probes are `NOT_SENT` or `ABORTED` with a collector fault. The causes are local: `EACCES`/`EPERM` from `socket()`, a missing route or a firewall refusal at `sendto()`, a full buffer, no in-flight slot before the deadline, or kernel receive drops during the cycle. Such probes are left out of the summary, and any fault adds `COLLECTOR_DEGRADED`, so 0 replies is `UNKNOWN`. A cycle with nothing sent has no ICMP observation. Router unreachables are target-path evidence: the probe is lost (`-1`), with the reason and reporter.
+- **`icmp.impaired_rtt_ms = 0` means off**, because the option catalog has no unset value.
+- **Health severity.** The `icmp` check is WARNING, not CRITICAL, when the range excludes the collector's group: `check health` gates self-update (UPD-006), and a rollback cannot fix a host setting.

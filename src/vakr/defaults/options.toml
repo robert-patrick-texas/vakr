@@ -103,6 +103,16 @@ reload = "live"
 description = "Pin the deployment to this release; timer-driven updates will not go past it (UPD-008). Empty means no hold."
 
 [[options]]
+key = "update.health_settle_seconds"
+type = "int"
+min = 0
+max = 600
+default = 30
+since = "0.1.1"
+reload = "live"
+description = "After installing an update, keep re-running the health check for up to this many seconds while it reports CRITICAL, so services that are still starting are not mistaken for a failed update and rolled back (UPD-006). 0 checks once."
+
+[[options]]
 key = "network.https_proxy"
 type = "str"
 format = "url"

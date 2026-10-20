@@ -3,7 +3,8 @@
 #
 # Creates the vakr user and groups and the directories in tmpfiles.d, writes
 # /etc/vakr/config.toml only when it does not exist (it is never a dpkg
-# conffile, so upgrades never prompt), and on upgrade restarts vakr.target
+# conffile, so upgrades never prompt), runs `vakr config upgrade` to apply
+# config migrations and record the release, and on upgrade restarts vakr.target
 # only if it was already running. Nothing is enabled or started on a first
 # install: collection begins after `vakr setup`.
 set -e
@@ -29,6 +30,17 @@ create_config() {
     echo "vakr: created $CONFIG from $origin"
 }
 
+upgrade_config() {
+    # Apply packaged config migrations and record the installed release, so
+    # `vakr config new-options` has a baseline at the next upgrade (CFGM-002,
+    # CFGM-004). Manual `apt install` upgrades get migrations this way too.
+    # An invalid operator config must not leave dpkg half-configured; the
+    # operator sees the problem with `vakr config validate`.
+    if ! PYTHONDONTWRITEBYTECODE=1 /opt/vakr/venv/bin/vakr config upgrade >/dev/null 2>&1; then
+        echo "vakr: 'vakr config upgrade' reported a problem; run 'vakr config validate'" >&2
+    fi
+}
+
 restart_if_active() {
     # $1 is the previously configured version; empty on a first install.
     [ -n "$1" ] || return 0
@@ -47,6 +59,7 @@ case "$1" in
         systemd-sysusers vakr.conf
         systemd-tmpfiles --create vakr.conf
         create_config
+        upgrade_config
         # Without systemd as PID 1 (containers, chroots) there is nothing to reload.
         if [ -d /run/systemd/system ]; then
             systemctl --system daemon-reload >/dev/null || true

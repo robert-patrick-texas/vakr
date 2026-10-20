@@ -31,6 +31,7 @@ from pathlib import Path
 
 from vakr.cli.cmd_tls import DIAGNOSIS_TIMEOUT, STRICT_HINT, TRUST_HINT, build_egress_settings
 from vakr.cli.common import SubParsers
+from vakr.cli.selfupdate_extras import health_hook, new_options_lines
 from vakr.cli.tls_strict import FALLBACK
 from vakr.config.loader import EffectiveConfig, load_effective_config
 from vakr.health.lifecycle_checks import check_update  # noqa: F401 - re-export for callers
@@ -129,6 +130,10 @@ def run(args: argparse.Namespace) -> int:
         return _fail(str(exc))
     for line in outcome.summary(PACKAGE):
         print(line)
+    if outcome.status == "updated":
+        new_vakr = str(paths.opt_dir / "venv/bin/vakr")
+        for line in new_options_lines(new_vakr, outcome.from_version, run_command):
+            print(line)
     return outcome.exit_code
 
 
@@ -213,7 +218,7 @@ def _updater(
         # Exit 3 means "not implemented yet" until the config upgrade command lands.
         Hook("config upgrade", (new_vakr, "config", "upgrade"), skip_codes=frozenset({3})),
         restart,
-        Hook("health check", (new_vakr, "check", "health"), ok_codes=frozenset({0, 1, 3})),
+        health_hook(new_vakr, int(config.get("update.health_settle_seconds") or 0)),
     )
     layout = Layout(
         cache_root=paths.cache_dir / "updates",

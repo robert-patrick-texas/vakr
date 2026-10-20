@@ -39,6 +39,7 @@ Useful commands: `vakr config show-effective --sources` prints every effective v
 | `update.repository` | str | `"robert-patrick-texas/vakr"` | live | v0.1.0 | GitHub repository (owner/name) that vakr self-update checks for releases (UPD-001). |
 | `update.channel` | enum: stable \| prerelease | `"prerelease"` | live | v0.1.0 | Release channel for self-update. MVP iterations are pre-releases, so prerelease is the default until MVP acceptance. |
 | `update.hold_version` | str | `""` | live | v0.1.0 | Pin the deployment to this release; timer-driven updates will not go past it (UPD-008). Empty means no hold. |
+| `update.health_settle_seconds` | int, >= 0, <= 600 | `30` | live | v0.1.1 | After installing an update, keep re-running the health check for up to this many seconds while it reports CRITICAL, so services that are still starting are not mistaken for a failed update and rolled back (UPD-006). 0 checks once. |
 
 ### `[network]`
 

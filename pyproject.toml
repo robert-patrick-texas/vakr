@@ -47,6 +47,9 @@ tools = [
 
 [tool.uv]
 default-groups = ["dev", "tools"]
+# Rebuild the editable install when VERSION changes, so `vakr --version` and
+# package metadata follow the single version source (VER-001).
+cache-keys = [{ file = "pyproject.toml" }, { file = "VERSION" }, { file = "src/**/*.py" }]
 
 [tool.hatch.version]
 path = "VERSION"

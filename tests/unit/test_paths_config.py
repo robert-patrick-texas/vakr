@@ -77,6 +77,7 @@ def test_missing_directory_is_empty_and_copies_are_independent(tmp_path: Path) -
         "repository": "robert-patrick-texas/vakr",
         "channel": "prerelease",
         "hold_version": "",
+        "health_settle_seconds": 30,
     }
     cfg = EffectiveConfig({"a": {"b": 1}})
     copy = cfg.as_dict()

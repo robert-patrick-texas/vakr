@@ -4,6 +4,25 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+## 0.1.1 - 2026-10-20
+
+Second pre-release, cut to prove the self-update path from `0.1.0` on production hosts.
+
+### Added
+
+- `update.health_settle_seconds` (default 30, new in this release): after an update installs, the post-update health check repeats for up to this many seconds while it reports CRITICAL, so services that are still restarting are not mistaken for a failed update and rolled back (UPD-006). Also available as `vakr check health --retry-for SECONDS`.
+- `vakr self-update` now ends its summary with the configuration options added since the previously installed release (CFGM-004).
+- The package now runs `vakr config upgrade` on every install and upgrade. That applies config migrations even for manual `apt install` upgrades, and records the installed release so later `vakr config new-options` runs have a baseline.
+
+### Notes for operators updating from 0.1.0
+
+- `0.1.0`'s updater does not yet print new options. After `sudo vakr self-update`, run `vakr config new-options --since 0.1.0` to see `update.health_settle_seconds`. Its default applies without any edit.
+- The settle window protects updates made *from* `0.1.1` onward.
+
+### Changed
+
+- Building from source now rebuilds the installed package whenever `VERSION` changes (uv cache keys), so `vakr --version` always matches `VERSION`.
+
 ## 0.1.0 - 2026-10-20
 
 First pre-release. It delivers the pipeline only: the package, signed self-update, configuration upgrade, and the field data kit. Production hosts can install it, update themselves, and send field data back, but vakr does not monitor any devices yet. Monitoring arrives in milestones M2–M4.

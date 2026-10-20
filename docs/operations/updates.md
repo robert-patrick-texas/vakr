@@ -75,6 +75,7 @@ Set these keys in `/etc/vakr/config.toml` or in a file under `/etc/vakr/conf.d/`
 | `update.repository` | `robert-patrick-texas/vakr` | GitHub `owner/name` that releases come from. |
 | `update.channel` | `prerelease` | `prerelease` accepts release candidates. `stable` accepts only final releases (neither marked pre-release on GitHub nor `-rc.N`). The default becomes `stable` at MVP acceptance (Appendix E.14). |
 | `update.hold_version` | empty | Pins the deployment. Automatic selection never goes past this version. Timer runs refuse anything newer, even with `--version`. An operator at the console may still install a newer release explicitly with `--version`. |
+| `update.health_settle_seconds` | `30` | After installing, keep re-running the health check for up to this many seconds while it reports CRITICAL, so services that are still restarting don't trigger a rollback. `0` checks once. |
 | `network.https_proxy` | empty | HTTPS proxy, for example `http://proxy.corp.example:3128`. |
 | `network.no_proxy` | `[]` | Destinations reached without the proxy. |
 | `network.tls_strict_x509` | `true` | Enforce the strict X.509 profile. Set `false` only as a fallback for an inspection CA that can't be reissued; see [The strict X.509 profile](#the-strict-x509-profile). |

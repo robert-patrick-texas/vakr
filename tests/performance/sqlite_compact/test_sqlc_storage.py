@@ -228,7 +228,7 @@ def test_rollup_methods_agree_and_match_known_samples(tmp_path: Path) -> None:
     assert rollup_interfaces(conn, layout, bucket, "builtin") == len(rows["builtin"])
     assert rollup_interfaces(conn, layout, bucket, "builtin") == len(rows["builtin"])
     assert rollup_icmp(conn, layout, bucket) == 6
-    assert bit_or_sql("f").count("|") == 22
+    assert bit_or_sql("f").count("|") == len([q for q in Quality if q is not Quality.NONE]) - 1
 
 
 @pytest.mark.parametrize("layout", [Layout("C"), Layout("C", hot=True)])

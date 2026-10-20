@@ -151,6 +151,21 @@ Code lives in `src/vakr/adapters/sqlite/` (connection, encoding, errors, writer,
 | UPD-002 (database migrations) | Implemented | `packaging/scripts/deb/postinst` | `make package-test` | `docs/operations/updates.md` | Runs on every install and upgrade; failure fails the install (E.20). |
 | OPS-001 | In progress | `adapters/sqlite/metadata/health.py` | `test_metadata_health.py` | `database.md` | Adds the `metadata_db` check. |
 
+## Compact SQLite telemetry layout (ADR-021 benchmark)
+
+The decision and its evidence are in [ADR-021](adr/ADR-021-compact-sqlite-telemetry.md) and the [benchmark report](performance/adr021-compact-sqlite-benchmark.md); defaults are in Appendix E.21. The harness in `tests/performance/sqlite_compact/` is evidence only: the adapter reimplements it under `src/vakr/adapters/sqlite/telemetry/` and does not import it.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| STORE-009 | In progress | Decision; reference `sqlc_writer.py` (natural key, `INSERT OR IGNORE`) | `test_sqlc_storage.py::test_replayed_batches_insert_nothing` | ADR-021, report §8 | Replays inserted 0 rows; a UUID index was rejected (+39 B/row). |
+| STORE-010 | In progress | Decision: `synchronous=FULL`, spool acknowledged after `COMMIT` | `sweep-*-FULL` runs | ADR-021, E.21 | About 5 ms per commit. |
+| STORE-011 | In progress | Decision: 10 s flushes (about 600 rows) | `sweep-*-10-*` runs | ADR-021, report §1, E.21 | |
+| RET-001/002/003 | In progress | Day tables dropped after day 30; month rollup tables dropped past day 400; 15-minute UTC buckets | `test_retention_drops_one_day_or_deletes_it`, `bench_rollup_store` | ADR-021, report §3, §6, §9, E.10 | Up to about 430 days of rollups are kept. |
+| RET-004/008/009 | In progress | Reference `sqlc_rollup.py`, `sqlc_rollup_icmp.py`; `INSERT OR REPLACE` per bucket | `test_rollup_methods_agree_and_match_known_samples` (ROLL-T01 harness), `test_rollup_of_a_bucket_inside_an_outage_reports_zero_coverage` (ROLL-T05 harness) | ADR-021 and its amendment | The harness measured type-7 p95; the adapter uses nearest-rank (E.17 #13). |
+| DASH-003/004 | In progress | `sqlc_queries.top_utilization`, `top_errors` | `test_top_utilization_methods_agree_and_rank_by_higher_direction`, `test_top_errors_sum_valid_deltas_only` | report §4 | 44 ms warm, under 380 ms cold p95. |
+| STATE-001/002/003 | In progress | `sqlc_current.latest_by_seek` | `test_current_state_seek_matches_projection` | ADR-021 | No projection table: it halved ingest. |
+| MVP-ACC-05 | In progress | — | `bench_rollup_store` | report §9, blueprint 27.3 | 400-day graph 36 ms warm, 84 ms cold; 33.9-37.5 GB per node. Final acceptance needs the adapter and UI. |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

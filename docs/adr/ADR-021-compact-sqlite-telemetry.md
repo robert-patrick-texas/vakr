@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted on benchmark evidence; owner sign-off pending (Appendix C lists it as "Proposed") |
+| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (see the end) |
 | Date | 2026-10-20 |
 | Decides | Physical layout of Compact-profile telemetry in SQLite: tables, keys, partitions, PRAGMAs, batching, idempotency, rollups, retention |
 | Requirements | Blueprint 5.1, 5.3, 10.1-10.6, 27.2-27.5, Appendix E.8 and E.10; STORE-009, STORE-010, STORE-011, RET-001..RET-009, DASH-003, DASH-004, STATE-001..STATE-004, MVP-ACC-05 |
@@ -160,8 +160,7 @@ Use the natural primary key `(series_key, collector_key, ts_us)` with `INSERT OR
 ### Rollups
 
 * Every 15 minutes, once a bucket's end is more than 10 minutes in the past (E.10), one statement computes all 3,200 interface rows from day plus staging rows and writes them with `INSERT OR REPLACE`. Re-running a bucket is therefore safe (RET-009).
-* The p95 is Hyndman-Fan type 7 (linear interpolation), which is the rule SQLite's `percentile_cont` uses.
-* The bundled SQLite 3.53.1 is compiled with `SQLITE_ENABLE_PERCENTILE`, so the adapter uses `percentile_cont`. It probes for it at startup and falls back to the measured window-function query (`ROW_NUMBER() OVER (… ORDER BY in_bps NULLS LAST)`), which gives identical results.
+* The p95 is nearest-rank, computed in Python with `vakr.logic.stats.p95` (see the amendment below). The benchmark measured Hyndman-Fan type 7 (linear interpolation) through SQLite's `percentile_cont`, a window-function query and Python; all three took 110-336 ms per bucket, so the choice of rule does not change the decision.
 * Count columns use `COUNT(…)`, never `SUM(condition)`, so a bucket whose polls all failed stores 0 available and 0 valid samples rather than `NULL`. The first full-day run hit this.
 * `quality_any` is the bitwise OR of the bucket's flags, written as one `MAX(flags & bit)` per defined `Quality` bit, because SQLite has no `bit_or` aggregate.
 * ICMP rollups (200 series) are computed in Python from every individual reply, so the RTT median and p95 come from up to 75 values, never from per-poll averages.
@@ -175,8 +174,7 @@ Use the natural primary key `(series_key, collector_key, ts_us)` with `INSERT OR
 ### SQLite features relied on
 
 * `STRICT` tables (3.37) and `WITHOUT ROWID`.
-* Window functions (3.25, with `NULLS LAST` from 3.30), used only by the fallback p95.
-* The percentile extension (`SQLITE_ENABLE_PERCENTILE`, 3.47 and later), used for the primary p95.
+* Window functions and the percentile extension are not required (see the amendment below).
 
 JSON functions are not used and play no part in the decision. The bundled 3.53.1 has every feature listed.
 
@@ -215,7 +213,6 @@ The workload's defining property is that 3,200 series each gain one row a minute
 * **HC counters at or above 2^63** need the signed mapping described above.
 * **Rounding native rates** would save about 10 bytes per row (7%). It changes stored precision, which is a RATE decision for the logic owner; the default is not to round.
 * **Host differences.** The benchmark host's virtual disk is fast (fsync p50 1.5 ms). On slower storage, `synchronous=FULL` costs more per commit, but six commits a minute leave ample margin.
-* **SQLite's percentile extension is a build option.** The startup probe and fallback query cover a different interpreter build.
 
 ## Security impact
 
@@ -274,3 +271,14 @@ Revisit when any of these holds:
 * The interpreter's SQLite build drops `ENABLE_PERCENTILE` or raises `MAX_ATTACHED` (which would reopen C′).
 
 Rolling back to plain C means disabling the staging path: the day tables, keys and queries are unchanged.
+
+## Amendment: the rollup p95 rule (2026-10-20, at merge)
+
+The benchmark computed p95 with linear interpolation (`percentile_cont`), but Appendix E.17 #13 already fixes p95 as nearest-rank: `vakr.logic.stats.p95`, which top-utilization rankings (DASH-003) use, and which rollups (RET-004) must share. This amendment records the contradiction and resolves it in favour of E.17:
+
+* Nearest-rank always returns a real sample, so a rollup's p95 equals the p95 a ranking computes from the same native rows, in every language.
+* SQLite's `percentile_disc` is not nearest-rank: it disagreed with `vakr.logic.stats.nearest_rank` on 360 of 399 random sample sets of 1-399 values.
+* The adapter therefore fetches each bucket's available rates in key order and computes p95 in Python. The benchmark's Python method took 130 ms for one bucket of all 3,200 series, against 110 ms for `percentile_cont`, every 15 minutes.
+* The SQL aggregates (counts, max, average, the `quality_any` OR) stay in SQL.
+
+The benchmark harness keeps its type-7 comparison as evidence; ROLL-T01 for the adapter tests nearest-rank.

@@ -3000,6 +3000,7 @@ No additional answer is required to begin implementation because this document s
 | Delivery to a separate production site | No release, update, configuration-merge, or production-data feedback path. | Section 28. |
 | Monitoring vakr itself | Alerting is external, but there was no way for the team's CheckMK/Nagios to watch vakr. | OPS-001 Nagios-format health check. |
 | Hash determinism | Scheduler hashing did not name a function; Python's `hash()` is salted per process and differs from Go's. | SHA-256 named in Appendix E.11. |
+| Compact sizing | 27.3 counted rollups for days 31–400 only, but each bucket is rolled up while its native rows still exist, so rollups cover days 1–400, and whole-month drops keep up to 431 days. | 27.3 uses the ADR-021 measurements; E.10 and E.21. |
 
 ---
 
@@ -3162,17 +3163,19 @@ The MVP is the first release that NetOps runs in production alongside MRTG and S
 
 The load per position is about 24,000 SNMP varbinds and 500 ICMP probes per minute. That is roughly 1/50 of the enterprise design point and well within one Python asyncio process.
 
-### 27.3 Storage sizing (planning estimate)
+### 27.3 Storage sizing (measured by ADR-021)
 
 | Data | Rows per collector |
 |---|---|
 | Native interface observations, 30 days | 1,600 × 1,440 × 30 ≈ 69.1 million |
 | Native ICMP and SNMP device observations, 30 days | 2 × 100 × 1,440 × 30 ≈ 8.6 million |
-| Interface rollups, days 31–400 at 15 minutes | 1,600 × 96 × 370 ≈ 56.8 million |
-| ICMP rollups, days 31–400 | 100 × 96 × 370 ≈ 3.6 million |
-| **Total** | **≈ 138 million** |
+| Interface rollups, days 1–400 at 15 minutes | 1,600 × 96 × 400 ≈ 61.4 million |
+| ICMP rollups, days 1–400 | 100 × 96 × 400 ≈ 3.8 million |
+| **Total** | **≈ 143 million** |
 
-With two positions, each node also stores its peer's observations, about 276 million rows per node. At an assumed 80–150 bytes per row including the clustered key, that is roughly 22–42 GB per node. Provision at least 100 GB of SSD-class storage for `/var/lib/vakr` on each node. The ADR-021 benchmark replaces this estimate with measured values.
+Rollups cover days 1–400, not 31–400, because each bucket is rolled up while its native rows still exist (E.10). With two positions, each node also stores its peer's observations.
+
+The [ADR-021 benchmark](docs/performance/adr021-compact-sqlite-benchmark.md) measured 110 bytes per row, including keys and page overhead. At the worst point, just before a scheduled drop, one node holds 32 native day tables and up to 431 days of rollups, because a month's rollup table is dropped only once all of it is past day 400. That comes to 33.9 GB per node with rollup rates rounded to whole bit/s, or about 37.5 GB at full precision, which is the default. Provision at least 100 GB of SSD-class storage for `/var/lib/vakr` on each node. The remaining space holds the metadata database, the spool, logs, and one `VACUUM INTO` or backup copy of the telemetry file.
 
 ### 27.4 Scope
 
@@ -3572,7 +3575,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | ADR-018 | Apache-2.0 license | Accepted 2026-10-19 |
 | ADR-019 | Product name `vakr` | Accepted 2026-10-19 |
 | ADR-020 | Public dashboard exposure posture and optional network restrictions | Owner decision before production publication; deferred past MVP |
-| ADR-021 | Compact profile: SQLite telemetry with time partitioning for 30/400-day retention | Proposed; benchmark at 2× the MVP workload (two positions replicated) required before milestone M3 |
+| ADR-021 | Compact profile: SQLite telemetry with time partitioning for 30/400-day retention | Accepted on benchmark evidence (layout C+H, every pass criterion met at 2× the MVP workload); owner sign-off pending |
 | ADR-022 | MVP walking-skeleton milestone order (section 27.8) supersedes the phase order until MVP acceptance | Accepted 2026-10-19 |
 | ADR-023 | Unprivileged ICMP datagram sockets; no `CAP_NET_RAW` by default | Accepted 2026-10-19 |
 | ADR-024 | Multi-position: independent full nodes, metadata primary, pull replication of observations | Proposed; validate in milestone M5 |
@@ -3704,6 +3707,7 @@ Summary values (min, average, median, max, jitter) are computed in floating poin
 - A bucket is complete once its end is more than 10 minutes in the past.
 - Native rows expire only after a complete rollup covers them (ROLL-T04).
 - Compact native partitions are dropped one UTC day at a time, after day 30.
+- Compact rollup partitions are dropped one UTC month at a time, once the month's last bucket is more than 400 days old. Up to about 430 days are therefore kept (RET-002).
 
 ### E.11 Scheduler hashing
 
@@ -3777,7 +3781,7 @@ Building `vakr.logic` exposed edge cases the text above doesn't settle. The deci
 | 10 | RATE-003 | A discontinuity-time value that appears or disappears counts as a change. `UNKNOWN` uptime continuity, including a missing `sysUpTime`, invalidates the baseline. Non-positive elapsed time sets `BASELINE_ELAPSED_INVALID` (quality bit 23). |
 | 11 | Missing counters | A missing counter blanks only its own metric. The sample-level `BASELINE_*` flags are set only when every metric is unavailable. |
 | 12 | E.6 lifecycle | An oper status of `unknown`, or a missing one, changes nothing. `testing` counts as not up/up. Rediscovery without status reactivates only interfaces that had gone missing. A restored interface starts `INACTIVE`. Evidence older than the current state is ignored. `STALE` keeps the reason it became inactive. |
-| 13 | Rankings | In and out p95 are computed separately; on a tie the inbound direction is reported. Errors per million packets is shown only when every counted sample has packet deltas. Interfaces with zero errors still rank, at the bottom. p95 is nearest-rank (`vakr.logic.stats.p95`), and rollups (RET-004) must use the same function. |
+| 13 | Rankings | In and out p95 are computed separately; on a tie the inbound direction is reported. Errors per million packets is shown only when every counted sample has packet deltas. Interfaces with zero errors still rank, at the bottom. p95 is nearest-rank (`vakr.logic.stats.p95`), and rollups (RET-004) must use the same function. Neither of SQLite's `percentile_cont` (interpolated) or `percentile_disc` matches nearest-rank, so rollups compute p95 in Python (ADR-021 amendment). |
 | 14 | E.3 freshness | A negative age (a future timestamp) is not stale and gets no flag. A clock-skew threshold would be a new default and is deferred. |
 
 These configuration keys arrive with M3, when the collector uses them. Until then the defaults above apply in code:
@@ -3838,7 +3842,7 @@ Decisions taken with the M2 domain model:
 | In-process wait for the single-writer gate | 10,000 ms, then a retryable `StorageError` |
 | Writers waiting at the gate | at most 32 |
 | Pooled connections per process and database | 8 |
-| Journal mode / synchronous / foreign keys | WAL / NORMAL / ON |
+| Journal mode / synchronous / foreign keys | WAL / NORMAL / ON (the telemetry database uses `FULL`; see E.21) |
 
 Decisions taken with the M2 SQLite metadata adapter:
 
@@ -3846,3 +3850,26 @@ Decisions taken with the M2 SQLite metadata adapter:
 - **Migrations run as the service user.** The package's postinst runs `vakr db migrate` on every install and upgrade, and `vakr db` switches to the `vakr` service user when invoked as root, so database, WAL, and shared-memory files stay vakr-owned.
 - **A failed migration fails the install**, so a self-update rolls back (UPD-002, UPD-005). A destructive migration can't run unattended: its release must carry the `manual-update-required` marker.
 - **A newer schema only warns during install.** A self-update rollback reinstalls the older package *before* it restores the pre-update database backup, so failing there would block the rollback. Services still refuse to start on a newer schema (MIG-004).
+
+### E.21 Compact telemetry storage (ADR-021, STORE-010, STORE-011)
+
+| Setting | Default |
+|---|---|
+| Layout | C+H: one table set per UTC day (native) and per UTC month (rollups), plus one time-ordered staging table per observation type |
+| Writer flush interval | 10 s, one `BEGIN IMMEDIATE` transaction (about 600 rows at the MVP workload) |
+| Staging move interval / move lag | every 15 min / rows older than 2 min |
+| Journal mode / synchronous | WAL / `FULL`; the spool is acknowledged only after `COMMIT` returns |
+| Checkpoint | `PRAGMA wal_checkpoint(TRUNCATE)` after every move; `wal_autocheckpoint` 1,000 pages; `journal_size_limit` 64 MiB |
+| Page size / cache / auto-vacuum / temp store | 4,096 B / 64 MiB per connection / `NONE` / `MEMORY` |
+| Idempotency | natural key `(series_key, collector_key, ts_us)` with `INSERT OR IGNORE`; the observation UUID is stored but not indexed |
+| Health: WAL size | warning above 256 MiB |
+| Health: mover lag | warning when the oldest staged row is older than 2 move intervals (30 min) |
+| Rollup p95 | nearest-rank, computed in Python with `vakr.logic.stats.p95` (E.17 #13) |
+| Stored rates | full precision; rounding to whole bit/s is deferred (it would save about 7% native and 28% rollup space) |
+
+Decisions taken with the ADR-021 benchmark:
+
+- **One writer moves the boundary.** Moving staged rows, deleting them from staging, and advancing the boundary happen in one transaction, so a row is in staging exactly when its timestamp is at or after the boundary. Readers never see a row twice or miss one.
+- **Rollup counts use `COUNT(CASE …)`**, never `SUM(condition)`, so a bucket whose polls all failed records 0 available samples, not `NULL`.
+- **Dictionary keys are node-local.** Replication and the API carry UUIDs. Vocabulary codes are pinned in a `vocab_code` table and are append-only, like `Quality` bits.
+- **HC counters at or above 2^63** are stored as signed 64-bit integers (`v - 2**64`) and mapped back on read.

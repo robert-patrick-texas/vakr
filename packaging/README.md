@@ -9,7 +9,7 @@ Sources for the vakr `.deb` (blueprint 28.6, ADR-025). The package installs ever
 | `build-deb.sh` | Host entry point (`make deb`): stages the source, derives the versions, and runs the container build |
 | `container/build.sh` | Inside the builder: interpreter, venv, defaults, share files, bytecode, checks, nfpm, and lintian |
 | `build-constraints.txt` | Hashed pins for the wheel build backend |
-| `systemd/` | `vakr.target`, `vakr-update.service`, `vakr-update.timer` (UPD-003) |
+| `systemd/` | `vakr.target`, `vakr-collector.service` (6.2, [collector guide](../docs/operations/collector.md)), `vakr-update.service`, `vakr-update.timer` (UPD-003) |
 | `sysusers.d/vakr.conf`, `tmpfiles.d/vakr.conf` | The `vakr` user and groups, and the directories with their modes |
 | `scripts/deb/` | `postinst`, `prerm`, `postrm` (PKG-003, PKG-005, CFGM-005) |
 | `templates/config.toml` | Fallback `/etc/vakr/config.toml` when `vakr config template` is unavailable |

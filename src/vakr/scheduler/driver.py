@@ -42,7 +42,7 @@ Example:
 """
 
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
 
 from vakr.ports.clock import Clock
@@ -71,7 +71,7 @@ class Scheduler:
 
     def __init__(
         self, clock: Clock, settings: SchedulerSettings, ids: SchedulerIds,
-        steps: PollSteps, sink: PollSink | None = None,
+        steps: PollSteps, sink: PollSink | None = None, admits: Callable[[], bool] | None = None,
     ) -> None:  # fmt: skip
         """Create a scheduler with an empty plan.
 
@@ -83,6 +83,9 @@ class Scheduler:
             steps: ICMP and SNMP step implementations.
             sink: Record sink; ``None`` creates an ``Outbox`` bounded by
                 ``settings.queue_capacity``.
+            admits: Whether storage takes new work, such as
+                ``Spool.admits_new_work``; while it is False, due slots are
+                recorded as not attempted (6.4). ``None`` always admits.
 
         Returns:
             None
@@ -95,6 +98,8 @@ class Scheduler:
         self.stats = SchedulerStats(settings.late_after_us)
         self._lag = LoopLagMonitor(clock)
         self._dispatch = Dispatcher(clock, settings, ids, steps, self.sink, self.stats)
+        if admits is not None:
+            self._dispatch.admits = admits
 
     def replan(self, targets: Iterable[PollTarget]) -> ReplanSummary:
         """Apply a new set of poll targets.

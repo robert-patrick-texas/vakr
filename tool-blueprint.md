@@ -4009,3 +4009,50 @@ Decisions taken with the M3 scheduler:
 7. **Collector state from the scheduler.** `OVERLOADED` when the period had capacity misses or producers are blocked on a full queue; `DEGRADED` when event-loop lag exceeded 1 s, a step failed on the collector side, or the scheduler is draining; otherwise `HEALTHY`.
 8. **Shutdown (16.4).** Stop admitting; give in-flight polls the grace period; cancel the rest and record them with the evidence their finished steps produced; then record waiting slots and slots that came due during the drain as `NOT_ATTEMPTED`.
 9. **Deferred.** Worker affinity and rebalancing (SCHED-014) wait for multiple worker processes; estimated-cost ordering (SCHED-015) and adaptive interval changes (ADAPT-002 to ADAPT-007) are post-MVP (27.4). Poll-health diagnostics are on.
+
+### E.27 Collector service (SVC-001 to SVC-009, 6.2, 16.3, 16.4, M3)
+
+`vakr-collector.service` runs `vakr collector run` (`vakr.app.collector`). Its own cadences are constants, not options, because none of them is a site decision; the operator guide is [docs/operations/collector.md](docs/operations/collector.md).
+
+| Setting | Default | Notes |
+|---|---|---|
+| Rate-baseline checkpoint | Every 60 s and at stop, to `/var/lib/vakr/collector/<collector UUID>/rate-baselines.json`: temporary file, fsync, rename, directory fsync | 6.2, RATE-004; also holds each device's last `sysUpTime` reading |
+| Checkpoint bounds | 200,000 interfaces, 20,000 devices, 64 MiB file | Twice the enterprise interface count (4.1) |
+| Collector identity | `/var/lib/vakr/collector/identity.json` plus the metadata `Collector` record; one UUID for both, the spool, and every observation | MPOL-006 |
+| Collector-health observation | At start, then every min(60 s, `polling.default_interval`, the shortest effective interval scheduled) | OBS-001; the views read a report older than its E.3 threshold as collector unavailable |
+| Inventory change-counter read | Every 5 s, in a worker thread | 6.2 |
+| Discovery concurrency | 2 at once, outside the scheduler's workers | DISC-001 |
+| First discovery | Within 60 s, placed by the E.11 hash of `collector_name/device UUID/discovery` | DISC-001 |
+| Rediscovery after a success | One full interval later: the device override or `snmp.rediscovery_interval`, clamped to E.18's 30 s to 30 d, even when inventory still has no poll plan for the device (an agent with no interfaces) | DISC-002 |
+| Rediscovery after a restart | Slot `k × interval + (hash mod interval)` after the Unix epoch, for devices with a plan; outcomes are not persisted | DISC-002 |
+| Discovery retry after a failure | Bounded exponential backoff: 60 s after the first failure, doubling after each consecutive one (60 s, 2, 4, 8, 16, 32 min), at most 1 h; reset by a success | No answer, no session, or an inventory error |
+| Telemetry upkeep | Staging move every 15 min; rollup hook, then retention, hourly; first passes at start | E.21 |
+| Spool append | At most 2,000 observations, and never more than `spool.queue_capacity` | 6.4 |
+| ICMP name lookup | 2 s | E.22, as `vakr icmp probe` |
+| `rates.max_gap_intervals` | 5.0 (2 to 20) | E.4, RATE-003; arrives with M3 as E.17 planned |
+| `rates.plausibility_factor` | 1.10 (1 to 10) | E.4, RATE-009 |
+| Shutdown budget | `scheduler.shutdown_grace` (15 s) plus 45 s; the unit's `TimeoutStopSec` is 120 s | 16.4 |
+| Failed preflight | Exit 78 (`EX_CONFIG`), with `RestartPreventExitStatus=78` | 16.3, SVC-T05 |
+| Restart policy | `Restart=on-failure`, `RestartSec=10s`, at most 5 starts in 10 min | SVC-009 |
+| Unit limits | `MemoryMax=2G`, `TasksMax=512`, `LimitNOFILE=16384`; no capabilities | SVC-009, 15.3 |
+| Test-only poll interval | `ServiceTimings.poll_interval_override_s`, settable from code only, never from configuration | E.18 keeps its 30 s minimum in production |
+
+Decisions taken with the M3 collector:
+
+1. **Shipped disabled.** The package installs the unit and never enables it (PKG-003). Started with an empty inventory it runs, reports health, and idles. It joins `vakr.target` with `WantedBy=` and `PartOf=`, and `prerm` names it as well, in case it was started alone.
+2. **Identity.** `identity.json` is the source of truth, because the spool and baselines on this disk belong to it. Without it, the metadata record of `scheduler.collector_name` is adopted, or a new UUID is made and registered (owner `api:collector`). The same name under another UUID is refused at startup (`identity`), so two histories are never merged.
+3. **Spool backpressure reaches the scheduler.** `Scheduler(admits=Spool.admits_new_work)`: while it is False, due slots are recorded as `NOT_ATTEMPTED` with `COLLECTOR_DEGRADED` and the new capacity reason `MissReason.STORAGE_FULL` (6.4, SCHED-017). This is the only change to `vakr.scheduler`.
+4. **The SNMP device observation describes Stage 1.** It is returned when Stage 1 ends, so a Stage 2 cut short by the deadline or shutdown never loses it (9.2). Its request, response, timeout, and retry counts therefore cover Stage 1. Stage 2's effort and gaps show on the interface observations and in the poll's execution state. Section 10.2 does not say which stages the counts cover; this is the reading adopted.
+5. **One session per stage.** Each stage opens its own short session. Stage 2 starts at the request size where Stage 1 ended (SNMP-017).
+6. **Stage 2 eligibility.** Stage 2 samples an interface only if policy collects it, the current Stage 1 found it up/up (SNMP-006, ADR-005), and it has a persistent UUID. An up/up interface without one is counted and skipped, and the poll carries `BASELINE_IDENTITY_UNRESOLVED`. No observation is ever keyed by `ifIndex` (invariant 6).
+7. **No status-only interface observations.** Interfaces that are not up/up get no `InterfaceObservation`, because 27.3 sizes storage for active interfaces only. Their state reaches the views through lifecycle (E.6) in M4. **Open question for the owner:** should the current state of down interfaces come from telemetry instead?
+8. **`snmp_fallback`'s single attempt** is one GET of `sysUpTime.0` without retries (ICMP-013).
+9. **ICMP.** A cycle that sent nothing raises, so the gate sees no reply count and `icmp_gated` runs SNMP (E.25 #5). With fewer than 2 replies under `icmp_gated`, the collector writes a `SKIPPED` SNMP device observation (9.2).
+10. **"Collector unhealthy" in E.1** means overload or event-loop lag above 1 s, the conditions that distort every measurement. One device's DNS or credential failure does not turn another device's lost probes into `UNKNOWN`.
+11. **Baselines.** Elapsed time is monotonic within one kernel boot (`/proc/sys/kernel/random/boot_id`), so it stays monotonic across a service restart (RATE-001), and is wall-clock time across a reboot. A baseline taken from another `ifIndex` is not used (`BASELINE_MISSING_PRIOR`). A sample with no counter at all does not replace the baseline; the E.4 gap rule still bounds the older one. Each device's last `sysUpTime` reading is checkpointed too, so continuity (E.5, E.17 #10) is judged across a restart instead of invalidating every rate.
+12. **Capacity** comes from the metadata interface records (override, contracted rate, `ifHighSpeed`, `ifSpeed`), read per device at each re-plan and after each discovery. A device without records gets absolute rates with `CAPACITY_UNKNOWN`, and no 32-bit wrap is accepted (RATE-010, E.17 #8). The contracted rate is never the utilization denominator until policy can say so.
+13. **Rollups.** `vakr.app.collector.maintenance.ROLLUP_HOOK` is where the M4 job plugs in. Today it computes nothing, so the hourly retention pass expires no native data, because no rollup covers it (E.10, ROLL-T04).
+14. **Collector health** is the worst of the scheduler's state (E.25 #7), the spool's (E.24), and `DEGRADED` when any step failed on the collector side during the period.
+15. **Inventory seam.** The collector depends on the four-method `InventorySource` protocol only, and calls it in worker threads. `vakr.app.collector.inventory.INVENTORY_FACTORY` builds `InventoryService`, and `INVENTORY_RELOAD` hands it a reloaded policy on SIGHUP (`replace_policy`); until they are wired, `EmptyInventory` applies. `poll_plan` raising `NotFoundError` means the device was removed between two reads: it is left out of that re-plan, and a discovery whose recording raises it is dropped, neither counted nor logged as a failure.
+16. **Discovery never loops.** Outcomes are kept per device in memory. Polling never waits for discovery: a device without a plan still gets ICMP under its strategy and a Stage 1 read of `sysUpTime.0`, so reachability shows up before, or without, interfaces.
+17. **Test IDs.** Section 21 defines no end-to-end test IDs. The end-to-end test cites DISC-T01, RATE-T01, RATE-T02, SVC-T03, SVC-T04, and RATE-004.

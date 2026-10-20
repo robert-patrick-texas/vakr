@@ -17,14 +17,33 @@ apt-get -qq update
 
 section "first install starts and enables nothing (PKG-003, UPD-003)"
 apt_get install "$DEB_N"
-for unit in vakr.target vakr-update.service vakr-update.timer; do
+for unit in vakr.target vakr-collector.service vakr-update.service vakr-update.timer; do
     check "$unit loads cleanly" equals "$(prop LoadState "$unit")" loaded
 done
 check "units verify under the running systemd" \
-    systemd-analyze verify vakr.target vakr-update.service vakr-update.timer
+    systemd-analyze verify vakr.target vakr-collector.service vakr-update.service vakr-update.timer
+check "vakr-collector.service is disabled" \
+    equals "$(systemctl is-enabled vakr-collector.service)" disabled
 check "vakr-update.timer is disabled" equals "$(systemctl is-enabled vakr-update.timer)" disabled
 check "vakr-update.timer is not running" equals "$(systemctl is-active vakr-update.timer)" inactive
 check "vakr.target is not running" equals "$(systemctl is-active vakr.target)" inactive
+
+section "collector idles on an empty inventory, reloads, and stops cleanly (6.2, SVC-T01, SVC-T03)"
+check "vakr-collector.service starts (READY=1 after its preflight)" \
+    systemctl start vakr-collector.service
+check "collector is active" equals "$(systemctl is-active vakr-collector.service)" active
+check "collector runs as vakr" equals "$(prop User vakr-collector.service)" vakr
+check "collector holds no raw-socket capability (ICMP-T07)" \
+    bash -c '! systemctl show -p CapabilityBoundingSet --value vakr-collector.service | grep -qi raw'
+check "systemctl reload vakr-collector" systemctl reload vakr-collector.service
+sleep 2
+check "collector is still active after reload" \
+    equals "$(systemctl is-active vakr-collector.service)" active
+check "systemctl stop vakr-collector" systemctl stop vakr-collector.service
+check "collector exited 0" equals "$(prop ExecMainStatus vakr-collector.service)" 0
+check "journal records a clean stop" \
+    grep -q 'collector.stopped' <<<"$(journalctl -u vakr-collector.service --no-pager)"
+check "collector registered its spool" test -d /var/lib/vakr/spool
 
 section "operator enables the daily update timer (UPD-003)"
 check "systemctl enable --now vakr-update.timer" systemctl enable --now vakr-update.timer
@@ -51,9 +70,10 @@ check "upgrade leaves a stopped vakr.target stopped" \
     equals "$(systemctl is-active vakr.target)" inactive
 
 section "remove stops units; purge removes enablement links (PKG-005)"
-systemctl start vakr.target
+systemctl start vakr.target vakr-collector.service
 apt_get remove vakr
 check "remove stopped the timer" equals "$(systemctl is-active vakr-update.timer)" inactive
+check "remove stopped the collector" bash -c '! systemctl is-active --quiet vakr-collector.service'
 check "remove stopped vakr.target" equals "$(systemctl is-active vakr.target)" inactive
 apt_get purge vakr
 check "purge removed the timer's enablement link" \

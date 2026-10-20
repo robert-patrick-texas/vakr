@@ -30,10 +30,11 @@ Example:
 """
 
 import asyncio
+from collections.abc import Callable
 
 from vakr.domain.ids import PollId, new_id
 from vakr.ports.clock import Clock
-from vakr.scheduler.admission import Admission, Miss
+from vakr.scheduler.admission import Admission, Miss, MissReason
 from vakr.scheduler.outbox import PollSink
 from vakr.scheduler.plan import Plan, Slot
 from vakr.scheduler.records import (
@@ -76,6 +77,7 @@ class Dispatcher:
         gate: Admission control.
         jobs: Polls in flight, by task.
         stopping: True once shutdown began; no new polls start.
+        admits: False while storage refuses new work (6.4); due slots are then missed.
     """
 
     def __init__(
@@ -105,6 +107,7 @@ class Dispatcher:
         self.gate = Admission(settings.workers)
         self.jobs: dict[asyncio.Task[None], Job] = {}
         self.stopping = False
+        self.admits: Callable[[], bool] = lambda: True
         self._waker: asyncio.Future[None] | None = None
 
     def wake(self) -> None:
@@ -172,7 +175,9 @@ class Dispatcher:
         for miss in self.gate.expire(now, max_delay):
             await self.emit_miss(miss)
         while (slot := self.plan.pop_due(now)) is not None:
-            if (miss := self.gate.offer(slot, now, max_delay)) is not None:
+            if not self.admits():
+                await self.emit_miss(Miss(slot, MissReason.STORAGE_FULL))
+            elif (miss := self.gate.offer(slot, now, max_delay)) is not None:
                 await self.emit_miss(miss)
         while not self.stopping and (ready := self.gate.start_next()) is not None:
             self._launch(ready)

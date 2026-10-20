@@ -585,3 +585,26 @@ default = "7d"
 since = "0.1.1"
 reload = "live"
 description = "How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9)."
+
+# Rate derivation in the collector (RATE-003, RATE-009; Appendix E.4, E.27).
+# E.17 defers these keys to the M3 collector, which uses them.
+
+[[options]]
+key = "rates.max_gap_intervals"
+type = "float"
+min = 2
+max = 20
+default = 5.0
+since = "0.1.1"
+reload = "live"
+description = "Longest gap between two counter samples, in effective polling intervals, across which a rate is still derived (Appendix E.4). A longer gap leaves the rate unavailable with BASELINE_GAP instead of averaging over the outage (RATE-003). 32-bit counters are further limited to half their wrap time at line rate."
+
+[[options]]
+key = "rates.plausibility_factor"
+type = "float"
+min = 1
+max = 10
+default = 1.1
+since = "0.1.1"
+reload = "live"
+description = "A derived rate above this multiple of the interface's effective capacity is kept and flagged RATE_EXCEEDS_CAPACITY, never clipped (RATE-009, Appendix E.4)."

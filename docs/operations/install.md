@@ -71,7 +71,7 @@ sudo apt install ./vakr_${debver}_amd64.deb
 | `/opt/vakr/share/release-signers` | Trusted release signing keys (UPD-001) | package |
 | `/opt/vakr/share/systemd/`, `share/doc/`, `share/templates/` | Unit sources, license and changelog, config template | package |
 | `/usr/bin/vakr` | Symlink to `/opt/vakr/venv/bin/vakr` | package |
-| `/usr/lib/systemd/system/` | `vakr.target`, `vakr-update.service`, `vakr-update.timer` | package |
+| `/usr/lib/systemd/system/` | `vakr.target`, `vakr-collector.service` ([collector](collector.md)), `vakr-update.service`, `vakr-update.timer` | package |
 | `/usr/lib/sysusers.d/vakr.conf`, `/usr/lib/tmpfiles.d/vakr.conf` | Account and directory definitions | package |
 | `/etc/vakr/config.toml` | Your settings, overrides only (mode `0640`, `root:vakr`) | you |
 | `/etc/vakr/secrets/` | Credentials (mode `0750`, `root:vakr`) | you |

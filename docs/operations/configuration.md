@@ -143,3 +143,10 @@ Packaged entries:
 | `snmp.max_walk_rows` | int, >= 100, <= 100000 | `10000` | live | v0.1.1 | Most rows one discovery walk of a table column may return. A walk that reaches it stops, keeps the rows it has, and marks the table partial (Appendix E.23). |
 | `snmp.rediscovery_interval` | duration, >= 30s, <= 2.592e+06s | `"24h"` | live | v0.1.1 | How often each device is rediscovered (DISC-002). Policy rules and devices can override it within 30s to 30d (Appendix E.18). |
 | `snmp.capability_reprobe_interval` | duration, >= 3600s, <= 7.776e+06s | `"7d"` | live | v0.1.1 | How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9). |
+
+### `[rates]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `rates.max_gap_intervals` | float, >= 2, <= 20 | `5.0` | live | v0.1.1 | Longest gap between two counter samples, in effective polling intervals, across which a rate is still derived (Appendix E.4). A longer gap leaves the rate unavailable with BASELINE_GAP instead of averaging over the outage (RATE-003). 32-bit counters are further limited to half their wrap time at line rate. |
+| `rates.plausibility_factor` | float, >= 1, <= 10 | `1.1` | live | v0.1.1 | A derived rate above this multiple of the interface's effective capacity is kept and flagged RATE_EXCEEDS_CAPACITY, never clipped (RATE-009, Appendix E.4). |

@@ -32,7 +32,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | UPD-006 | Implemented | `src/vakr/lifecycle/update/{engine,state,policy}.py`, `src/vakr/health/lifecycle_checks.py` | `test_update_flow.py::test_upd_t03_health_failure_rolls_back_and_is_not_retried` | `docs/operations/updates.md` | |
 | UPD-007 | Implemented | `src/vakr/lifecycle/update/{lock,journal}.py` | `test_update_flow.py`, `test_lifecycle_support.py::test_journal_native_protocol` | `docs/operations/updates.md` | |
 | UPD-008 | Implemented | `src/vakr/lifecycle/update/{releases,policy}.py` | `test_update_flow.py::test_upd_t05_timer_updates_once_then_noops_and_respects_hold` | `docs/operations/updates.md` | |
-| EGRESS-001 | Implemented | `src/vakr/lifecycle/egress/{proxy,transport,client}.py`, `src/vakr/defaults/options.toml` (`network.*`) | `test_egress_proxy.py` (EGRESS-T03), `test_egress_tls.py` | `docs/operations/updates.md` | ADR-032. Credentials in proxy URLs are refused until the credential provider exists. |
+| EGRESS-001 | Implemented | `src/vakr/lifecycle/egress/{proxy,transport,client}.py`, `src/vakr/defaults/options.toml` (`network.*`) | `test_egress_proxy.py` (EGRESS-T03), `test_egress_tls.py` | `docs/operations/updates.md` | ADR-032. Credentials in proxy URLs are refused. The credential provider exists now (`secret(name)`), so authenticated proxies can be added. |
 | EGRESS-002 | Implemented | `src/vakr/lifecycle/egress/truststore.py` | `test_egress_tls.py` (EGRESS-T01) | `docs/operations/updates.md` | |
 | EGRESS-003 | Implemented | `src/vakr/lifecycle/egress/certinfo.py` (`validate_ca`, `strict_profile_gaps`), `castore.py` (`install(strict_x509=)`), `src/vakr/cli/cmd_tls.py`, `src/vakr/cli/tls_strict.py` | `test_tls_cli.py` (EGRESS-T02), `test_egress_tls.py` (EGRESS-T01), `test_egress_strict.py` (EGRESS-T05, cross-checked with `openssl verify -x509_strict`) | `docs/operations/updates.md` | ADR-032. A CA with `keyUsage` but no `keyCertSign` is refused in both modes, because OpenSSL rejects it in every mode. |
 | EGRESS-004 | Verified | `src/vakr/lifecycle/egress/peek.py` (the single allowlisted function) | `test_static_rules.py` (EGRESS-T04) | `docs/operations/updates.md` | |
@@ -53,6 +53,19 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | CFGM-007 | In progress | `src/vakr/lifecycle/configmerge/operations.py` | `test_operations.py` | | Inventory, policy, and dashboard files are not loaded yet. |
 | CONF-006 | In progress | `src/vakr/lifecycle/configmerge/layering.py`, `vakr config show-effective --sources` | `test_layering.py::test_precedence_defaults_main_dropins_overrides_with_sources` | `docs/operations/configuration.md` | Environment and CLI overrides are not wired yet. |
 | CONF-009 | In progress | `src/vakr/lifecycle/configmerge/checks.py`, `vakr config validate` | `test_layering.py` | `docs/operations/configuration.md` | Reference, permission, and database checks come later. |
+
+## Credentials
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| SEC-001 | In progress | `src/vakr/credentials/vocabulary.py` (`CredentialReference`) | `tests/unit/credentials/test_model.py`, `test_provider.py` | `docs/operations/credentials.md` | Device records keep a reference or name only. Reference-integrity checking (CFG-004) is not wired yet. |
+| SEC-002 | Implemented | `src/vakr/credentials/{port,provider,protected,policy,parse,entry}.py` | `test_provider.py`, `test_permissions.py` (CRED-001) | `docs/operations/credentials.md` | The `CredentialResolver` port leaves room for a later Vault provider. |
+| SEC-003 | In progress | `src/vakr/credentials/{secret,errors,parse,redact}.py`, `src/vakr/cli/cmd_credentials.py` | `test_redaction_corpus.py` (CRED-002), `test_secret.py` | `docs/operations/credentials.md` | API, diagnostic, and audit payloads must reuse `Secret` and `redact_text`, and extend CRED-002. |
+| SEC-016 | Implemented | `src/vakr/credentials/{policy,protected,health}.py` | `test_permissions.py` (CRED-001), `test_credentials_cli.py` | `docs/operations/credentials.md` | Strict by default. Development mode is available only through a constructor flag or `--dev`. |
+| SEC-020 | In progress | `src/vakr/credentials/redact.py` | `test_redaction_corpus.py` (CRED-002) | `docs/operations/credentials.md` | Redaction helpers are ready; the support bundle comes later. |
+| CONF-007 | Implemented | `src/vakr/credentials/provider.py` | `test_provider.py` | `docs/operations/credentials.md` | |
+| SNMP-002 | Implemented | `src/vakr/credentials/{model,vocabulary,entry}.py` | `test_model.py`, `test_provider.py` | `docs/operations/credentials.md` | v3 passphrases need at least 8 characters (RFC 3414). |
+| SNMP-003 | In progress | `src/vakr/credentials/model.py` (`is_recommended`) | `test_model.py`, `test_credentials_cli.py` | `docs/operations/credentials.md` | Security posture is reported, not enforced. SNMPv3 polling comes after MVP. |
 
 ## Field data
 

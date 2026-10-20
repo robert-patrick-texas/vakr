@@ -15,6 +15,8 @@ Example:
 
 import json
 import os
+import sqlite3
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -135,9 +137,16 @@ def test_timer_invocation_updates_once(
     monkeypatch.setattr(cmd_selfupdate, "API_BASE", https_server.base)
     _serve_release(https_server, signer, tmp_path, "99.0.0")
     timer = ["self-update", "--yes", "--if-newer", "--unattended"]
+    paths.state_dir.mkdir(parents=True, exist_ok=True)
+    for name in ("metadata.db", "telemetry.db"):
+        sqlite3.connect(paths.state_dir / name).close()
     assert main(timer) == 0
     out = capsys.readouterr().out
     assert installer.installed == ["vakr_99.0.0_amd64.deb"]
+    # E.14: the pre-update backup holds metadata.db only, never the large telemetry.db.
+    (archive,) = (paths.state_dir / "backups").glob("pre-update-*.tar.gz")
+    with tarfile.open(archive) as tar:
+        assert [n for n in tar.getnames() if n.startswith("state/")] == ["state/metadata.db"]
     assert "update.hook.skipped: config upgrade" in out
     assert "vakr self-update: updated:" in out
     assert "  Release notes line" in out

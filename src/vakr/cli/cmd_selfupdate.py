@@ -29,6 +29,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from vakr.adapters.sqlite.metadata import METADATA_FILE
 from vakr.cli.cmd_tls import DIAGNOSIS_TIMEOUT, STRICT_HINT, TRUST_HINT, build_egress_settings
 from vakr.cli.common import SubParsers
 from vakr.cli.selfupdate_extras import health_hook, new_options_lines
@@ -227,6 +228,8 @@ def _updater(
         lock_file=paths.run_dir / "self-update.lock",
         config_dir=paths.config_dir,
         db_dir=paths.state_dir,
+        # Not telemetry.db: it reaches about 40 GB per node, too much to copy per update (E.14).
+        db_names=(METADATA_FILE,),
     )
     emit = EventSink("vakr-update", echo_always=not unattended)
     kit = Toolkit(layout, hooks, (restart,), INSTALLER(run_command), run_command, emit, UTC_NOW)

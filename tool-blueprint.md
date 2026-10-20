@@ -3739,6 +3739,9 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | Update timer | Disabled; when enabled, runs daily with `RandomizedDelaySec=4h` |
 | Channel | `prerelease` until MVP acceptance, then `stable` |
 | Cached previous packages for rollback | 2 |
+| Pre-update backup | configuration plus `metadata.db`; 5 kept. `telemetry.db` is not copied: it reaches about 40 GB per node (27.3), and five copies would not fit the volume. |
+
+Because rollback cannot restore `telemetry.db`, a release that migrates the telemetry schema must leave it readable by the previous release (additive changes only, with read-compatible versioning) or carry the `manual-update-required` marker. A test fails if a second telemetry migration is added before either exists.
 
 ### E.15 Interface description keywords (META-012)
 

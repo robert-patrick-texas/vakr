@@ -57,7 +57,8 @@ class Layout:
         state_file: ``update-state.json``.
         lock_file: Update lock in the runtime directory.
         config_dir: Configuration directory to back up and restore.
-        db_dir: Directory whose ``*.db`` files are backed up.
+        db_dir: Directory whose databases are backed up.
+        db_names: Database file names to back up; empty means every ``*.db``.
         keep_packages: Older cached versions kept (E.14: 2).
         keep_backups: Backups kept.
     """
@@ -68,6 +69,7 @@ class Layout:
     lock_file: Path
     config_dir: Path
     db_dir: Path
+    db_names: tuple[str, ...] = ()
     keep_packages: int = 2
     keep_backups: int = 5
 

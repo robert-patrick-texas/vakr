@@ -1,10 +1,12 @@
 """Pre-update backups of operator configuration and SQLite databases.
 
 Before a new package runs its migrations, self-update archives the
-configuration directory and every ``*.db`` in the state directory, so a
-failed update or a manual rollback can put both back exactly (UPD-002,
-UPD-005). Databases are copied with SQLite's online backup API, which gives
-a consistent snapshot while services keep writing.
+configuration directory and the state directory's databases (every
+``*.db``, or only the names the project lists), so a failed update or a
+manual rollback can put both back exactly (UPD-002, UPD-005). A project
+leaves out a database that is too large to copy before every update.
+Databases are copied with SQLite's online backup API, which gives a
+consistent snapshot while services keep writing.
 
 Dependencies:
     tarfile, sqlite3, shutil, tempfile: Standard library only.
@@ -30,7 +32,7 @@ import sqlite3
 import stat
 import tarfile
 import tempfile
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 
@@ -40,16 +42,23 @@ SIDECARS = ("-wal", "-shm", "-journal")
 
 
 def create_backup(
-    config_dir: Path, db_dir: Path, backups_dir: Path, now: datetime, prefix: str = BACKUP_PREFIX
+    config_dir: Path,
+    db_dir: Path,
+    backups_dir: Path,
+    now: datetime,
+    prefix: str = BACKUP_PREFIX,
+    names: Sequence[str] = (),
 ) -> Path:
-    """Archive ``config_dir`` and ``db_dir/*.db`` into ``backups_dir``.
+    """Archive ``config_dir`` and the databases in ``db_dir`` into ``backups_dir``.
 
     Args:
         config_dir: Operator configuration directory.
-        db_dir: Directory whose ``*.db`` files are snapshotted.
+        db_dir: Directory whose databases are snapshotted.
         backups_dir: Destination directory; created at mode 0700.
         now: Timestamp for the archive name (UTC).
         prefix: Archive name prefix.
+        names: Database file names to snapshot, skipping absent ones;
+            empty means every ``*.db`` in ``db_dir``.
 
     Returns:
         Path: ``<prefix>-<YYYYmmddTHHMMSSZ>.tar.gz``.
@@ -63,13 +72,33 @@ def create_backup(
     with tempfile.TemporaryDirectory(dir=backups_dir) as scratch, tarfile.open(part, "w:gz") as tar:
         if config_dir.is_dir():
             tar.add(config_dir, arcname="config")
-        for db in sorted(db_dir.glob("*.db")) if db_dir.is_dir() else []:
+        for db in _databases(db_dir, names):
             snapshot = Path(scratch) / db.name
             _snapshot(db, snapshot)
             tar.add(snapshot, arcname=f"state/{db.name}", filter=_owned_like(db))
     part.chmod(ARCHIVE_MODE)
     part.replace(archive)
     return archive
+
+
+def _databases(db_dir: Path, names: Sequence[str]) -> list[Path]:
+    """Return the databases a backup includes.
+
+    Args:
+        db_dir: State directory.
+        names: Listed file names, or empty for every ``*.db``.
+
+    Returns:
+        list[Path]: Existing database files, sorted.
+
+    Raises:
+        None
+    """
+    if not db_dir.is_dir():
+        return []
+    if not names:
+        return sorted(db_dir.glob("*.db"))
+    return sorted(db_dir / name for name in names if (db_dir / name).is_file())
 
 
 def list_backups(backups_dir: Path, prefix: str = BACKUP_PREFIX) -> list[Path]:

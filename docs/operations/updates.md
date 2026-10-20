@@ -18,7 +18,7 @@ The requirements behind this behavior are in the blueprint, sections [28.3 Self-
 2. **Discover.** It lists the 30 most recent releases of `update.repository` from the GitHub API and selects the newest release on `update.channel`, at or below `update.hold_version`.
 3. **Download.** It saves `vakr_<version>_amd64.deb`, `SHA256SUMS`, and `SHA256SUMS.sig` into `/var/cache/vakr/updates/<version>/`.
 4. **Verify.** It runs `ssh-keygen -Y verify` to check the signature on `SHA256SUMS` against the release signers in the installed package (`/opt/vakr/share/release-signers`, identity and namespace `vakr-release`). It then checks that the package's SHA-256 matches its line in `SHA256SUMS`. If either check fails, the update stops with nothing changed.
-5. **Back up.** It writes `/var/lib/vakr/backups/pre-update-<UTC>.tar.gz` (mode 0600). The archive holds `/etc/vakr`, which includes `secrets/` and the trusted-CA directory, plus a consistent snapshot of every `/var/lib/vakr/*.db`. The five newest archives are kept.
+5. **Back up.** It writes `/var/lib/vakr/backups/pre-update-<UTC>.tar.gz` (mode 0600). The archive holds `/etc/vakr`, which includes `secrets/` and the trusted-CA directory, plus a consistent snapshot of the metadata database, `/var/lib/vakr/metadata.db`. The five newest archives are kept. The telemetry database, `telemetry.db`, is not copied: at the MVP workload it grows to about 40 GB, too large to copy before every update. A rollback therefore keeps the telemetry collected so far, and releases never make a change to it that the previous release cannot read.
 6. **Prepare rollback.** It makes sure a verified package of the version that is running now is cached. If that package isn't cached, it downloads it by tag.
 7. **Install.** It runs `apt-get install -y --allow-downgrades <package>` with `DEBIAN_FRONTEND=noninteractive`, so apt resolves dependencies.
 8. **Post-install hooks.** These run through the **new** binary, `/opt/vakr/venv/bin/vakr`:
@@ -288,7 +288,7 @@ $ sha256sum --check --ignore-missing SHA256SUMS
 If `apt-get` fails, or a post-install hook fails (including a CRITICAL `check health`), self-update rolls back:
 
 1. It reinstalls the cached, re-verified package of the previous version.
-2. It restores `/etc/vakr` and the databases from the pre-update backup. Databases are replaced atomically, and stale `-wal` and `-shm` files are removed.
+2. It restores `/etc/vakr` and the metadata database from the pre-update backup. Databases are replaced atomically, and stale `-wal` and `-shm` files are removed.
 3. It runs `systemctl try-restart vakr.target`.
 4. It records the failed version, so the timer doesn't retry it, and exits with status 1.
 

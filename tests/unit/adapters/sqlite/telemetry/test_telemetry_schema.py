@@ -184,3 +184,28 @@ def test_mig004_store_refuses_a_newer_or_older_schema(tmp_path: Path) -> None:
         SqliteTelemetryStore(path)
     assert telemetry_migrations(path).status().state is SchemaState.TOO_NEW
     SqliteTelemetryStore(path, family=later).close()  # the newer release itself may open it
+
+
+def test_a_second_telemetry_migration_needs_a_rollback_story() -> None:
+    """E.14 tripwire: self-update does not back up telemetry.db, so rollback cannot undo its schema.
+
+    A failed update restores ``metadata.db`` from its pre-update backup, but
+    ``telemetry.db`` (about 40 GB per node) is never copied. Once a release
+    migrates it, an older release would refuse the newer schema (MIG-004).
+    Before adding migration 0002, give the telemetry file read-compatible
+    versioning (older releases open newer additive schemas) or ship that
+    release with the ``manual-update-required`` marker, then update this test.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    from vakr.adapters.sqlite import telemetry
+
+    sql = sorted(p.name for p in (Path(telemetry.__file__).parent / "sql").glob("*.sql"))
+    assert sql == ["0001_initial.sql"], "see this test's docstring before adding migrations"

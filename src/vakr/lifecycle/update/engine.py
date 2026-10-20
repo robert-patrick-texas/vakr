@@ -124,7 +124,9 @@ def apply_update(
         OSError: When the backup cannot be written (nothing changed yet).
     """
     state, layout = current_state(kit), kit.layout
-    archive = backups.create_backup(layout.config_dir, layout.db_dir, layout.backups_dir, kit.now())
+    archive = backups.create_backup(
+        layout.config_dir, layout.db_dir, layout.backups_dir, kit.now(), names=layout.db_names
+    )
     backups.prune_backups(layout.backups_dir, layout.keep_backups)
     kit.emit("update.backup.done", f"backup written to {archive}")
     kit.emit("update.install.start", f"installing {artifacts.package.name}")
@@ -213,7 +215,12 @@ def manual_rollback(
     state, layout = current_state(kit), kit.layout
     archives = backups.list_backups(layout.backups_dir)
     safety = backups.create_backup(
-        layout.config_dir, layout.db_dir, layout.backups_dir, kit.now(), prefix="pre-rollback"
+        layout.config_dir,
+        layout.db_dir,
+        layout.backups_dir,
+        kit.now(),
+        prefix="pre-rollback",
+        names=layout.db_names,
     )
     backups.prune_backups(layout.backups_dir, layout.keep_backups, prefix="pre-rollback")
     kit.emit("update.rollback.start", f"rolling back {current} -> {target}; saved {safety.name}")

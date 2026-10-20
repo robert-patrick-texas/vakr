@@ -10,6 +10,7 @@ Example:
 import socket
 import sqlite3
 import struct
+import tarfile
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -196,6 +197,10 @@ def test_backup_restore_prune_and_naming(tmp_path: Path) -> None:
     assert len(backup.list_backups(store)) == 5
     assert backup.list_backups(tmp_path / "absent") == []
     empty = backup.create_backup(tmp_path / "no-config", tmp_path / "no-state", store, T0)
+    _db(state / "big.db", "large")
+    listed = backup.create_backup(config, state, store, T0, names=("meta.db", "absent.db"))
+    with tarfile.open(listed) as tar:
+        assert sorted(n for n in tar.getnames() if n.startswith("state/")) == ["state/meta.db"]
     backup.restore_backup(empty, tmp_path / "no-config", tmp_path / "no-state")
     assert not (tmp_path / "no-config").exists()
 

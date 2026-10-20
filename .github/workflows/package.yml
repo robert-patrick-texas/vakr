@@ -32,10 +32,10 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Build the .deb in a clean ubuntu:26.04 container
         run: make deb
-      - name: Install, upgrade, and removal tests in fresh containers
+      - name: Reproducibility, then install, upgrade, and removal tests in fresh containers
         run: |
           deb=(dist/vakr_*_amd64.deb)
-          PACKAGE_TEST_DEB_N="${deb[0]}" make package-test
+          PACKAGE_TEST_DEB_N="${deb[0]}" PACKAGE_TEST_REPRO=1 make package-test
       - uses: actions/upload-artifact@v7
         with:
           name: vakr-deb-${{ github.sha }}

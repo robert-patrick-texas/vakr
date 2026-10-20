@@ -90,7 +90,15 @@ install_venv() {
         --no-deps -r /build/requirements.txt
     uv build --wheel --python "$PY" --out-dir /build/wheel \
         --build-constraint packaging/build-constraints.txt --require-hashes .
-    uv pip install --python "$OPT/venv/bin/python3" --no-deps /build/wheel/vakr-*.whl
+    # --no-cache: a cached wheel of the same name must never stand in for
+    # this build's code.
+    uv pip install --python "$OPT/venv/bin/python3" --no-deps --no-cache /build/wheel/vakr-*.whl
+    # uv's install-time timestamp (uv_cache.json, listed in RECORD) is only
+    # uv bookkeeping and would make two builds of one commit differ.
+    local info
+    info=$(echo "$OPT"/venv/lib/python"$PYVER"/site-packages/vakr-*.dist-info)
+    rm -f "$info/uv_cache.json"
+    sed -i '/\/uv_cache\.json,/d' "$info/RECORD"
 }
 
 install_defaults() {
@@ -145,7 +153,9 @@ normalize_tree() {
     find "$OPT" -name __pycache__ -type d -prune -exec rm -rf {} +
     # Hash-based .pyc files stay valid whatever the source mtime is, so the
     # mtime clamp below cannot make Python rewrite them as root at runtime.
-    "$PY" -m compileall -q -j 0 --invalidation-mode checked-hash \
+    # One process in sorted order: marshal output depends on string refcounts,
+    # so spreading files over worker processes (-j 0) is not reproducible.
+    "$PY" -m compileall -q -j 1 --invalidation-mode checked-hash \
         "$OPT/python/lib/python$PYVER" "$OPT/venv/lib/python$PYVER/site-packages"
     chmod -R u+rwX,go+rX,go-w "$OPT"
     # Shared libraries are mapped, never executed; dpkg and lintian expect 0644.

@@ -89,7 +89,7 @@ Both targets need Docker, git, and uv.
 | Command | Result |
 |---|---|
 | `make deb` | `dist/vakr_<debver>_amd64.deb`, plus `dist/vakr-fieldkit.pyz` once the field kit exists |
-| `make package-test` | Static packaging checks, then two builds (N from `VERSION`, and N+1 = the next patch version) and container tests: install, remove, reinstall, upgrade N to N+1 keeping the operator's config, and purge. Then a systemd-booted container checks the timer and the restart-only-if-running upgrade rule. Set `PACKAGE_TEST_SYSTEMD=0` where privileged containers are not allowed. |
+| `make package-test` | Static packaging checks, then two builds (N from `VERSION`, and N+1 = the next patch version) and container tests: install, remove, reinstall, upgrade N to N+1 keeping the operator's config, and purge. Then a systemd-booted container checks the timer and the restart-only-if-running upgrade rule. Set `PACKAGE_TEST_SYSTEMD=0` where privileged containers are not allowed, and `PACKAGE_TEST_REPRO=1` (as CI does) to rebuild N and require a byte-identical package. |
 
 How the build works (`packaging/build-deb.sh`, which runs `packaging/container/build.sh` in the builder image from `packaging/Dockerfile`):
 

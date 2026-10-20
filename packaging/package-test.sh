@@ -17,6 +17,8 @@
 #   PACKAGE_TEST_DEB_N    use this already-built release-N package instead of
 #                         building one (CI passes the `make deb` output)
 #   PACKAGE_TEST_SYSTEMD  1 (default) runs step 4; 0 skips it
+#   PACKAGE_TEST_REPRO    1 rebuilds release N and requires a byte-identical
+#                         package (PKG-004, QG-010); default 0, CI sets 1
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -42,6 +44,16 @@ VERSION_OVERRIDE=$version_n1 packaging/build-deb.sh "$work/n1"
 
 deb_n=vakr_${debver_n}_amd64.deb
 deb_n1=vakr_${debver_n1}_amd64.deb
+
+if [ "${PACKAGE_TEST_REPRO:-0}" = 1 ]; then
+    echo "package-test: rebuilding release N to check reproducibility"
+    VAKR_UV_CACHE='' packaging/build-deb.sh "$work/repro"
+    if ! cmp "$work/n/$deb_n" "$work/repro/$deb_n"; then
+        echo "package-test: FAIL: two builds of one commit differ (PKG-004)"
+        exit 1
+    fi
+    echo "package-test: PASS: rebuild is byte-identical ($(sha256sum <"$work/n/$deb_n" | cut -c1-16)...)"
+fi
 test_env=(
     --env DEB_N="/debs/n/$deb_n" --env DEB_N1="/debs/n1/$deb_n1"
     --env DEBVER_N="$debver_n" --env DEBVER_N1="$debver_n1"

@@ -62,8 +62,6 @@ include = ["src/vakr", "tests", "VERSION", "LICENSE", "NOTICE", "README.md"]
 line-length = 100
 target-version = "py315"
 extend-exclude = ["_site"]
-# Portable tools must also run on older system Pythons (fieldkit on RHEL 3.12).
-per-file-target-version = { "tools/**/*.py" = "py312" }
 
 [tool.ruff.lint]
 select = [

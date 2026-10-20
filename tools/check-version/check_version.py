@@ -73,7 +73,7 @@ def find_copies(version: str, files: list[Path], allow: list[str]) -> list[str]:
             continue
         try:
             text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
+        except UnicodeDecodeError, OSError:
             continue  # binary or unreadable files cannot carry a text version
         hits += [
             f"{path.as_posix()}:{n}"

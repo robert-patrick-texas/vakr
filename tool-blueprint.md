@@ -3419,7 +3419,7 @@ Whenever development needs information from production, a collection tool is bui
 
 | ID | Requirement |
 |---|---|
-| FIELD-001 | `vakr-fieldkit` shall be a single-file tool that uses only the Python standard library and runs on a production host without vakr installed. It works with any system Python 3.12 or newer. It is also packaged as `vakr field collect`. External commands such as `snmpwalk` and `journalctl` are called with argument lists only, never through a shell. |
+| FIELD-001 | `vakr-fieldkit` shall use only the Python standard library and run on a production host without vakr installed. It ships as one self-contained zipapp (`vakr-fieldkit.pyz`) attached to every GitHub release, and runs on the project's Python version (3.15), obtained independently of the system Python. Before vakr is installed, the operator runs it with `uv run --python 3.15 vakr-fieldkit.pyz`. Once vakr is installed, `vakr field collect` runs it with the bundled interpreter. External commands such as `snmpwalk` and `journalctl` are called with argument lists only, never through a shell. |
 | FIELD-002 | The data-driven collection profiles are: <br>• `host`: OS, kernel, CPU, memory, disks, time sync, `ping_group_range`, Python version, and HTTPS reachability to GitHub; <br>• `snmp`: bounded walks of the system, IF-MIB, IP-MIB, and any named extra subtrees for listed devices, rate-limited to protect device control planes; <br>• `paths`: ICMP RTT and loss to the peer position and to sample devices; <br>• `vakr`, when installed: version, redacted effective configuration, `doctor` output, health snapshot, recent journald events, schema versions, and storage statistics. <br>A new need adds a profile, not a new tool. |
 | FIELD-003 | The output shall be one bundle, `vakr-field-<host>-<UTC timestamp>.tar.gz`. Its `manifest.json` lists the tool version, profiles, non-secret parameters, timings, and errors, plus a SHA-256 for every member. |
 | FIELD-004 | SNMP communities and other credentials shall be read from a protected local file or an interactive prompt, never from command-line arguments, and shall never be written into the bundle. A redaction test corpus proves this. |
@@ -3437,7 +3437,7 @@ Whenever development needs information from production, a collection tool is bui
 | PKG-001 | The MVP shall ship as `vakr_<version>_amd64.deb` for Ubuntu 26.04 LTS, built with nfpm from a packaging spec that will also produce the later `.rpm`. |
 | PKG-002 | The package installs its files under `/opt/vakr`: a relocatable CPython build of the project's pinned Python version (`python/`), a locked virtual environment (`venv/`), defaults (`share/defaults/`), release signers (`share/release-signers`), unit-file sources (`share/systemd/`), and documentation (`share/doc/`). The only files outside `/opt/vakr` are the integration points the OS requires to be in system paths: systemd units in `/usr/lib/systemd/system/`, `sysusers.d` and `tmpfiles.d` entries in `/usr/lib/`, and the `/usr/bin/vakr` symlink. Operator configuration (`/etc/vakr`), state (`/var/lib/vakr`), and cache (`/var/cache/vakr`) are created by the package but never overwritten by it. |
 | PKG-003 | Maintainer scripts create the `vakr` system user and group, `/var/lib/vakr`, `/var/cache/vakr`, and `/etc/vakr` with `secrets/` at mode `0750`. On first install, collection does not start until `vakr setup` has created the first admin and set the node role and position. On upgrade, only services that were running are restarted. |
-| PKG-004 | Package builds are reproducible from the lockfile in a clean `ubuntu:26.04` container and produce no `lintian` errors. |
+| PKG-004 | Package builds are reproducible from the lockfile in a clean `ubuntu:26.04` container. They produce no `lintian` errors except tags overridden with a written justification in the package's lintian overrides, such as `dir-or-file-in-opt` (the owner chose `/opt/vakr`) and bundled-interpreter tags. |
 | PKG-005 | `apt remove` keeps configuration and data. `apt purge` removes configuration but keeps the telemetry history in `/var/lib/vakr`, and prints a notice. Deleting that history requires `vakr data purge`. |
 | PKG-006 | RHEL-family `.rpm` packaging (AlmaLinux, Rocky Linux, RHEL) starts only after the MVP reaches production-level robustness and can replace basic MRTG and SmokePing functionality (MVP-ACC-10). |
 
@@ -3473,6 +3473,7 @@ CI may build artifacts for testing but cannot sign releases.
 | DOCPUB-001 | Every `.md` file in the repository shall be published as HTML to GitHub Pages on each push to `main`, using `tools/md2html`. |
 | DOCPUB-002 | The Pages build shall fail on broken internal links or anchors (`md2html --check`). This also implements QG-009 for Markdown. |
 | DOCPUB-003 | Generated HTML shall be self-contained (no CDN), readable at phone width, and support light and dark themes. Each page links to its source on GitHub. |
+| DOCPUB-004 | Every page shall show a link to the GitHub repository at the top. Every page shall also have a navigation index down the left side that lists all published pages, grouped by directory, with the current page marked. At phone width the index collapses behind a toggle and works without JavaScript. |
 
 ---
 
@@ -3485,7 +3486,7 @@ Tools that support development and operations, rather than network monitoring it
 1. import nothing from vakr's domain, application, or adapter packages;
 2. take project-specific values (names, repository, paths, key files, profiles) from arguments or a small config file, never from constants;
 3. have its own README, its own tests, and an Apache-2.0 header;
-4. be a small self-contained directory that another project can vendor by copying it: one entry-point script, plus sibling modules and templates where the 300-line limit (section 17.2) requires them. Development tools declare dependencies with PEP 723 inline metadata in the entry point. Tools that run on production hosts use only the Python standard library;
+4. be a small self-contained directory that another project can vendor by copying it: one entry-point script, plus sibling modules and templates where the 300-line limit (section 17.2) requires them. Development tools declare dependencies with PEP 723 inline metadata in the entry point. Tools that run on production hosts use only the Python standard library. All tools target the project's Python version and get it from `uv` or the bundled interpreter, never from the OS, so no tool supports an older Python;
 5. move to its own repository once a second project adopts it (ADR-030).
 
 An import-boundary test in CI enforces rule 1 for code under `src/vakr/lifecycle/` and `tools/`.

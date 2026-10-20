@@ -23,6 +23,8 @@ Example:
 import platform
 from collections.abc import Callable
 
+from vakr.cli.cmd_selfupdate import check_update
+from vakr.cli.cmd_tls import check_trusted_cas
 from vakr.health.model import CheckResult, Status
 from vakr.version import UNKNOWN_VERSION, get_version
 
@@ -66,6 +68,8 @@ def check_python() -> CheckResult:
 CHECKS: tuple[Check, ...] = (
     check_version,
     check_python,
+    check_update,
+    check_trusted_cas,
 )
 
 

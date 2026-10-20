@@ -11,6 +11,7 @@ import argparse
 
 import pytest
 
+from vakr.cli.common import not_implemented
 from vakr.cli.main import COMMAND_MODULES, build_parser, main
 from vakr.health.model import CheckResult, PerfDatum, Status, nagios_line, worst
 from vakr.health.registry import run_checks
@@ -192,5 +193,7 @@ def test_placeholder_command_exits_3(capsys: pytest.CaptureFixture[str]) -> None
     Raises:
         None
     """
-    assert main(["tls"]) == 3
-    assert "not implemented" in capsys.readouterr().err
+    # Calls the shared handler directly so the test does not depend on which
+    # commands are still placeholders while M1 pieces land in parallel.
+    assert not_implemented(argparse.Namespace(command_name="example")) == 3
+    assert "example is not implemented" in capsys.readouterr().err

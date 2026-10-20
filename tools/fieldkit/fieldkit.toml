@@ -1,0 +1,30 @@
+# Project values for the portable field kit (blueprint section 29.1, rule 2).
+# Another project reuses tools/fieldkit/ by copying the directory and editing
+# this file; no Python changes are needed. build_pyz.py embeds the [fieldkit]
+# values into the zipapp; field_inbox.py reads [inbox] on the development host.
+
+[fieldkit]
+tool_name = "vakr-fieldkit"
+bundle_prefix = "vakr-field"            # bundles are <prefix>-<host>-<UTC>.tar.gz
+python = "3.15"                         # the project's Python; the zipapp refuses older ones
+version_file = "../../VERSION"          # single version source (VER-001), relative to this file
+recipient = "recipients/vakr-dev.pem"   # development host's recipient certificate (public)
+inbox_hint = "~/vakr-inbox/ on the development host"
+# Description keywords kept verbatim by --pseudonymize: Appendix E.15 (META-012) plus TRANSIT.
+keep_keywords = ["ISP", "WAN", "UPLINK", "TRANSIT"]
+# GitHub reachability test (FIELD-010): one GET of the release API, one HEAD of the releases page.
+egress_get = ["https://api.github.com/repos/robert-patrick-texas/vakr/releases/latest"]
+egress_head = ["https://github.com/robert-patrick-texas/vakr/releases"]
+
+[fieldkit.app]
+# The installed application's profile (`--profile vakr`): read-only commands and journald units.
+name = "vakr"
+commands = [["--version"], ["doctor"], ["config", "show-effective"], ["check", "health"]]
+units = ["vakr*"]
+
+[inbox]
+recipient_key = "~/.config/vakr-field/recipient-key.pem"   # never inside the repository
+recipient_cn = "vakr field recipient"
+recipient_days = 3650
+inbox_dir = "~/vakr-inbox"
+extract_dir = "../../inbox"             # git-ignored, relative to this file

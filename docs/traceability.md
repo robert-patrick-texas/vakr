@@ -135,7 +135,21 @@ Code lives in `src/vakr/domain/`, `src/vakr/ports/`, and `src/vakr/adapters/memo
 | ICMP-004/005 | In progress | The domain uses `None`; `-1` is a storage detail | golden fixtures, `test_icmp_series_metrics` | `storage.md` | The SQLite adapter will store `-1`. |
 | RATE-004, LIFE-002 | Implemented | `InterfaceObservation` baseline check, `set_lifecycle` | `test_interface_sample_invariants`, `test_meta009_*` | `domain.md` | |
 | RET-007 | In progress | `RetentionManager` | `test_retention_follows_policy` | `storage.md` | Audited purge comes in M4. |
-| DB-001..007 | In progress | `tests/contract/` suites | The memory adapter passes all of them | `storage.md` | SQLite metadata and telemetry runs are next. |
+| DB-001..007 | In progress | `tests/contract/` suites | The memory adapter passes all of them; the SQLite metadata adapter passes DB-001/002/003/007 unchanged (`tests/contract/sqlite_metadata/`) | `storage.md` | The SQLite telemetry run is next. |
+
+## SQLite metadata adapter and migrations
+
+Code lives in `src/vakr/adapters/sqlite/` (connection, encoding, errors, writer, pool, `migrations/`, `metadata/`) and `src/vakr/ports/migrations.py`; the CLI is `src/vakr/cli/cmd_db.py`. See `docs/operations/database.md` and Appendix E.20.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| DB-001/002/003/007 | In progress | `adapters/sqlite/metadata/*` | `tests/contract/sqlite_metadata/` (shared suites, unchanged), `tests/unit/adapters/sqlite/` | `database.md` | Passes on SQLite; PostgreSQL comes later. A stale snapshot maps to `ConflictError`. No rowids exist. |
+| DB-008 | Implemented | `adapters/sqlite/{writer,pool,connection}.py` | `test_sqlite_concurrency.py`, `test_sqlite_pool_writer.py` | `database.md` | Bounds are in E.20. |
+| MIG-001..005 | Implemented | `adapters/sqlite/migrations/*`, `metadata/sql/0001_initial.sql`, `cmd_db.py` | `test_mig00*_*`, `test_sqlite_migration_crash.py` (real `os._exit`) | `database.md` | Synthetic migrations stand in for prior releases. |
+| META-009, SEC-018 | Implemented | `0001_initial.sql` no-delete and append-only triggers, `metadata/audit.py` | `test_rows_are_never_deleted_and_history_is_append_only`, contract audit tests | `database.md` | Also enforced at the schema level (E.20). |
+| PKG-003 (database ownership) | Implemented | `src/vakr/cli/service_user.py`, `packaging/scripts/deb/postinst` (`vakr db migrate`) | `tests/unit/test_service_user.py`, `make package-test` | `database.md` | `vakr db` switches root to the `vakr` user (E.20). |
+| UPD-002 (database migrations) | Implemented | `packaging/scripts/deb/postinst` | `make package-test` | `docs/operations/updates.md` | Runs on every install and upgrade; failure fails the install (E.20). |
+| OPS-001 | In progress | `adapters/sqlite/metadata/health.py` | `test_metadata_health.py` | `database.md` | Adds the `metadata_db` check. |
 
 ## Field data
 

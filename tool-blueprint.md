@@ -3829,3 +3829,20 @@ Decisions taken with the M2 domain model:
 - **Error precedence.** Ownership is checked before version: editing a file-managed record with a stale version reports ownership, because retrying can't help.
 - **Gaps in native series.** A native series has one point per stored observation. The M4 query layer shall insert an explicit `None` point wherever consecutive points are more than 1.5 × the effective poll interval apart, so graphs break the line instead of drawing across an outage (STORE-012, UI-010). Rollup series already emit every bucket.
 - **Claiming interfaces from files.** Discovered interfaces start API-managed. A file-managed annotation for an existing interface needs an explicit, audited ownership-transfer operation (META-008). This lands with the M3 inventory loader.
+
+### E.20 SQLite connection and writer bounds (5.3, DB-008)
+
+| Setting | Default |
+|---|---|
+| `busy_timeout` | 5,000 ms |
+| In-process wait for the single-writer gate | 10,000 ms, then a retryable `StorageError` |
+| Writers waiting at the gate | at most 32 |
+| Pooled connections per process and database | 8 |
+| Journal mode / synchronous / foreign keys | WAL / NORMAL / ON |
+
+Decisions taken with the M2 SQLite metadata adapter:
+
+- **No deletes, append-only history.** The schema has no rowids, and triggers block deletes and history edits, so META-009 and SEC-018 are enforced by the database as well as by the code.
+- **Migrations run as the service user.** The package's postinst runs `vakr db migrate` on every install and upgrade, and `vakr db` switches to the `vakr` service user when invoked as root, so database, WAL, and shared-memory files stay vakr-owned.
+- **A failed migration fails the install**, so a self-update rolls back (UPD-002, UPD-005). A destructive migration can't run unattended: its release must carry the `manual-update-required` marker.
+- **A newer schema only warns during install.** A self-update rollback reinstalls the older package *before* it restores the pre-update database backup, so failing there would block the rollback. Services still refuse to start on a newer schema (MIG-004).

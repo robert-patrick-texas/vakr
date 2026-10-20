@@ -32,6 +32,7 @@ from pathlib import Path
 
 from vakr.adapters.sqlite.metadata import METADATA_FILE, metadata_migrations
 from vakr.cli.common import SubParsers
+from vakr.cli.service_user import drop_to_service_user
 from vakr.domain.errors import StorageError
 from vakr.paths import InstallPaths
 from vakr.ports.migrations import (
@@ -114,8 +115,12 @@ def _database(args: argparse.Namespace) -> Path:
         Path: The database file.
 
     Raises:
-        None
+        SystemExit: When running as root and the switch to the service user
+            fails, so no root-owned database files are ever created.
     """
+    if (problem := drop_to_service_user()) is not None:
+        _fail(problem)
+        raise SystemExit(EXIT_PROBLEM)
     return args.database or InstallPaths.from_environment().state_dir / METADATA_FILE
 
 

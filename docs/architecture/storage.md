@@ -8,7 +8,7 @@ All persistence goes through typed `Protocol`s in `vakr.ports` (blueprint [5.2](
 | `vakr.ports.telemetry` | `TelemetryBackend`; `ObservationWriter`, `ObservationQuery`, `CurrentStateQuery`, `RollupRepository`, `CollectorHealthRepository`, `RetentionManager`; `TelemetryCapabilities`, `WriteResult`, `RetentionPolicy`, `RetentionReport` |
 | `vakr.ports.clock` | `Clock`, `SystemClock`, `ManualClock` |
 
-The 5.2 `TagGroupRepository` is split into `TagRepository` and `GroupRepository`, which share the generic protocol. `DashboardRepository`, `UserSessionRepository`, and `MigrationManager` arrive with their features in M4.
+The 5.2 `TagGroupRepository` is split into `TagRepository` and `GroupRepository`, which share the generic protocol. `DashboardRepository` and `UserSessionRepository` arrive with their features in M4. `MigrationManager` is in `vakr.ports.migrations`, and the SQLite implementation is in `vakr.adapters.sqlite.migrations` (see the [database operations guide](../operations/database.md)).
 
 ## Metadata: units of work
 

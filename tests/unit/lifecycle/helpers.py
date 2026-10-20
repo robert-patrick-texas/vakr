@@ -75,8 +75,12 @@ def make_cert(
     issuer: Cert | None = None,
     days: tuple[int, int] = (-1, 365),
     sans: tuple[str, ...] = (),
+    omit: frozenset[str] = frozenset(),
 ) -> Cert:
     """Create a certificate (self-signed unless ``issuer`` is given).
+
+    By default CAs meet the strict X.509 profile (EGRESS-003); ``omit``
+    produces the non-compliant certificates that EGRESS-T05 needs.
 
     Args:
         directory: Where to write PEM files.
@@ -85,6 +89,9 @@ def make_cert(
         issuer: Signing CA, or ``None`` for self-signed.
         days: Validity start and end offsets from now, in days.
         sans: DNS names or IP addresses for subjectAltName.
+        omit: Items to leave out: ``"keyUsage"``, ``"keyCertSign"`` (keyUsage
+            without it), ``"critical"`` (non-critical basicConstraints),
+            ``"subjectKeyIdentifier"``, or ``"authorityKeyIdentifier"``.
 
     Returns:
         Cert: The generated certificate.
@@ -102,7 +109,9 @@ def make_cert(
         .serial_number(x509.random_serial_number())
         .not_valid_before(NOW + timedelta(days=days[0]))
         .not_valid_after(NOW + timedelta(days=days[1]))
-        .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True)
+        .add_extension(
+            x509.BasicConstraints(ca=ca, path_length=None), critical="critical" not in omit
+        )
     )
     if sans:
         names: list[x509.GeneralName] = []
@@ -113,22 +122,8 @@ def make_cert(
                 names.append(x509.DNSName(san))
         builder = builder.add_extension(x509.SubjectAlternativeName(names), critical=False)
     if ca:
-        usage = x509.KeyUsage(
-            digital_signature=True,
-            content_commitment=False,
-            key_encipherment=False,
-            data_encipherment=False,
-            key_agreement=False,
-            key_cert_sign=True,
-            crl_sign=True,
-            encipher_only=False,
-            decipher_only=False,
-        )
-        builder = builder.add_extension(usage, critical=True)
-        builder = builder.add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False
-        )
-    if issuer is not None:
+        builder = _ca_extensions(builder, key, omit)
+    if issuer is not None and "authorityKeyIdentifier" not in omit:
         builder = builder.add_extension(
             x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer.key.public_key()),
             critical=False,
@@ -145,6 +140,42 @@ def make_cert(
         )
     )
     return Cert(cert, key, pem, cert_path, key_path)
+
+
+def _ca_extensions(
+    builder: x509.CertificateBuilder, key: ec.EllipticCurvePrivateKey, omit: frozenset[str]
+) -> x509.CertificateBuilder:
+    """Add keyUsage and the subject key identifier to a CA, minus ``omit``.
+
+    Args:
+        builder: Certificate under construction.
+        key: The CA's own key.
+        omit: Items to leave out (see ``make_cert``).
+
+    Returns:
+        x509.CertificateBuilder: The builder with the extensions added.
+
+    Raises:
+        None
+    """
+    if "keyUsage" not in omit:
+        usage = x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign="keyCertSign" not in omit,
+            crl_sign=True,
+            encipher_only=False,
+            decipher_only=False,
+        )
+        builder = builder.add_extension(usage, critical=True)
+    if "subjectKeyIdentifier" not in omit:
+        builder = builder.add_extension(
+            x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False
+        )
+    return builder
 
 
 @dataclass

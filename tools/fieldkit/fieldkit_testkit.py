@@ -48,6 +48,10 @@ class Pki:
         recipient_key: Key of ``recipient``.
         other: A second recipient certificate (wrong-recipient tests).
         other_key: Key of ``other``.
+        no_aki_cert: Leaf for ``localhost`` signed by ``ca`` without an
+            authority key identifier, as some inspection proxies mint them
+            (fails only the strict X.509 profile, EGRESS-T05).
+        no_aki_key: Key of ``no_aki_cert``.
     """
 
     ca: Path
@@ -57,6 +61,8 @@ class Pki:
     recipient_key: Path
     other: Path
     other_key: Path
+    no_aki_cert: Path
+    no_aki_key: Path
 
 
 def openssl(*args: str) -> None:
@@ -115,17 +121,43 @@ def pki(tmp_path_factory: pytest.TempPathFactory) -> Pki:
     """
     d = tmp_path_factory.mktemp("pki")
     ca, ca_key = _self_signed(d, "ca", "Fieldkit Test Inspection CA", ca=True)
-    server_key, csr, server_cert = d / "server-key.pem", d / "server.csr", d / "server.pem"
-    openssl("req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", str(server_key),
-            "-out", str(csr), "-subj", "/CN=localhost")  # fmt: skip
-    ext = d / "ext.cnf"
-    ext.write_text("subjectAltName=DNS:localhost,IP:127.0.0.1\n", encoding="ascii")
-    openssl("x509", "-req", "-in", str(csr), "-CA", str(ca), "-CAkey", str(ca_key),
-            "-CAcreateserial", "-days", "2", "-extfile", str(ext),
-            "-out", str(server_cert))  # fmt: skip
+    server_cert, server_key = _leaf(d, "server", (ca, ca_key), "")
+    no_aki = "authorityKeyIdentifier=none\nsubjectKeyIdentifier=none\n"
+    no_aki_cert, no_aki_key = _leaf(d, "no-aki", (ca, ca_key), no_aki)
     recipient, recipient_key = _self_signed(d, "recipient", "test recipient", ca=False)
     other, other_key = _self_signed(d, "other", "other recipient", ca=False)
-    return Pki(ca, server_cert, server_key, recipient, recipient_key, other, other_key)
+    return Pki(ca, server_cert, server_key, recipient, recipient_key, other, other_key,
+               no_aki_cert, no_aki_key)  # fmt: skip
+
+
+def _leaf(directory: Path, name: str, issuer: tuple[Path, Path], extra: str) -> tuple[Path, Path]:
+    """Issue a ``localhost``/127.0.0.1 server certificate from ``issuer``.
+
+    Args:
+        directory: Output directory.
+        name: File stem.
+        issuer: CA certificate and key paths.
+        extra: Additional extension-file lines (``openssl x509 -extfile``).
+
+    Returns:
+        tuple[Path, Path]: Certificate and key paths.
+
+    Raises:
+        subprocess.CalledProcessError: If openssl fails.
+    """
+    key, csr, cert = (
+        directory / f"{name}-key.pem",
+        directory / f"{name}.csr",
+        directory / f"{name}.pem",
+    )
+    openssl("req", "-new", "-newkey", "rsa:2048", "-nodes", "-keyout", str(key),
+            "-out", str(csr), "-subj", "/CN=localhost")  # fmt: skip
+    ext = directory / f"{name}-ext.cnf"
+    ext.write_text("subjectAltName=DNS:localhost,IP:127.0.0.1\n" + extra, encoding="ascii")
+    openssl("x509", "-req", "-in", str(csr), "-CA", str(issuer[0]), "-CAkey", str(issuer[1]),
+            "-CAcreateserial", "-days", "2", "-extfile", str(ext),
+            "-out", str(cert))  # fmt: skip
+    return cert, key
 
 
 @pytest.fixture
@@ -141,8 +173,40 @@ def tls_server(pki: Pki) -> Generator[int]:
     Raises:
         None
     """
+    yield from _serve(pki.server_cert, pki.server_key)
+
+
+@pytest.fixture
+def tls_server_no_aki(pki: Pki) -> Generator[int]:
+    """Run a TLS server whose leaf lacks an authority key identifier (EGRESS-T05).
+
+    Args:
+        pki: Session PKI.
+
+    Returns:
+        Generator[int]: The listening port.
+
+    Raises:
+        None
+    """
+    yield from _serve(pki.no_aki_cert, pki.no_aki_key)
+
+
+def _serve(cert: Path, key: Path) -> Generator[int]:
+    """Serve TLS with ``cert`` on an ephemeral loopback port until closed.
+
+    Args:
+        cert: Server certificate.
+        key: Its private key.
+
+    Returns:
+        Generator[int]: The listening port; the server stops afterwards.
+
+    Raises:
+        None
+    """
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(str(pki.server_cert), str(pki.server_key))
+    context.load_cert_chain(str(cert), str(key))
     server = TlsServer(context)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

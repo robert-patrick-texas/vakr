@@ -12,9 +12,12 @@ Dependencies:
 
 Safety:
     The context requires certificate verification and hostname matching and
-    refuses TLS older than 1.2. A malformed file in the CA directory is an
-    error naming that file rather than being skipped, so a broken trust
-    store is noticed instead of silently weakening or narrowing trust.
+    refuses TLS older than 1.2. It enforces the strict X.509 profile
+    (``VERIFY_X509_STRICT``) unless the caller passes ``strict_x509=False``
+    (EGRESS-007), which clears that one flag and nothing else. A malformed
+    file in the CA directory is an error naming that file rather than being
+    skipped, so a broken trust store is noticed instead of silently
+    weakening or narrowing trust.
 
 Example:
     >>> ctx = build_context(None, os_bundles=OS_BUNDLES)  # doctest: +SKIP
@@ -71,16 +74,20 @@ def ca_files(ca_dir: Path | None) -> list[Path]:
     return sorted(p for p in ca_dir.iterdir() if p.suffix in CA_SUFFIXES and p.is_file())
 
 
-def build_context(ca_dir: Path | None, os_bundles: Sequence[Path] = OS_BUNDLES) -> ssl.SSLContext:
+def build_context(
+    ca_dir: Path | None, os_bundles: Sequence[Path] = OS_BUNDLES, *, strict_x509: bool = True
+) -> ssl.SSLContext:
     """Create a verifying client context from the OS bundle and ``ca_dir``.
 
     Args:
         ca_dir: Extra trusted CAs (EGRESS-002), or ``None`` for none.
         os_bundles: Distribution bundle candidates; tests pass their own.
+        strict_x509: Enforce the strict X.509 profile; ``False`` clears only
+            ``VERIFY_X509_STRICT`` (EGRESS-007).
 
     Returns:
         ssl.SSLContext: Context with ``CERT_REQUIRED``, hostname checking,
-        and a TLS 1.2 minimum.
+        and a TLS 1.2 minimum in both modes.
 
     Raises:
         EgressError: Step ``"config"`` when a CA file cannot be loaded or no
@@ -89,6 +96,12 @@ def build_context(ca_dir: Path | None, os_bundles: Sequence[Path] = OS_BUNDLES) 
     # PROTOCOL_TLS_CLIENT turns on certificate and hostname verification.
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.minimum_version = ssl.TLSVersion.TLSv1_2
+    # Only create_default_context() sets the strict profile on its own, so it
+    # is set explicitly here; relaxing it touches no other verification flag.
+    if strict_x509:
+        context.verify_flags |= ssl.VERIFY_X509_STRICT
+    else:
+        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
     sources = [bundle] if (bundle := find_os_bundle(os_bundles)) else []
     sources += ca_files(ca_dir)
     if not sources:

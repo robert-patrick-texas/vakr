@@ -4,20 +4,24 @@ Hosts behind a decrypting proxy see GitHub's certificate re-signed by the
 enterprise CA, so updates fail until that CA is trusted (blueprint 28.3.1).
 ``trust-ca`` validates a PEM CA certificate, shows its fingerprint for
 out-of-band comparison, and installs it into ``/etc/vakr/tls/ca.d``
-(EGRESS-003). This module also binds the portable egress library to vakr's
-paths and configuration for the other commands, and provides the CA-expiry
-health check (EGRESS-006) and ``doctor --network`` checks (EGRESS-005).
+(EGRESS-003). A CA that fails the strict X.509 profile is refused unless
+``network.tls_strict_x509 = false`` (EGRESS-007). This module also binds the
+portable egress library to vakr's paths and configuration for the other
+commands, and provides the CA-expiry health check (EGRESS-006) and
+``doctor --network`` checks (EGRESS-005).
 
 Dependencies:
     vakr.lifecycle.egress: Trust store, CA store, proxies, diagnosis.
     vakr.lifecycle.update.journal: Audit events to journald.
+    vakr.cli.tls_strict: Strict-profile policy messages.
     vakr.paths, vakr.config.loader: Installation paths and settings.
 
 Safety:
     Nothing is installed without confirmation or ``--yes``; leaf, expired,
     and non-PEM certificates are refused. ``--system`` changes trust for
     every program on the host and is therefore opt-in. Every change emits an
-    audit event. There is no option to disable verification (EGRESS-004).
+    audit event. There is no option to disable verification (EGRESS-004);
+    the strict-profile fallback relaxes only that profile.
 
 Example:
     $ sudo vakr tls trust-ca corp-inspection.pem --name corp-inspection
@@ -31,9 +35,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from vakr.cli import tls_strict
 from vakr.cli.common import SubParsers
 from vakr.config.loader import EffectiveConfig, load_effective_config
-from vakr.health.lifecycle_checks import check_trusted_cas  # noqa: F401 - re-export for callers
+from vakr.health.lifecycle_checks import (
+    check_trusted_cas,  # noqa: F401 - re-export for callers
+    strict_x509_enabled,
+)
 from vakr.health.model import CheckResult, Status
 from vakr.lifecycle.egress import castore, certinfo, truststore
 from vakr.lifecycle.egress.client import EgressSettings
@@ -47,6 +55,7 @@ from vakr.paths import InstallPaths
 from vakr.version import get_version
 
 TRUST_HINT = "verify its fingerprint out of band, then run: vakr tls trust-ca FILE"
+STRICT_HINT = tls_strict.STRICT_HINT
 EGRESS_URLS = (
     "https://api.github.com/",
     "https://github.com/",
@@ -55,7 +64,6 @@ EGRESS_URLS = (
 """GitHub API, release page, and release-asset download hosts."""
 DIAGNOSIS_TIMEOUT = 10.0
 """Per-step timeout for diagnosis, so a blackholed host cannot stall doctor for minutes."""
-SEVERITY = {"ok": Status.OK, "warning": Status.WARNING, "critical": Status.CRITICAL}
 OS_BUNDLES: tuple[Path, ...] = truststore.OS_BUNDLES
 SYSTEM_STORES: tuple[castore.SystemStore, ...] = castore.SYSTEM_STORES
 AUDIT = EventSink("vakr-tls")
@@ -107,14 +115,23 @@ def run_trust(args: argparse.Namespace) -> int:
         name = castore.check_name(args.name or castore.default_name(args.file))
     except (OSError, certinfo.CertificateRejectedError) as exc:
         return _fail(f"refusing {args.file}: {exc}; nothing was installed")
+    gaps, strict = certinfo.strict_profile_gaps(cert), tls_strict.configured(paths.config_dir)
+    if gaps and strict:
+        return _fail(tls_strict.refusal(args.file, gaps))
     summary = certinfo.summarize(cert)
     print(f"subject:  {summary.subject}\nissuer:   {summary.issuer}")
     print(f"SHA-256:  {summary.sha256}\nexpires:  {summary.not_after:%Y-%m-%d %H:%M}Z")
+    if gaps:
+        print(tls_strict.relaxed_warning(gaps), file=sys.stderr)
     if not confirmer(args.yes)(f"Trust this CA as {name!r} for vakr outbound HTTPS?"):
         return _fail("not installed")
+    relaxed = f" (accepted with {tls_strict.FALLBACK}; lacks {'; '.join(gaps)})" if gaps else ""
     try:
-        path = castore.install(data, name, paths.ca_dir, now)
-        AUDIT("tls.ca.trusted", f"trusted CA {name}: {summary.subject} SHA-256 {summary.sha256}")
+        path = castore.install(data, name, paths.ca_dir, now, strict_x509=strict)
+        AUDIT(
+            "tls.ca.trusted",
+            f"trusted CA {name}: {summary.subject} SHA-256 {summary.sha256}{relaxed}",
+        )
         print(f"installed {path}")
         if args.system:
             store = castore.detect_system_store(SYSTEM_STORES)
@@ -195,7 +212,8 @@ def build_egress_settings(
         timeout: Socket timeout per operation, in seconds.
 
     Returns:
-        EgressSettings: Verifying context, proxy policy, and user agent.
+        EgressSettings: Verifying context (strict X.509 profile unless
+        ``network.tls_strict_x509 = false``), proxy policy, and user agent.
 
     Raises:
         EgressError: When the trust store or proxy settings are invalid.
@@ -204,8 +222,10 @@ def build_egress_settings(
     no_proxy = config.get("network.no_proxy")
     env = os.environ if environ is None else environ
     policy = resolve_policy(str(https_proxy or ""), no_proxy, env)
-    context = truststore.build_context(paths.ca_dir, OS_BUNDLES)
-    return EgressSettings(context, policy, timeout=timeout, user_agent=f"vakr/{get_version()}")
+    strict = strict_x509_enabled(config)
+    context = truststore.build_context(paths.ca_dir, OS_BUNDLES, strict_x509=strict)
+    agent = f"vakr/{get_version()}"
+    return EgressSettings(context, policy, timeout=timeout, user_agent=agent, strict_x509=strict)
 
 
 def network_checks(urls: Sequence[str] = ()) -> tuple[CheckResult, ...]:
@@ -216,7 +236,8 @@ def network_checks(urls: Sequence[str] = ()) -> tuple[CheckResult, ...]:
 
     Returns:
         tuple[CheckResult, ...]: OK or CRITICAL per step; the failing step's
-        summary carries the hint when an untrusted issuer was presented.
+        summary carries the hint for an untrusted issuer or a strict-profile
+        failure, and TLS steps name ``network.tls_strict_x509`` when relaxed.
 
     Raises:
         None
@@ -228,11 +249,13 @@ def network_checks(urls: Sequence[str] = ()) -> tuple[CheckResult, ...]:
     except (EgressError, OSError, ValueError) as exc:
         return (CheckResult("egress config", Status.CRITICAL, str(exc)),)
     results: list[CheckResult] = []
+    relaxed = "" if settings.strict_x509 else f" ({tls_strict.FALLBACK})"
     for url in urls or EGRESS_URLS:
-        diagnosis = diagnose(url, settings, TRUST_HINT)
+        diagnosis = diagnose(url, settings, TRUST_HINT, STRICT_HINT)
         host = urlsplit(url).hostname or url
         for step in diagnosis.steps:
             hint = f"; {diagnosis.hint}" if diagnosis.hint and not step.ok else ""
+            hint += relaxed if step.name == "tls" else ""
             status = Status.OK if step.ok else Status.CRITICAL
             results.append(CheckResult(f"egress {host} {step.name}", status, step.detail + hint))
     return tuple(results)

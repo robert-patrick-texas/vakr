@@ -53,15 +53,18 @@ class CertificateVerifyError(EgressError):
         port: TCP port of the TLS server.
         reason: OpenSSL's verification message, for example
             ``"unable to get local issuer certificate"``.
+        code: OpenSSL's ``X509_V_ERR_*`` number, or ``None`` when unknown.
     """
 
-    def __init__(self, host: str, port: int, reason: str) -> None:
+    def __init__(self, host: str, port: int, reason: str, code: int | None = None) -> None:
         """Describe a verification failure for ``host:port``.
 
         Args:
             host: Expected server name.
             port: Server port.
             reason: Verification failure reason from OpenSSL.
+            code: OpenSSL verify error number, which identifies strict-profile
+                failures (EGRESS-005).
 
         Returns:
             None
@@ -73,6 +76,7 @@ class CertificateVerifyError(EgressError):
         self.host = host
         self.port = port
         self.reason = reason
+        self.code = code
 
 
 class ResponseTooLargeError(EgressError):

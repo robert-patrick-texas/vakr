@@ -127,6 +127,9 @@ def _add_outputs(parser: argparse.ArgumentParser) -> None:
     egress = parser.add_argument_group("GitHub reachability test")
     egress.add_argument("--proxy", metavar="URL", help="http://[user:pass@]host:port")
     egress.add_argument("--ca-file", type=Path, metavar="PEM", help="extra trusted CA")
+    egress.add_argument(
+        "--no-strict-x509", action="store_true", help="relax only the strict X.509 profile"
+    )
     egress.add_argument("--no-egress", action="store_true", help="skip the test")
     egress.add_argument("--egress-url", action="append", default=[], metavar="URL")
     egress.add_argument("--egress-head", action="append", default=[], metavar="URL")

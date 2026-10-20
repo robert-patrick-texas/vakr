@@ -110,6 +110,7 @@ def _parameters(args: argparse.Namespace, plan: Plan) -> dict[str, Any]:
         "community_source": source,
         "proxy": redact_url(args.proxy) if args.proxy else None,
         "ca_file": str(args.ca_file) if args.ca_file else None,
+        "strict_x509": not args.no_strict_x509,
         "egress_test": not args.no_egress,
         "limits": {k: getattr(args, k) for k in ("time_budget", "max_bytes", "max_member_bytes")},
         "snmp": {k: getattr(args, k) for k in ("walk_timeout", "device_pause", "snmp_timeout")},

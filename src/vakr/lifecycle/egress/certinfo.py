@@ -3,9 +3,12 @@
 Before an operator trusts an enterprise TLS-inspection CA, vakr shows the
 subject, SHA-256 fingerprint, and expiry so they can be compared with the
 security team's published values, and refuses anything that is not a
-currently valid CA certificate in PEM form (EGRESS-003). The same summaries
-name the issuer a server presented when verification fails (EGRESS-005)
-and drive the CA-expiry health check (EGRESS-006).
+currently valid CA certificate in PEM form (EGRESS-003). It also lists what
+a CA lacks for the strict X.509 profile that Python 3.13+ asks OpenSSL to
+enforce (``VERIFY_X509_STRICT``): such a CA is rejected during every
+handshake even after it has been trusted. The same summaries name the
+issuer a server presented when verification fails (EGRESS-005) and drive
+the CA-expiry health check (EGRESS-006).
 
 Dependencies:
     cryptography.x509: Certificate parsing; the standard library has no
@@ -14,7 +17,8 @@ Dependencies:
 Safety:
     Parsing never trusts anything; validation only accepts single PEM CA
     certificates within their validity window. Rejection messages name the
-    reason without echoing file contents.
+    reason without echoing file contents. The strict-profile check only
+    reports gaps; whether they are fatal is the caller's policy.
 
 Example:
     >>> summary = summarize(cert)  # doctest: +SKIP
@@ -26,6 +30,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from cryptography import x509
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 
 PEM_MARKER = b"-----BEGIN CERTIFICATE-----"
@@ -137,13 +142,20 @@ def validate_ca(data: bytes, now: datetime) -> x509.Certificate:
 
     Raises:
         CertificateRejectedError: For non-PEM data, a leaf certificate (no
-            ``basicConstraints CA:TRUE``), or a certificate outside its
-            validity window.
+            ``basicConstraints CA:TRUE``), a ``keyUsage`` that forbids
+            certificate signing, or a certificate outside its validity window.
     """
     cert = load_single_pem(data)
     if not _is_ca(cert):
         raise CertificateRejectedError(
             "not a CA certificate (basicConstraints CA:TRUE is required)"
+        )
+    # Unlike a missing keyUsage, this fails in every OpenSSL mode, so no
+    # setting (not even EGRESS-007's fallback) could make the CA usable.
+    usage = _extension(cert, x509.KeyUsage)
+    if usage is not None and not usage.value.key_cert_sign:
+        raise CertificateRejectedError(
+            "keyUsage does not include keyCertSign, so it cannot sign certificates"
         )
     if now < cert.not_valid_before_utc:
         raise CertificateRejectedError(
@@ -152,6 +164,69 @@ def validate_ca(data: bytes, now: datetime) -> x509.Certificate:
     if now > cert.not_valid_after_utc:
         raise CertificateRejectedError(f"expired on {cert.not_valid_after_utc:%Y-%m-%d %H:%M}Z")
     return cert
+
+
+def strict_profile_gaps(cert: x509.Certificate) -> list[str]:
+    """List what a CA certificate lacks for the strict X.509 profile (EGRESS-003).
+
+    The rules are the CA-side checks of OpenSSL's ``X509_V_FLAG_X509_STRICT``
+    that enterprise inspection CAs typically fail: version 3, critical
+    ``basicConstraints`` with CA:TRUE, ``keyUsage`` with ``keyCertSign``, a
+    subject key identifier, and an authority key identifier unless the CA
+    is self-signed.
+
+    Args:
+        cert: Parsed CA certificate.
+
+    Returns:
+        list[str]: One operator-readable missing item per failed rule, in a
+        stable order; empty when the certificate meets the profile.
+
+    Raises:
+        None
+    """
+    if cert.version is not x509.Version.v3:
+        return ["X.509 version 3 (this certificate is version 1, so it has no extensions)"]
+    gaps: list[str] = []
+    constraints = _extension(cert, x509.BasicConstraints)
+    if constraints is None or not constraints.value.ca:
+        gaps.append("basicConstraints extension with CA:TRUE")
+    elif not constraints.critical:
+        gaps.append("basicConstraints marked critical (it is present but not critical)")
+    usage = _extension(cert, x509.KeyUsage)
+    if usage is None:
+        gaps.append("keyUsage extension (with keyCertSign)")
+    elif not usage.value.key_cert_sign:
+        gaps.append("keyCertSign in the keyUsage extension")
+    if _extension(cert, x509.SubjectKeyIdentifier) is None:
+        gaps.append("subject key identifier (subjectKeyIdentifier extension)")
+    authority = _extension(cert, x509.AuthorityKeyIdentifier)
+    if (authority is None or authority.value.key_identifier is None) and not is_self_signed(cert):
+        gaps.append(
+            "authority key identifier (authorityKeyIdentifier with a keyIdentifier), "
+            "required because this CA is not self-signed"
+        )
+    return gaps
+
+
+def is_self_signed(cert: x509.Certificate) -> bool:
+    """Return whether ``cert`` names itself as issuer and its own key signed it.
+
+    Args:
+        cert: Parsed certificate.
+
+    Returns:
+        bool: ``True`` only when issuer equals subject and the signature
+        verifies with the certificate's own public key.
+
+    Raises:
+        None
+    """
+    try:
+        cert.verify_directly_issued_by(cert)
+    except ValueError, TypeError, InvalidSignature:
+        return False
+    return True
 
 
 def expiry_state(not_after: datetime, now: datetime, warn: timedelta = EXPIRY_WARNING) -> str:
@@ -185,8 +260,26 @@ def _is_ca(cert: x509.Certificate) -> bool:
     Raises:
         None
     """
+    ext = _extension(cert, x509.BasicConstraints)
+    return ext is not None and bool(ext.value.ca)
+
+
+def _extension[T: x509.ExtensionType](
+    cert: x509.Certificate, kind: type[T]
+) -> x509.Extension[T] | None:
+    """Return the extension of type ``kind``, or ``None`` when absent.
+
+    Args:
+        cert: Parsed certificate.
+        kind: Extension class, for example ``x509.KeyUsage``.
+
+    Returns:
+        x509.Extension | None: The extension with its criticality.
+
+    Raises:
+        None
+    """
     try:
-        ext = cert.extensions.get_extension_for_class(x509.BasicConstraints)
+        return cert.extensions.get_extension_for_class(kind)
     except x509.ExtensionNotFound:
-        return False
-    return bool(ext.value.ca)
+        return None

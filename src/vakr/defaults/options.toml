@@ -120,6 +120,14 @@ reload = "restart"
 description = "Hosts and domains that bypass network.https_proxy. Empty falls back to the NO_PROXY environment variable."
 
 [[options]]
+key = "network.tls_strict_x509"
+type = "bool"
+default = true
+since = "0.1.0"
+reload = "live"
+description = "Enforce the strict X.509 profile (OpenSSL VERIFY_X509_STRICT, the Python 3.13+ default) for outbound HTTPS (EGRESS-007). Set to false only when an enterprise TLS-inspection CA, or the certificates its proxy issues, cannot be reissued to meet it. False relaxes only the strict-profile rules, such as a CA's required keyUsage, critical basicConstraints, and key identifiers, lets vakr tls trust-ca install such a CA with a warning, and makes vakr check health report WARNING. It never relaxes certificate verification itself: chain signatures, validity periods, certificate purpose, and host name checks always apply."
+
+[[options]]
 key = "telemetry.native_retention_days"
 type = "int"
 min = 1

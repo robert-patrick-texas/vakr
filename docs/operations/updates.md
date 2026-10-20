@@ -77,6 +77,7 @@ Set these keys in `/etc/vakr/config.toml` or in a file under `/etc/vakr/conf.d/`
 | `update.hold_version` | empty | Pins the deployment. Automatic selection never goes past this version. Timer runs refuse anything newer, even with `--version`. An operator at the console may still install a newer release explicitly with `--version`. |
 | `network.https_proxy` | empty | HTTPS proxy, for example `http://proxy.corp.example:3128`. |
 | `network.no_proxy` | `[]` | Destinations reached without the proxy. |
+| `network.tls_strict_x509` | `true` | Enforce the strict X.509 profile. Set `false` only as a fallback for an inspection CA that can't be reissued; see [The strict X.509 profile](#the-strict-x509-profile). |
 
 ```toml
 [update]
@@ -152,7 +153,7 @@ The proxy URL must be `http://HOST:PORT`, with an explicit port. TLS to the prox
 
 ## Enterprise TLS inspection
 
-Some networks decrypt outbound HTTPS and re-sign it with an enterprise CA. vakr never turns certificate verification off: no option, flag, or environment variable does that. Instead, you add the enterprise CA to vakr's trust store.
+Some networks decrypt outbound HTTPS and re-sign it with an enterprise CA. vakr never turns certificate verification off: no option, flag, or environment variable does that. Instead, you add the enterprise CA to vakr's trust store. The CA must also meet the [strict X.509 profile](#the-strict-x509-profile), or you must explicitly relax that profile.
 
 ### Symptoms and diagnosis
 
@@ -181,7 +182,7 @@ installed /etc/vakr/tls/ca.d/corp-inspection.pem
 
 Before you answer, compare the SHA-256 fingerprint with the value your security team publishes.
 
-`trust-ca` accepts only a single PEM X.509 certificate that has `basicConstraints CA:TRUE` and is within its validity period. It refuses a leaf (server) certificate, an expired or not-yet-valid certificate, a DER or other non-PEM file, and a file that holds several certificates. A refused file installs nothing.
+`trust-ca` accepts only a single PEM X.509 certificate that has `basicConstraints CA:TRUE` and is within its validity period. It refuses a leaf (server) certificate, an expired or not-yet-valid certificate, a DER or other non-PEM file, and a file that holds several certificates. By default it also refuses a CA that doesn't meet the [strict X.509 profile](#the-strict-x509-profile). A refused file installs nothing.
 
 | Command | Effect |
 |---|---|
@@ -193,6 +194,67 @@ Before you answer, compare the SHA-256 fingerprint with the value your security 
 vakr's trust store is the OS bundle (`/etc/ssl/certs/ca-certificates.crt` on Ubuntu, `/etc/pki/tls/certs/ca-bundle.crt` on the RHEL family) plus every `*.pem` or `*.crt` file in `/etc/vakr/tls/ca.d/`. The bundled Python interpreter's compiled-in CA paths are never used. A malformed file in `ca.d` is an error that names the file. It is never silently skipped.
 
 `vakr check health` reports WARNING when a trusted CA expires within 30 days, and CRITICAL once one has expired (the `trusted_cas` check). Install the replacement CA before the old one expires, then remove the old one.
+
+### The strict X.509 profile
+
+vakr runs on Python 3.13 or later, which checks certificates against OpenSSL's strict X.509 profile. vakr applies that profile to all outbound HTTPS. Many enterprise inspection CAs were issued before clients enforced it, and they fail it even after you trust them. To pass, a CA must:
+
+- be an X.509 version 3 certificate;
+- have `basicConstraints` with `CA:TRUE`, marked critical;
+- have a `keyUsage` extension that includes `keyCertSign`;
+- have a subject key identifier;
+- have an authority key identifier, unless it is self-signed (a root CA).
+
+The certificates that the inspection proxy issues for each site must also carry an authority key identifier.
+
+**By default, `trust-ca` refuses a CA that fails the profile.** It lists each missing item:
+
+```console
+$ sudo vakr tls trust-ca corp-inspection-ca.pem
+vakr: refusing corp-inspection-ca.pem: this CA does not meet the strict X.509 profile that Python
+3.13+ enforces (VERIFY_X509_STRICT), so every handshake through it would fail. It lacks:
+  - keyUsage extension (with keyCertSign)
+  - subject key identifier (subjectKeyIdentifier extension)
+Ask the team that runs this CA to reissue it with these items.
+If a reissue is not possible, set network.tls_strict_x509 = false in the [network] table of the
+vakr configuration (EGRESS-007). That relaxes only the strict-profile rules;
+chain signatures, validity, purpose, and host names are still verified.
+Then run trust-ca again; nothing was installed
+```
+
+Ask your security team to reissue the CA with the missing items. That is the right fix, because every other client on Python 3.13 or later fails the same way.
+
+**If the CA can't be reissued**, add this to `/etc/vakr/config.toml`:
+
+```toml
+[network]
+tls_strict_x509 = false
+```
+
+This clears only OpenSSL's strict-profile flag for vakr's outbound HTTPS. Certificate verification stays on. The chain must still end at a trusted CA with valid signatures, every certificate must be within its validity period and allowed for its purpose, and the host name must match. No vakr setting turns verification off. The change applies from the next command, with no restart.
+
+While `tls_strict_x509` is `false`:
+
+- `trust-ca` installs a CA that fails the profile, after a warning that lists what it lacks. The audit event records the missing items too.
+- `vakr check health` reports WARNING. The `tls_policy` check says `strict X.509 checks relaxed for outbound HTTPS`.
+- `vakr doctor --network` names the setting on each TLS step. `vakr self-update --check` prints a note.
+
+Once the reissued CA arrives, trust it, remove the old one with `vakr tls remove NAME`, and delete the setting.
+
+A CA whose `keyUsage` leaves out `keyCertSign` is refused in both modes. OpenSSL rejects such a CA whatever the setting, so it could never work.
+
+**Diagnosing a strict-profile failure.** If the CA is trusted but the handshake still fails with a reason such as `Missing Authority Key Identifier` or `CA cert does not include key usage extension`, `vakr doctor --network` and `vakr self-update --check` make one more handshake with only the strict profile relaxed. That handshake still verifies the chain and the host name. It sends no application data, and its result only chooses the message. vakr never retries a real request with the profile relaxed.
+
+```console
+$ sudo vakr doctor --network
+[CRITICAL] egress api.github.com tls: certificate verify failed: Missing Authority Key Identifier;
+only the strict X.509 profile rejects it (it verifies with just that relaxed); server presented
+subject 'CN=api.github.com' issued by 'CN=Corp Inspection CA,O=Example Corp' (SHA-256 4A:...); ask
+for certificates that meet the strict X.509 profile; if that is not possible, set
+network.tls_strict_x509 = false (EGRESS-007), which relaxes only those rules
+```
+
+If the relaxed handshake fails too, the output shows the reason that remains (for example a host-name mismatch) and doesn't suggest the setting, because changing it wouldn't help.
 
 ## Hosts without GitHub access
 
@@ -269,4 +331,5 @@ During the MVP, telemetry migrations are additive, so a rollback doesn't need a 
 | `release signers file missing` | The installed package is damaged. Reinstall the current version with `--file`. |
 | `another update is already running` | Wait for the other run (the timer or another operator) to finish. |
 | `certificate verify failed ... issued by '...'` | See [Enterprise TLS inspection](#enterprise-tls-inspection). |
+| `refusing ...: this CA does not meet the strict X.509 profile` or `only the strict X.509 profile rejects it` | Get the CA reissued. If that isn't possible, see [The strict X.509 profile](#the-strict-x509-profile). |
 | `proxy refused CONNECT ...: HTTP/1.1 407` | The proxy requires authentication, which vakr doesn't support yet. Ask for an exception for the GitHub hosts, or use `--file`. |

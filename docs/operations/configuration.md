@@ -46,6 +46,7 @@ Useful commands: `vakr config show-effective --sources` prints every effective v
 |---|---|---|---|---|---|
 | `network.https_proxy` | str (url) | `""` | restart | v0.1.0 | Proxy for all outbound HTTPS, such as release checks and peer replication (EGRESS-001). Empty falls back to the HTTPS_PROXY environment variable. Never put credentials here; proxy credentials come from the credential provider. |
 | `network.no_proxy` | list[str] | `[]` | restart | v0.1.0 | Hosts and domains that bypass network.https_proxy. Empty falls back to the NO_PROXY environment variable. |
+| `network.tls_strict_x509` | bool | `true` | live | v0.1.0 | Enforce the strict X.509 profile (OpenSSL VERIFY_X509_STRICT, the Python 3.13+ default) for outbound HTTPS (EGRESS-007). Set to false only when an enterprise TLS-inspection CA, or the certificates its proxy issues, cannot be reissued to meet it. False relaxes only the strict-profile rules, such as a CA's required keyUsage, critical basicConstraints, and key identifiers, lets vakr tls trust-ca install such a CA with a warning, and makes vakr check health report WARNING. It never relaxes certificate verification itself: chain signatures, validity periods, certificate purpose, and host name checks always apply. |
 
 ### `[telemetry]`
 

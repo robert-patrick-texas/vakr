@@ -8,9 +8,12 @@ the proxy, the TCP connect, TLS verification, or HTTP. Many enterprises
 re-sign outbound TLS with their own inspection CA; when verification fails,
 the test reports the issuer and subject of the certificate the host was
 shown, which tells development which CA to trust with ``vakr tls trust-ca``
-(EGRESS-003, EGRESS-005). Proxies come from ``--proxy`` or the standard
-environment variables; the trust store is the OS bundle plus ``--ca-file``,
-never only the interpreter's compiled-in paths (EGRESS-002).
+(EGRESS-003, EGRESS-005). When only the strict X.509 profile that Python
+3.13+ enforces rejects the chain, the report says so and names the
+``--no-strict-x509`` flag and vakr's ``network.tls_strict_x509`` fallback
+(EGRESS-007). Proxies come from ``--proxy`` or the standard environment
+variables; the trust store is the OS bundle plus ``--ca-file``, never only
+the interpreter's compiled-in paths (EGRESS-002).
 
 Dependencies:
     ssl, http.client: Standard library only.
@@ -21,7 +24,9 @@ Safety:
     Verification is never disabled for a request that carries data
     (EGRESS-004). The one exception is ``peek_presented_certificate_unverified``,
     which completes a handshake only to read the presented certificate and
-    closes without sending application data. Proxy credentials are used for
+    closes without sending application data. ``--no-strict-x509`` clears only
+    ``VERIFY_X509_STRICT``; the strict-profile confirmation handshake keeps
+    every other check and also sends nothing. Proxy credentials are used for
     ``Proxy-Authorization`` but every recorded URL is redacted.
 
 Example:
@@ -43,23 +48,34 @@ from fieldkit_tunnel import choose_proxy, open_tunnel, redact_url
 
 OS_CA_BUNDLES = ("/etc/ssl/certs/ca-certificates.crt", "/etc/pki/tls/certs/ca-bundle.crt")
 MAX_BODY_BYTES = 256 * 1024
+STRICT_ONLY_CODES = frozenset({78, *range(80, 95)})
+"""OpenSSL 3 verify codes raised only by the strict profile, e.g. 85 missing AKI, 92 no keyUsage."""
+STRICT_HINT = (
+    "the chain fails the strict X.509 profile that Python 3.13+ enforces; rerun with "
+    "--no-strict-x509 to compare, and if the CA or proxy certificates cannot be reissued, "
+    "vakr needs network.tls_strict_x509 = false (EGRESS-007)"
+)
 
 
-def tls_context(ca_file: Path | None) -> tuple[ssl.SSLContext, list[str]]:
+def tls_context(ca_file: Path | None, strict_x509: bool = True) -> tuple[ssl.SSLContext, list[str]]:
     """Build a verifying client context from the OS store plus ``ca_file``.
 
     Args:
         ca_file: Extra PEM CA file (enterprise inspection CA), or ``None``.
+        strict_x509: Keep the strict X.509 profile; ``False`` clears only
+            ``VERIFY_X509_STRICT`` (``--no-strict-x509``).
 
     Returns:
         tuple[ssl.SSLContext, list[str]]: Context with hostname checking and
-        verification on, and the trust sources that were loaded.
+        verification on in both modes, and the trust sources that were loaded.
 
     Raises:
         OSError: If ``ca_file`` cannot be read.
         ssl.SSLError: If ``ca_file`` holds no usable certificate.
     """
     context = ssl.create_default_context()
+    if not strict_x509:
+        context.verify_flags &= ~ssl.VERIFY_X509_STRICT
     sources = ["interpreter default paths"]
     for bundle in OS_CA_BUNDLES:
         if Path(bundle).is_file():
@@ -166,7 +182,8 @@ def probe(method: str, url: str, options: Mapping[str, Any]) -> dict[str, Any]:
         method: ``GET`` or ``HEAD``.
         url: ``https://`` URL to test.
         options: ``proxy`` (str or None), ``ca_file`` (Path or None),
-            ``timeout`` (float), ``agent`` (str), ``environ`` (mapping).
+            ``timeout`` (float), ``agent`` (str), ``environ`` (mapping), and
+            ``strict_x509`` (bool, default ``True``).
 
     Returns:
         dict[str, Any]: ``dns``, ``connect``, ``tls``, ``http`` entries as
@@ -179,9 +196,10 @@ def probe(method: str, url: str, options: Mapping[str, Any]) -> dict[str, Any]:
     host, port = parts.hostname or "", parts.port or 443
     proxy = choose_proxy(options.get("proxy"), host, options.get("environ", {}))
     record: dict[str, Any] = {"method": method, "url": url, "proxy": proxy and redact_url(proxy)}
+    record["strict_x509"] = strict = options.get("strict_x509", True)
     stage = "tls-setup"
     try:
-        context, record["trust"] = tls_context(options.get("ca_file"))
+        context, record["trust"] = tls_context(options.get("ca_file"), strict)
         stage = "connect"
         sock = open_tunnel(host, port, proxy, options["timeout"], record)
         stage = "tls"
@@ -200,6 +218,8 @@ def probe(method: str, url: str, options: Mapping[str, Any]) -> dict[str, Any]:
         record["error"] = f"tls: certificate verification failed: {exc.verify_message}"
         presented = _peek_or_error(host, port, proxy, options["timeout"])
         record["tls"] = {"verified": False, "verify_code": exc.verify_code, "presented": presented}
+        if strict and exc.verify_code in STRICT_ONLY_CODES:
+            _strict_profile(record, host, port, proxy, options)
     except (OSError, ssl.SSLError, http.client.HTTPException) as exc:
         record["error"] = f"{stage}: {type(exc).__name__}: {exc}"
     return record
@@ -224,3 +244,40 @@ def _peek_or_error(host: str, port: int, proxy: str | None, timeout: float) -> d
         return peek_presented_certificate_unverified(host, port, proxy, timeout)
     except (OSError, ValueError) as exc:
         return {"error": f"{type(exc).__name__}: {exc}"}
+
+
+def _strict_profile(
+    record: dict[str, Any], host: str, port: int, proxy: str | None, options: Mapping[str, Any]
+) -> None:
+    """Confirm a strict-profile failure and add the fallback hint to the record.
+
+    The confirmation is a verifying handshake with only ``VERIFY_X509_STRICT``
+    cleared; it closes right after the handshake and sends nothing.
+
+    Args:
+        record: Probe record whose TLS stage failed with a strict-only code.
+        host: Server name (SNI and host name check).
+        port: Server port.
+        proxy: Same proxy as the failed request, or ``None``.
+        options: Probe options (``ca_file``, ``timeout``).
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    remaining: str | None = None
+    try:
+        context, _ = tls_context(options.get("ca_file"), strict_x509=False)
+        sock = open_tunnel(host, port, proxy, options["timeout"], {})
+        context.wrap_socket(sock, server_hostname=host).close()
+    except ssl.SSLCertVerificationError as exc:
+        remaining = exc.verify_message
+    except (OSError, ssl.SSLError) as exc:
+        remaining = f"confirmation failed: {type(exc).__name__}: {exc}"
+    record["tls"]["passes_without_strict"] = remaining is None
+    if remaining is None:
+        record["error"] += f" (only the strict X.509 profile rejects it); hint: {STRICT_HINT}"
+    else:
+        record["error"] += f" (strict X.509 profile rule; without it: {remaining})"

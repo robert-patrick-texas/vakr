@@ -13,6 +13,6 @@ Example:
     $ uv run pytest tools/fieldkit
 """
 
-from fieldkit_testkit import connect_proxy, pki, tls_server
+from fieldkit_testkit import connect_proxy, pki, tls_server, tls_server_no_aki
 
-__all__ = ["connect_proxy", "pki", "tls_server"]
+__all__ = ["connect_proxy", "pki", "tls_server", "tls_server_no_aki"]

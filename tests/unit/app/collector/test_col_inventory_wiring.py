@@ -32,11 +32,14 @@ match.ifalias = ["exact:", "user port"]
 """
 
 
-def test_collector_uses_the_inventory_service_and_reloads_its_rules(tmp_path: Path) -> None:
+def test_collector_uses_the_inventory_service_and_reloads_its_rules(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     """6.2, CONF-003: the real service is wired; a reload moves the change counter.
 
     Args:
         tmp_path: Test directory.
+        caplog: Log capture, for the unapplied-setting warning (E.25 #10).
 
     Returns:
         None
@@ -54,6 +57,15 @@ def test_collector_uses_the_inventory_service_and_reloads_its_rules(tmp_path: Pa
         (paths.config_dir / "policies.toml").write_text(RULE, encoding="utf-8")
         reload_inventory(inventory, parts.config, paths.config_dir)
         assert inventory.change_counter() > before
+        assert not [r for r in caplog.records if "not applied yet" in r.getMessage()]
+        fast = RULE + 'settings.polling_interval = "30s"\n'
+        (paths.config_dir / "policies.toml").write_text(fast, encoding="utf-8")
+        reload_inventory(inventory, parts.config, paths.config_dir)
+        warned = [r.getMessage() for r in caplog.records if "not applied yet" in r.getMessage()]
+        assert warned == [
+            "interface_policy.rules[0] (no-user-ports): polling_interval is not applied yet: "
+            "the MVP polls whole devices; set `interval` on the device in inventory.toml"
+        ]
     finally:
         asyncio.run(parts.close())
 

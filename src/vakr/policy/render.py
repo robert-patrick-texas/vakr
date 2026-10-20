@@ -22,7 +22,8 @@ Example:
 
 from typing import Any
 
-from vakr.policy.settings import format_setting
+from vakr.policy.scope import NOT_APPLIED
+from vakr.policy.settings import SETTING_LIMITS, format_setting
 from vakr.policy.trace import (
     Candidate,
     ConditionCheck,
@@ -149,7 +150,8 @@ def render_text(explanation: Explanation) -> str:
         lines.append("  (no rules)")
     lines.append("values:")
     for value in explanation.values:
-        lines.append(f"  {value.name} = {_candidate(value.name, value.winner)}")
+        unused = f" ({NOT_APPLIED})" if value.name in SETTING_LIMITS else ""
+        lines.append(f"  {value.name} = {_candidate(value.name, value.winner)}{unused}")
         lines.append(f"      why: {value.reason}")
         for other in value.overridden:
             lines.append(f"      overrides: {_candidate(value.name, other)}")

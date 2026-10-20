@@ -42,6 +42,13 @@ OVERRIDABLE = {
     "wrong-path-for-interpreter",
 }
 
+UNIT_OVERRIDES = {
+    # Owner approval 2026-10-20: vakr's services join the package's own
+    # vakr.target (6.2), which lintian calls unusual. Units must live in
+    # /usr/lib/systemd/system, so this is the one override outside /opt/vakr.
+    "systemd-service-file-refers-to-unusual-wantedby-target": "[usr/lib/systemd/system/vakr-",
+}
+
 
 def nfpm_entries() -> list[dict[str, str]]:
     """Extract the ``contents`` entries of ``nfpm.yaml`` without a YAML library.
@@ -192,9 +199,12 @@ def test_lintian_overrides_are_justified_and_confined() -> None:
     assert overrides
     for n, line in overrides:
         tag = line.split()[1]
-        assert tag in OVERRIDABLE, f"override for {tag} needs owner approval"
+        assert tag in OVERRIDABLE or tag in UNIT_OVERRIDES, (
+            f"override for {tag} needs owner approval"
+        )
         assert line.rstrip().endswith("]"), f"override without a pointer: {line}"
-        assert "[opt/vakr/" in line, f"override outside /opt/vakr: {line}"
+        confined = UNIT_OVERRIDES.get(tag, "[opt/vakr/")
+        assert confined in line, f"override outside {confined.strip('[')}: {line}"
         preceding = lines[n - 1]
         assert preceding.startswith("#") or preceding.startswith("vakr: "), "no justification"
 

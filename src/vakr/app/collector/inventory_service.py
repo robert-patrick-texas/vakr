@@ -22,6 +22,7 @@ Example:
     ()
 """
 
+import logging
 from pathlib import Path
 
 from vakr.app.collector.inventory import InventoryContext, InventorySource
@@ -30,6 +31,9 @@ from vakr.inventory.service import InventoryService
 from vakr.policy.files import load_policy_file
 from vakr.policy.keywords import keywords_from_config
 from vakr.policy.rules import Policy
+from vakr.policy.scope import unapplied_settings
+
+_LOG = logging.getLogger(__name__)
 
 POLICIES_FILE = "policies.toml"
 """The collection rules file in the configuration directory (11.1)."""
@@ -63,10 +67,12 @@ def open_service(context: InventoryContext) -> InventorySource:
     Raises:
         PolicyError: If ``policies.toml`` or the keyword settings are invalid.
     """
+    policy = load_policy(context.config_dir)
+    _note_unapplied(policy)
     return InventoryService(
         context.uow_factory,
         context.collector.id,
-        load_policy(context.config_dir),
+        policy,
         context.clock,
         keywords=keywords_from_config(context.config),
     )
@@ -88,4 +94,22 @@ def reload_service(inventory: InventorySource, config: EffectiveConfig, config_d
         PolicyError: If the reloaded rules are invalid; the caller keeps the old ones.
     """
     if isinstance(inventory, InventoryService):
-        inventory.replace_policy(load_policy(config_dir), keywords_from_config(config))
+        policy = load_policy(config_dir)
+        _note_unapplied(policy)
+        inventory.replace_policy(policy, keywords_from_config(config))
+
+
+def _note_unapplied(policy: Policy) -> None:
+    """Log each rule setting the MVP collector does not apply (E.25 #10).
+
+    Args:
+        policy: The rules just loaded.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    for note in unapplied_settings(policy):
+        _LOG.warning("%s", note, extra={"event_id": "collector.policy_setting_unused"})

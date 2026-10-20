@@ -153,6 +153,8 @@ write_debian_changelog() {
 normalize_tree() {
     log "compiling bytecode and normalising modes and mtimes"
     find "$OPT" -name __pycache__ -type d -prune -exec rm -rf {} +
+    # Some wheels (pysnmp) ship macOS Finder metadata; it is never needed at runtime.
+    find "$OPT" -name .DS_Store -type f -delete
     # Hash-based .pyc files stay valid whatever the source mtime is, so the
     # mtime clamp below cannot make Python rewrite them as root at runtime.
     # One process in sorted order: marshal output depends on string refcounts,

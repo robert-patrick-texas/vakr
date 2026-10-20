@@ -36,6 +36,7 @@ from vakr.policy.files import load_facts_file, load_policy_file
 from vakr.policy.keywords import KeywordSet, keywords_from_config
 from vakr.policy.render import render_text, to_dict
 from vakr.policy.rules import Policy
+from vakr.policy.scope import unapplied_settings
 
 POLICIES_FILE = "policies.toml"
 """Policies file inside the configuration directory (section 11.1)."""
@@ -200,9 +201,9 @@ def run_validate(args: argparse.Namespace) -> int:
         None
     """
     problems: list[object] = []
-    rules = keywords = 0
+    keywords, policy = 0, Policy()
     try:
-        rules = len(load_policy_file(args.file).rules)
+        policy = load_policy_file(args.file)
     except PolicyError as exc:
         problems.extend(exc.issues)
     try:
@@ -211,5 +212,8 @@ def run_validate(args: argparse.Namespace) -> int:
         problems.extend(exc.issues)
     if problems:
         return _report(problems)
+    rules = len(policy.rules)
     print(f"policies valid: {rules} rule(s) in {args.file}; {keywords} description keyword(s)")
+    for note in unapplied_settings(policy):  # Option A: the MVP polls whole devices
+        print(f"warning: {note}")
     return 0

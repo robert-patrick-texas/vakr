@@ -89,11 +89,12 @@ HOST_CHECKS: frozenset[str] = frozenset({"icmp"})
 """Checks of host settings that rolling an update back cannot fix (UPD-006, E.14)."""
 
 
-def run_checks(checks: tuple[Check, ...] = CHECKS) -> tuple[CheckResult, ...]:
+def run_checks(checks: tuple[Check, ...] | None = None) -> tuple[CheckResult, ...]:
     """Evaluate every check, converting unexpected exceptions into UNKNOWN.
 
     Args:
-        checks: Check callables to run, in display order.
+        checks: Check callables to run, in display order; ``None`` runs
+            ``CHECKS`` as it is at call time.
 
     Returns:
         tuple[CheckResult, ...]: One result per check, in the same order.
@@ -102,7 +103,7 @@ def run_checks(checks: tuple[Check, ...] = CHECKS) -> tuple[CheckResult, ...]:
         None
     """
     results: list[CheckResult] = []
-    for check in checks:
+    for check in CHECKS if checks is None else checks:
         name = getattr(check, "__name__", "check").removeprefix("check_")
         try:
             results.append(check())

@@ -31,6 +31,7 @@ First release that monitors devices (milestones M2 and M3): SNMPv2c and ICMP col
 - Utilization percentages are shown only for physical ports and port-channels. Tunnels, loopbacks, VLAN interfaces, and subinterfaces report nominal speeds (IOS XE: 100 kb/s on many tunnels), so their traffic is shown without a percentage unless `capacity_override_bps` is set.
 - A poll cut short by shutdown is recorded as `cancelled`, with the evidence its finished steps produced, instead of partial or failed with a collector-degraded flag.
 - Interface rollup values are stored at single precision (ADR-021 amendment 3), keeping the worst case at about 40 GB per node.
+- Each device is polled as a whole at one interval: its `interval` in `inventory.toml`, or `polling.default_interval`. Settings inside collection rules in `policies.toml` (such as `polling_interval` on an interface rule) are shown by `vakr policy explain` but not applied yet; `vakr policy validate` warns about each one and names the device-level field to use.
 
 ### Notes for operators updating from 0.1.1
 

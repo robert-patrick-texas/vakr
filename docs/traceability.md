@@ -261,6 +261,8 @@ Code is in `src/vakr/ingest/` and `src/vakr/health/spool_check.py`, with tests i
 | SVC-003, 16.4 (cancelled polls) | Implemented | `PollExecution.CANCELLED`, `scheduler/records.finished_result`, telemetry vocabulary code 8, `query/evidence._CUT_SHORT` | `test_shutdown_records_waiting_cancelled_and_due_slots`, `test_shutdown_lets_short_polls_finish_and_keeps_partial_evidence`, `test_finished_record_times_and_flags` | E.25 #4 and #8, `scheduler.md` | Reads as unknown, never down. |
 | RET-004 (rollup precision) | Approved | `adapters/sqlite/telemetry/rollup_codec.py` | `test_e21_*` | ADR-021 amendment 3, E.21 | float32 interface rollup values; 40.1 GB per node. |
 | E.27 #7 | Approved | collector | | E.27 | Down interfaces get no traffic records. |
+| SCHED-013, POLICY-003 (Option A) | Implemented | `vakr.policy.scope.unapplied_settings`, `cli/cmd_policy.py`, `policy/render.py`, `app/collector/inventory_service.py` | `test_policy_scope.py`, `test_validate_reports_success_and_every_problem`, `test_collector_uses_the_inventory_service_and_reloads_its_rules` | E.25 #10, `policies.md` | Device-level intervals only; rule settings are explained, warned about, and logged, never silently ignored. |
+| PKG-004 (lintian) | Implemented | `packaging/lintian/vakr`, `packaging/tests/test_package_spec.py` (`UNIT_OVERRIDES`) | `test_lintian_overrides_are_justified_and_confined` | | Owner approval 2026-10-20: one override outside `/opt/vakr`, for `vakr.target` in unit files. |
 
 ## Scheduler and poll planning (M3)
 

@@ -147,6 +147,8 @@ The form used in the blueprint's example, `exclude_ifname_patterns = ["Vlan*"]`,
 
 ### Settings and their limits
 
+> **Not applied yet in the MVP.** This release polls each device as a whole, at the `interval` set on the device in `inventory.toml` or at `polling.default_interval`, and every collected interface is sampled at each poll. Rule settings are validated and shown by `vakr policy explain`, marked "not applied yet", but the collector does not use them. `vakr policy validate` warns about each one and names the device-level field to use instead, when there is one (`interval`, `discovery_interval`, `reachability`). Per-interface settings arrive after the MVP (blueprint E.25 #10).
+
 | Setting | Type | Allowed | Controls |
 |---|---|---|---|
 | `polling_interval` | duration | 30s to 1h | Interface poll interval |

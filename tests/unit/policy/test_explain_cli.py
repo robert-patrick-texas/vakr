@@ -182,7 +182,10 @@ def test_validate_reports_success_and_every_problem(
     )
     assert (status, out) == (
         0,
-        f"policies valid: 4 rule(s) in {POLICIES}; 3 description keyword(s)\n",
+        f"policies valid: 4 rule(s) in {POLICIES}; 3 description keyword(s)\n"
+        # E.25 #10 (Option A): rule settings are explained but not applied yet.
+        "warning: interface_policy.rules[2] (wan-fast-poll): polling_interval is not applied "
+        "yet: the MVP polls whole devices; set `interval` on the device in inventory.toml\n",
     )
     bad = tmp_path / "bad.toml"
     bad.write_text(

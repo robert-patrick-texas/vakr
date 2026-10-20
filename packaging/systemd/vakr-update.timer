@@ -1,0 +1,16 @@
+# Optional daily self-update (UPD-003, Appendix E.14). Shipped disabled; enable
+# it with `systemctl enable --now vakr-update.timer`.
+[Unit]
+Description=Daily vakr self-update check
+Documentation=https://robert-patrick-texas.github.io/vakr/docs/operations/updates.html
+
+[Timer]
+OnCalendar=daily
+# Spread a fleet's downloads over four hours (Appendix E.14).
+RandomizedDelaySec=4h
+# Catch up after downtime instead of skipping that day's check.
+Persistent=true
+Unit=vakr-update.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,41 @@
+#!/bin/sh
+# postrm for vakr (PKG-005).
+#
+# `apt remove` keeps configuration (/etc/vakr), state and telemetry history
+# (/var/lib/vakr), and the update cache. `apt purge` removes configuration,
+# the update cache, and the operator's enablement links for vakr units, but
+# keeps the telemetry history and says so. The vakr user and groups stay, as
+# Debian does for system accounts, so files left in /var/lib/vakr keep an owner.
+set -e
+
+reload_systemd() {
+    if [ -d /run/systemd/system ]; then
+        systemctl --system daemon-reload >/dev/null || true
+    fi
+}
+
+case "$1" in
+    remove)
+        reload_systemd
+        ;;
+    purge)
+        rm -rf /etc/vakr /var/cache/vakr
+        # `systemctl enable` links (and masks) for units that no longer exist.
+        find /etc/systemd/system -maxdepth 2 -type l -name 'vakr*' -delete 2>/dev/null || true
+        rmdir --ignore-fail-on-non-empty /etc/systemd/system/vakr.target.wants 2>/dev/null || true
+        reload_systemd
+        if [ -d /var/lib/vakr ]; then
+            echo "vakr: removed configuration in /etc/vakr."
+            echo "vakr: kept telemetry history in /var/lib/vakr (PKG-005). To delete it, run"
+            echo "vakr: 'vakr data purge' before removing vakr, or remove the directory yourself."
+        fi
+        ;;
+    upgrade | failed-upgrade | abort-install | abort-upgrade | disappear)
+        ;;
+    *)
+        echo "postrm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

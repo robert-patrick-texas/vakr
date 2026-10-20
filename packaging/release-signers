@@ -1,0 +1,13 @@
+# Trusted vakr release signing keys, in ssh-keygen "allowed signers" format
+# (see ssh-keygen(1), ALLOWED SIGNERS). The package installs this file as
+# /opt/vakr/share/release-signers, and `vakr self-update` checks
+# SHA256SUMS.sig against it before installing anything (UPD-001, ADR-026).
+#
+# PLACEHOLDER: no key is listed yet, so every signature check fails closed.
+# The project owner adds the release public key, one line per key:
+#
+#   vakr-release namespaces="vakr-release" ssh-ed25519 AAAA...key... vakr release
+#
+# Both the principal and the namespace are "vakr-release". To rotate, add the
+# new key here and publish that release signed with the old key; remove the
+# old key in a later release.

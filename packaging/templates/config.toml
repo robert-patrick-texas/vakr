@@ -1,0 +1,9 @@
+# vakr operator configuration: /etc/vakr/config.toml
+#
+# This file holds only the settings you change. Every option, with its
+# documented default, ships read-only in /opt/vakr/share/defaults/, so options
+# added by later releases take effect without editing this file (CFGM-001).
+#
+# The package wrote this minimal file because none existed; it never
+# overwrites it (CFGM-005). `vakr config upgrade` migrates it after upgrades,
+# keeping your comments. Put files with secrets in /etc/vakr/secrets/.

@@ -1,0 +1,64 @@
+#!/bin/sh
+# postinst for vakr (PKG-003, CFGM-005).
+#
+# Creates the vakr user and groups and the directories in tmpfiles.d, writes
+# /etc/vakr/config.toml only when it does not exist (it is never a dpkg
+# conffile, so upgrades never prompt), and on upgrade restarts vakr.target
+# only if it was already running. Nothing is enabled or started on a first
+# install: collection begins after `vakr setup`.
+set -e
+
+CONFIG=/etc/vakr/config.toml
+FALLBACK_TEMPLATE=/opt/vakr/share/templates/config.toml
+
+create_config() {
+    [ -e "$CONFIG" ] && return 0
+    tmp=$(mktemp "$CONFIG.XXXXXX")
+    # PYTHONDONTWRITEBYTECODE keeps root from leaving __pycache__ files under
+    # /opt/vakr that dpkg does not own and could not remove.
+    if PYTHONDONTWRITEBYTECODE=1 /opt/vakr/venv/bin/vakr config template >"$tmp" 2>/dev/null \
+        && [ -s "$tmp" ]; then
+        origin="vakr config template"
+    else
+        cp "$FALLBACK_TEMPLATE" "$tmp"
+        origin="the packaged minimal template"
+    fi
+    chown root:vakr "$tmp"
+    chmod 0640 "$tmp"
+    mv "$tmp" "$CONFIG"
+    echo "vakr: created $CONFIG from $origin"
+}
+
+restart_if_active() {
+    # $1 is the previously configured version; empty on a first install.
+    [ -n "$1" ] || return 0
+    # try-restart restarts vakr.target (and the units PartOf it) only if it is
+    # active. deb-systemd-invoke is not used: its "restart" also starts an
+    # enabled unit that the operator had stopped.
+    if ! systemctl try-restart vakr.target; then
+        # Self-update's post-update health checks report and roll back
+        # (UPD-006); failing here would only leave dpkg half-configured.
+        echo "vakr: restarting vakr.target failed; see 'journalctl -u vakr.target'" >&2
+    fi
+}
+
+case "$1" in
+    configure)
+        systemd-sysusers vakr.conf
+        systemd-tmpfiles --create vakr.conf
+        create_config
+        # Without systemd as PID 1 (containers, chroots) there is nothing to reload.
+        if [ -d /run/systemd/system ]; then
+            systemctl --system daemon-reload >/dev/null || true
+            restart_if_active "$2"
+        fi
+        ;;
+    abort-upgrade | abort-remove | abort-deconfigure)
+        ;;
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

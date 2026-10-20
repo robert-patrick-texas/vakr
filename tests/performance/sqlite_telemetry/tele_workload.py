@@ -154,7 +154,7 @@ class Generator:
                     col,
                     START + timedelta(minutes=m, seconds=59),
                     CollectorState.HEALTHY,
-                    "0.2.0-bench",
+                    "7.2.0-bench",
                     queue_depth=3,
                     queue_capacity=1000,
                 )

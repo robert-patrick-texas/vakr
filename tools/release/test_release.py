@@ -243,9 +243,9 @@ def test_main_prints_versions_and_reports_errors(
     Raises:
         AssertionError: If output or exit codes differ.
     """
-    assert release.main(["--print-version", "deb", "--version", "0.2.0-rc.1"]) == 0
+    assert release.main(["--print-version", "deb", "--version", "7.2.0-rc.1"]) == 0
     assert release.main(["--print-version", "next-patch", "--root", str(repo)]) == 0
-    assert capsys.readouterr().out.split() == ["0.2.0~rc.1", "1.2.4"]
+    assert capsys.readouterr().out.split() == ["7.2.0~rc.1", "1.2.4"]
     assert release.main(["--print-version", "deb", "--version", "1.2"]) == 2
     assert release.main(["--config", str(repo / "absent.toml"), "--root", str(repo)]) == 2
     assert "cannot read release config" in capsys.readouterr().err

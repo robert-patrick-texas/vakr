@@ -243,11 +243,11 @@ def test_check_update_health(host: tuple[InstallPaths, FakeInstaller]) -> None:
     paths, _ = host
     state_file = paths.state_dir / "update-state.json"
     assert cmd_selfupdate.check_update().summary == "never updated"
-    save_state(state_file, UpdateState("failed", "t", "0.2.0", "0.3.0", "health check failed"))
+    save_state(state_file, UpdateState("failed", "t", "7.2.0", "7.3.0", "health check failed"))
     failed = cmd_selfupdate.check_update()
     assert failed.status is Status.WARNING
     assert "health check failed" in failed.summary
-    save_state(state_file, UpdateState("rolled-back", "t", "0.3.0", "0.2.0", "ok"))
+    save_state(state_file, UpdateState("rolled-back", "t", "7.3.0", "7.2.0", "ok"))
     assert cmd_selfupdate.check_update().status is Status.OK
     state_file.write_text(json.dumps({"result": "bogus"}))
     assert cmd_selfupdate.check_update().status is Status.WARNING

@@ -17,7 +17,7 @@ Safety:
 
 Example:
     >>> updater = SelfUpdater(project, kit, client)  # doctest: +SKIP
-    >>> updater.update(Version.parse("0.2.0"), Request(), lambda q: True).status  # doctest: +SKIP
+    >>> updater.update(Version.parse("7.2.0"), Request(), lambda q: True).status  # doctest: +SKIP
     'updated'
 """
 

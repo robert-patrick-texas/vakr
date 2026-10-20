@@ -169,7 +169,7 @@ key = "spool.directory"
 type = "str"
 pattern = '^(/[^\x00]*)?$'
 default = ""
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Directory of the durable observation spool (STORE-004). Empty means spool/ under the state directory, normally /var/lib/vakr/spool. Each collector writes its own subdirectory named by its UUID. Use a disk-backed filesystem: paths under /dev/shm and /run are refused because tmpfs can never be the only durability layer (STORE-005)."
 
@@ -179,7 +179,7 @@ type = "int"
 min = 64
 max = 524288
 default = 4096
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Upper bound on the spool's disk use in MiB, quarantined files included (6.4, E.24). The default holds about 40 hours of the MVP workload while the telemetry database is unavailable. Must be at least four segments."
 
@@ -189,7 +189,7 @@ type = "int"
 min = 1
 max = 1024
 default = 64
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Size in MiB at which the spool starts a new segment file (E.8). A segment is deleted only once every record in it is stored in the telemetry database."
 
@@ -199,7 +199,7 @@ type = "duration"
 min = 0.1
 max = 10
 default = "1s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Longest time a completed observation waits for the fsync that makes it durable (group commit, E.8). An abrupt power loss can lose at most about this much telemetry, and recovery records the loss (STORE-007)."
 
@@ -209,7 +209,7 @@ type = "int"
 min = 1
 max = 100000
 default = 1000
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Records written before the spool fsyncs early, even if spool.fsync_interval has not elapsed (E.8)."
 
@@ -219,7 +219,7 @@ type = "int"
 min = 100
 max = 500000
 default = 10000
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Observations that may wait in memory for the spool's fsync (6.4). When full, collectors wait instead of growing memory, and the wait is reported as queue saturation (QUEUE-T01)."
 
@@ -229,7 +229,7 @@ type = "int"
 min = 1
 max = 99
 default = 70
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Spool fill level, in percent of spool.max_size_mib, at which vakr check health reports WARNING (6.4). Must be below spool.critical_pct."
 
@@ -239,7 +239,7 @@ type = "int"
 min = 1
 max = 99
 default = 85
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Spool fill level at which vakr check health reports CRITICAL capacity degradation (6.4). Must be below spool.exhausted_pct."
 
@@ -249,7 +249,7 @@ type = "int"
 min = 1
 max = 99
 default = 95
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Spool fill level at which the collector stops scheduling new normal polling instead of losing observations (6.4). Targets not polled are unknown, never down. The space above it absorbs observations already in flight."
 
@@ -259,7 +259,7 @@ type = "duration"
 min = 1
 max = 300
 default = "10s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "How often ingestion writes spooled observations to the telemetry database in one batch (STORE-011, E.21). While at least spool.ingest_max_rows observations wait, batches are written back to back."
 
@@ -269,7 +269,7 @@ type = "int"
 min = 1
 max = 50000
 default = 50000
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Most observations in one telemetry write (STORE-011, E.19). The telemetry backend's own limit applies when it is lower."
 
@@ -330,7 +330,7 @@ type = "duration"
 min = 30
 max = 3600
 default = "60s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Poll interval for devices without their own interval (SCHED-010). Each poll is anchored to its intended slot, not to when the previous poll finished. The range matches the policy limits of Appendix E.18."
 
@@ -339,7 +339,7 @@ key = "polling.reachability_strategy"
 type = "enum"
 choices = ["icmp_gated", "snmp_fallback", "icmp_only", "snmp_only"]
 default = "icmp_gated"
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "How ICMP gates SNMP for devices without their own strategy (ICMP-006 to ICMP-014). icmp_gated skips SNMP after 0 or 1 of 5 replies; snmp_fallback then makes one low-cost Stage 1 attempt; icmp_only never uses SNMP; snmp_only never pings."
 
@@ -348,7 +348,7 @@ key = "scheduler.collector_name"
 type = "str"
 pattern = '^([A-Za-z0-9][A-Za-z0-9._-]{0,62})?$'
 default = ""
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Name of this collector; the hostname phase is hashed from it (SCHED-001, Appendix E.11). Empty means the host's short name, lower-cased, without its DNS suffix. Changing it moves every device's poll time."
 
@@ -357,7 +357,7 @@ key = "scheduler.phase"
 type = "enum"
 choices = ["hostname", "fixed"]
 default = "hostname"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Where this collector's polling cycle starts within each interval (SCHED-002 to SCHED-004). hostname derives it from scheduler.collector_name, so two collectors watching the same devices do not probe them at the same instant; fixed uses scheduler.fixed_phase."
 
@@ -367,7 +367,7 @@ type = "duration"
 min = 0
 max = 3600
 default = "0s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Cycle start offset when scheduler.phase is fixed (SCHED-004), taken modulo each device's interval."
 
@@ -376,7 +376,7 @@ key = "scheduler.device_order"
 type = "enum"
 choices = ["common", "hashed"]
 default = "common"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "How devices are placed after the phase (SCHED-005, SCHED-006). common hashes the device UUID, so every collector visits devices in the same relative order; hashed also hashes the collector name, giving each collector its own order. Hashing spreads polls across the interval; it does not guarantee that two devices never start together (SCHED-007)."
 
@@ -386,7 +386,7 @@ type = "int"
 min = 1
 max = 1000
 default = 32
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Polls that may run at once (SCHED-016). The MVP workload needs about 5 on average. When every worker is busy, a due poll waits up to scheduler.max_start_delay and is then recorded as not attempted, which shows as unknown, never as a device outage (SCHED-017)."
 
@@ -396,7 +396,7 @@ type = "int"
 min = 16
 max = 100000
 default = 1000
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Finished poll records held between the scheduler and the spool (section 6.4), about 10 minutes of polls at the MVP workload. When it is full, polling slows and the collector reports itself overloaded; records are never dropped."
 
@@ -406,7 +406,7 @@ type = "duration"
 min = 1
 max = 300
 default = "5s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "A poll that starts more than this after its slot counts as late in health metrics (section 4.2 asks for 99% within about 5s). Must not exceed scheduler.max_start_delay."
 
@@ -416,7 +416,7 @@ type = "duration"
 min = 1
 max = 600
 default = "30s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "A due poll that cannot start within this time, because every worker is busy or the collector stalled, is recorded as not attempted instead of running late (SCHED-017). A device still being polled at its next slot gets that slot recorded as missed (overrun) at once (SCHED-012)."
 
@@ -426,7 +426,7 @@ type = "duration"
 min = 5
 max = 3600
 default = "90s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "A poll still running after this long is stopped. Steps that already finished keep their results, and the poll is recorded as partial or failed. At the 60s default interval a hung poll costs at most one missed slot."
 
@@ -436,7 +436,7 @@ type = "duration"
 min = 0
 max = 300
 default = "15s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "On shutdown, how long running polls get to finish before they are cancelled; every cancelled poll is still recorded, with the results of its finished steps (section 16.4). Keep it well below the service's systemd stop timeout."
 
@@ -446,7 +446,7 @@ type = "int"
 min = 2
 max = 5
 default = 5
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "ICMP Echo probes sent to each device per reachability cycle (ICMP-001). At least 2: under the default icmp_gated strategy SNMP runs only after two replies, and a single probe can never show a device as reachable (Appendix E.17). At most 5, the per-probe RTT columns of Compact storage (ADR-021)."
 
@@ -456,7 +456,7 @@ type = "duration"
 min = 0.02
 max = 5
 default = "200ms"
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Time between the starts of consecutive probes to one device (ICMP-002). Probes go out on a fixed schedule from the start of the cycle, so a late probe does not delay the next one."
 
@@ -466,7 +466,7 @@ type = "duration"
 min = 0.1
 max = 5
 default = "1s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "How long to wait for each probe's reply before counting that probe as lost (Appendix E.9). With the defaults a cycle finishes within about 2 seconds."
 
@@ -476,7 +476,7 @@ type = "float"
 min = 1
 max = 100
 default = 40.0
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Packet loss, in percent of the probes sent, at or above which a device that still answers is shown as impaired instead of reachable (Appendix E.1). The default 40 tolerates one lost probe in five, which Control Plane Policing causes routinely."
 
@@ -486,7 +486,7 @@ type = "float"
 min = 0
 max = 5000
 default = 0.0
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Median round-trip time, in milliseconds, above which a device is shown as impaired (Appendix E.1). 0, the default, turns the latency check off."
 
@@ -496,7 +496,7 @@ type = "int"
 min = 16
 max = 16384
 default = 1024
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "Most ICMP probes the collector waits on at once, across all devices (Appendix E.22). A probe that cannot be sent in time is recorded as collector overload, never as packet loss. 1,024 is about twice what 100 unreachable devices need."
 
@@ -512,7 +512,7 @@ type = "int"
 min = 1
 max = 65535
 default = 161
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "UDP port of SNMP agents (SNMP-016)."
 
@@ -522,7 +522,7 @@ type = "duration"
 min = 1
 max = 30
 default = "2s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "How long to wait for each SNMP answer before the attempt counts as unanswered (SNMP-011, Appendix E.9)."
 
@@ -532,7 +532,7 @@ type = "int"
 min = 0
 max = 5
 default = 1
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Complete new attempts after an unanswered SNMP request. Each retry is counted and flagged in the poll's quality (SNMP-018)."
 
@@ -542,7 +542,7 @@ type = "int"
 min = 5
 max = 100
 default = 30
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Varbinds per SNMP request at the start of each session. After a tooBig answer vakr halves it, down to 5, for the rest of the session (SNMP-017, Appendix E.4)."
 
@@ -552,7 +552,7 @@ type = "int"
 min = 1
 max = 100
 default = 25
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "GETBULK max-repetitions for discovery walks (Appendix E.9). It never exceeds snmp.max_varbinds."
 
@@ -562,7 +562,7 @@ type = "int"
 min = 100
 max = 100000
 default = 10000
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Most rows one discovery walk of a table column may return. A walk that reaches it stops, keeps the rows it has, and marks the table partial (Appendix E.23)."
 
@@ -572,7 +572,7 @@ type = "duration"
 min = 30
 max = 2592000
 default = "24h"
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "How often each device is rediscovered (DISC-002). Policy rules and devices can override it within 30s to 30d (Appendix E.18)."
 
@@ -582,7 +582,7 @@ type = "duration"
 min = 3600
 max = 7776000
 default = "7d"
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9)."
 
@@ -595,7 +595,7 @@ type = "duration"
 min = 2
 max = 600
 default = "10s"
-since = "0.1.1"
+since = "0.2.0"
 reload = "restart"
 description = "How often vakr tui reads current state again (13.1, Appendix E.29). vakr tui --refresh overrides it. At the 60s default poll interval, 10s shows a new poll within a few seconds and keeps database reads trivial."
 
@@ -607,7 +607,7 @@ key = "inventory.file"
 type = "str"
 pattern = '^(/[^\x00]*)?$'
 default = ""
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "File holding file-managed devices, sites, and interface annotations (META-008, META-010). Empty means inventory.toml in the configuration directory, normally /etc/vakr/inventory.toml. Apply changes with vakr inventory plan and vakr inventory apply."
 
@@ -615,7 +615,7 @@ description = "File holding file-managed devices, sites, and interface annotatio
 key = "security.allowed_target_cidrs"
 type = "list[str]"
 default = []
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Networks, in CIDR form, that every poll target must fall in (15.5, SEC-015). Empty allows any unicast address. Multicast, unspecified, and broadcast addresses are always refused."
 
@@ -623,7 +623,7 @@ description = "Networks, in CIDR form, that every poll target must fall in (15.5
 key = "security.denied_target_addresses"
 type = "list[str]"
 default = ["169.254.169.254/32", "fd00:ec2::254/128", "100.100.100.200/32"]
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Addresses or CIDR networks that are never polled (15.5, SEC-015). The defaults are the cloud metadata services, which answer anyone on the host. Setting this list replaces the defaults."
 
@@ -636,7 +636,7 @@ type = "float"
 min = 2
 max = 20
 default = 5.0
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "Longest gap between two counter samples, in effective polling intervals, across which a rate is still derived (Appendix E.4). A longer gap leaves the rate unavailable with BASELINE_GAP instead of averaging over the outage (RATE-003). 32-bit counters are further limited to half their wrap time at line rate."
 
@@ -646,6 +646,6 @@ type = "float"
 min = 1
 max = 10
 default = 1.1
-since = "0.1.1"
+since = "0.2.0"
 reload = "live"
 description = "A derived rate above this multiple of the interface's effective capacity is kept and flagged RATE_EXCEEDS_CAPACITY, never clipped (RATE-009, Appendix E.4)."

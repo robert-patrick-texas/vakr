@@ -4,6 +4,10 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+## 0.2.0 - 2026-10-20
+
+First release that monitors devices (milestones M2 and M3): SNMPv2c and ICMP collection for Cisco IOS XE, a durable spool, Compact SQLite storage, file-managed inventory with conservative interface identity, and current state in `vakr status` and `vakr tui`. Graphs, the web UI, and rollups arrive in M4.
+
 ### Added
 
 - Compact SQLite telemetry storage (`telemetry.db`, ADR-021 layout C+H): day-partitioned native tables with a staging table, monthly rollup tables, exact 30/400-day retention by horizon with whole-partition drops, and a `telemetry_db` health check. `vakr db status|migrate|backup` now cover both databases (`vakr db status telemetry` for one).
@@ -21,12 +25,22 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - `vakr status [DEVICE] [--json]` and a read-only `vakr tui` (Textual) show current state from the local databases: devices with Attention first, each status as an icon and a label, the age and freshness of every value, and "—" with a reason wherever data is missing, never zero. Collector or storage trouble reads as Unknown, never Down. `vakr status` exits with Nagios codes (0 OK, 1 attention, 3 unknown). New option `tui.refresh_interval` (10 s). See [the status and TUI guide](docs/operations/status-and-tui.md) (TUI-001..008, Appendix E.29).
 - File-managed inventory and interface identity: `vakr inventory validate|plan|apply|list` for `/etc/vakr/inventory.toml` (sites, devices, interface annotations; removed devices are disabled, never deleted), the audited `vakr interface claim`, conservative identity reconciliation on rediscovery with `vakr interface review list|map|new` for uncertain cases, and the collector-facing `InventoryService`. New options `inventory.file`, `security.allowed_target_cidrs`, and `security.denied_target_addresses` (cloud metadata services denied by default). Metadata schema 2 adds identity reviews: run `vakr db migrate` (it takes a backup first). See [the inventory guide](docs/operations/inventory.md).
 
-### Changed (owner decisions of 2026-10-20)
+### Behaviour to know about (owner decisions of 2026-10-20)
 
 - A host that cannot send ICMP Echo is a hard stop: `vakr-collector` refuses to start (exit 78, not restarted) when `net.ipv4.ping_group_range` excludes the `vakr` group and no `CAP_NET_RAW` drop-in is installed, and stops the same way if permission is withdrawn while it runs. The `icmp` check in `vakr check health` is now CRITICAL; self-update counts it as a warning, because rolling a release back cannot fix a host setting. `vakr doctor` prints the exact fix.
 - Utilization percentages are shown only for physical ports and port-channels. Tunnels, loopbacks, VLAN interfaces, and subinterfaces report nominal speeds (IOS XE: 100 kb/s on many tunnels), so their traffic is shown without a percentage unless `capacity_override_bps` is set.
 - A poll cut short by shutdown is recorded as `cancelled`, with the evidence its finished steps produced, instead of partial or failed with a collector-degraded flag.
 - Interface rollup values are stored at single precision (ADR-021 amendment 3), keeping the worst case at about 40 GB per node.
+
+### Notes for operators updating from 0.1.1
+
+- `sudo vakr self-update` installs it. The update migrates the configuration (43 new options, all with packaged defaults; `vakr config new-options --since 0.1.1` lists them) and creates both databases (`metadata.db` at schema 2 and the new `telemetry.db`).
+- Nothing is polled until you enable the collector. To start monitoring:
+  1. Put the SNMPv2c community in `/etc/vakr/secrets/credentials.toml` (mode 0640, owner root:vakr) under a name such as `[credentials.network-v2c]`; `vakr credentials check` verifies it.
+  2. List the devices in `/etc/vakr/inventory.toml` (see the inventory guide), then run `vakr inventory validate`, `vakr inventory plan`, and `sudo vakr inventory apply`.
+  3. Run `vakr doctor`. The `icmp` line must be OK: a host whose `net.ipv4.ping_group_range` excludes the `vakr` group is a hard stop, and the line prints the one-line fix.
+  4. `sudo systemctl enable --now vakr-collector.service vakr.target`, then watch `vakr status` or `vakr tui`. Interfaces appear after the first discovery, and rates after the second poll.
+- `vakr snmp discover ADDRESS --credential NAME` and `vakr icmp probe ADDRESS` check one device before you enable the collector.
 
 ## 0.1.1 - 2026-10-20
 

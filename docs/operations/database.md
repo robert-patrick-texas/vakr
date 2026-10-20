@@ -51,7 +51,7 @@ state:     current: schema 1 is current
 pending:   none
 integrity: ok (PRAGMA quick_check of the 12 fixed tables; --full checks all)
 history:
-  0001 initial applied 2026-10-20T03:15:00Z in 0.004 s by vakr 0.2.0
+  0001 initial applied 2026-10-20T03:15:00Z in 0.004 s by vakr 1.4.0
 wal:       3.9 MiB
 staging:   oldest staged row 412 s old
 ```

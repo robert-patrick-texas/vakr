@@ -35,7 +35,7 @@ Safety:
 Example:
     $ uv run tools/release/release.py --dry-run
     $ uv run tools/release/release.py --print-version deb
-    0.2.0~rc.1
+    7.2.0~rc.1
 """
 
 import argparse

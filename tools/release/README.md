@@ -8,7 +8,7 @@ Builds, checksums, SSH-signs, verifies, tags, and publishes a GitHub release. It
 uv run tools/release/release.py --dry-run         # everything except tag, push, release
 uv run tools/release/release.py                   # a real release
 uv run tools/release/release.py --print-version deb             # from VERSION
-uv run tools/release/release.py --print-version deb --version 0.2.0-rc.1
+uv run tools/release/release.py --print-version deb --version 1.4.0-rc.1
 ```
 
 | Option | Meaning |

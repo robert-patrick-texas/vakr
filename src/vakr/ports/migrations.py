@@ -87,7 +87,7 @@ class AppliedMigration:
         name: Short identifier.
         applied_at: When it finished (UTC).
         duration: How long it took.
-        applied_by: Release that applied it, such as ``vakr 0.2.0``.
+        applied_by: Release that applied it, such as ``vakr 7.2.0``.
     """
 
     version: int

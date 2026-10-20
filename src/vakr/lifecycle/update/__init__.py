@@ -19,6 +19,6 @@ Safety:
 
 Example:
     >>> from vakr.lifecycle.update.versions import Version
-    >>> Version.parse("0.2.0rc1").debian()
-    '0.2.0~rc.1'
+    >>> Version.parse("7.2.0rc1").debian()
+    '7.2.0~rc.1'
 """

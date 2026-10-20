@@ -8,7 +8,7 @@
 #
 # packaging/container/build.sh runs nfpm from the repository root inside the
 # build container, after it has assembled /opt/vakr. It sets:
-#   VAKR_DEB_VERSION  Debian form of VERSION, e.g. 0.2.0~rc.1 (VER-002)
+#   VAKR_DEB_VERSION  Debian form of VERSION, e.g. 7.2.0~rc.1 (VER-002)
 #   SOURCE_DATE_EPOCH commit time; nfpm stamps it on generated archive members
 name: vakr
 arch: amd64

@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for the VERSION-to-package version mapping (VER-001, VER-002).
 
-A wrong mapping breaks upgrades silently: if ``0.2.0-rc.1`` became the
-Debian version ``0.2.0-rc.1``, dpkg would sort it *after* ``0.2.0`` and the
+A wrong mapping breaks upgrades silently: if ``7.3.0-rc.1`` became the
+Debian version ``7.3.0-rc.1``, dpkg would sort it *after* ``7.3.0`` and the
 final release would never install over the candidate. These tests check the
 spellings and, where the tools exist, check ordering with ``dpkg`` itself
 and with the ``packaging`` library that pip and uv follow.
@@ -33,7 +33,7 @@ from release_version import ReleaseVersion, VersionError, read_version_file
     ("text", "semver", "pep440", "debian", "tag"),
     [
         ("1.2.3", "1.2.3", "1.2.3", "1.2.3", "v1.2.3"),
-        ("0.2.0-rc.1\n", "0.2.0-rc.1", "0.2.0rc1", "0.2.0~rc.1", "v0.2.0-rc.1"),
+        ("7.3.0-rc.1\n", "7.3.0-rc.1", "7.3.0rc1", "7.3.0~rc.1", "v7.3.0-rc.1"),
         (" 10.20.30-rc.0 ", "10.20.30-rc.0", "10.20.30rc0", "10.20.30~rc.0", "v10.20.30-rc.0"),
     ],
 )
@@ -89,9 +89,9 @@ def test_rejects_versions_outside_the_accepted_form(text: str) -> None:
 @pytest.mark.parametrize(
     ("older", "newer"),
     [
-        ("0.2.0-rc.1", "0.2.0"),
-        ("0.2.0-rc.1", "0.2.0-rc.2"),
-        ("0.2.0-rc.9", "0.2.0-rc.10"),
+        ("7.3.0-rc.1", "7.3.0"),
+        ("7.3.0-rc.1", "7.3.0-rc.2"),
+        ("7.3.0-rc.9", "7.3.0-rc.10"),
         ("1.2.3", "1.2.4"),
         ("1.9.0", "1.10.0"),
     ],
@@ -128,7 +128,7 @@ def test_next_patch_is_newer_and_final() -> None:
         AssertionError: If the bump is wrong.
     """
     assert ReleaseVersion.parse("1.2.3").next_patch().semver == "1.2.4"
-    assert ReleaseVersion.parse("0.2.0-rc.1").render("next-patch") == "0.2.1"
+    assert ReleaseVersion.parse("7.3.0-rc.1").render("next-patch") == "7.3.1"
 
 
 @pytest.mark.parametrize(

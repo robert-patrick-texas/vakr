@@ -3354,7 +3354,7 @@ inbox/ <- field_inbox.py <---- HTTPS URL or scp <--  vakr field collect -> bundl
 | ID | Requirement |
 |---|---|
 | VER-001 | The project version shall be defined only in the repository-root `VERSION` file. Python package metadata (dynamic version), `vakr --version`, Go builds (`-ldflags -X`), package versions (nfpm), release tags (`v<version>`), and documentation footers all derive from it. |
-| VER-002 | `VERSION` holds a Semantic Versioning string, `MAJOR.MINOR.PATCH`, optionally followed by a `-rc.N` pre-release suffix. The release tool derives the PEP 440 form (`0.2.0rc1`) and the Debian/RPM form (`0.2.0~rc.1`) mechanically. |
+| VER-002 | `VERSION` holds a Semantic Versioning string, `MAJOR.MINOR.PATCH`, optionally followed by a `-rc.N` pre-release suffix. The release tool derives the PEP 440 form (`1.4.0rc1`) and the Debian/RPM form (`1.4.0~rc.1`) mechanically. |
 | VER-003 | CI shall fail when a version string is hard-coded anywhere other than `VERSION`. Changelog headings and migration identifiers are allowlisted. |
 | VER-004 | Before MVP acceptance, minor releases may contain breaking changes (ADR-031). The changelog marks each one and names the automatic migration that handles it. |
 

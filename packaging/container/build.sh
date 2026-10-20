@@ -4,8 +4,8 @@
 # not run it on a host, because it installs into /opt/vakr.
 #
 # Inputs: /in/source.tar (the staged tree) and these environment variables:
-#   VAKR_VERSION       VERSION string, e.g. 0.2.0-rc.1
-#   VAKR_DEB_VERSION   its Debian form, e.g. 0.2.0~rc.1 (tools/release, VER-002)
+#   VAKR_VERSION       VERSION string, e.g. 7.2.0-rc.1
+#   VAKR_DEB_VERSION   its Debian form, e.g. 7.2.0~rc.1 (tools/release, VER-002)
 #   VAKR_TEST_BUILD    1 when VERSION_OVERRIDE set the version (test builds only)
 #   SOURCE_DATE_EPOCH  commit time; every packaged file gets this mtime
 #   HOST_UID, HOST_GID owner for the files written to /out

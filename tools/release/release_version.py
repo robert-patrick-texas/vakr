@@ -4,9 +4,9 @@
 
 A project that keeps its version in a single ``VERSION`` file (VER-001) still
 needs that version spelled several ways: Python packaging normalises
-``0.2.0-rc.1`` to ``0.2.0rc1`` (PEP 440), Debian and RPM need ``0.2.0~rc.1``
+``7.2.0-rc.1`` to ``7.2.0rc1`` (PEP 440), Debian and RPM need ``7.2.0~rc.1``
 so a release candidate sorts *before* the final release, and git tags use
-``v0.2.0-rc.1``. Deriving them mechanically here means no build script ever
+``v7.2.0-rc.1``. Deriving them mechanically here means no build script ever
 hand-edits a version, and package managers order upgrades correctly.
 
 Dependencies:
@@ -19,9 +19,9 @@ Safety:
     misorder.
 
 Example:
-    >>> v = ReleaseVersion.parse("0.2.0-rc.1")
+    >>> v = ReleaseVersion.parse("7.2.0-rc.1")
     >>> v.pep440, v.debian, v.tag
-    ('0.2.0rc1', '0.2.0~rc.1', 'v0.2.0-rc.1')
+    ('7.2.0rc1', '7.2.0~rc.1', 'v7.2.0-rc.1')
 """
 
 import re
@@ -82,7 +82,7 @@ class ReleaseVersion:
             None
 
         Returns:
-            str: For example ``"0.2.0"``.
+            str: For example ``"7.2.0"``.
 
         Raises:
             None
@@ -97,7 +97,7 @@ class ReleaseVersion:
             None
 
         Returns:
-            str: For example ``"0.2.0-rc.1"``.
+            str: For example ``"7.2.0-rc.1"``.
 
         Raises:
             None
@@ -112,7 +112,7 @@ class ReleaseVersion:
             None
 
         Returns:
-            str: For example ``"0.2.0rc1"``.
+            str: For example ``"7.2.0rc1"``.
 
         Raises:
             None
@@ -127,7 +127,7 @@ class ReleaseVersion:
             None
 
         Returns:
-            str: For example ``"0.2.0~rc.1"``.
+            str: For example ``"7.2.0~rc.1"``.
 
         Raises:
             None
@@ -142,7 +142,7 @@ class ReleaseVersion:
             None
 
         Returns:
-            str: For example ``"v0.2.0-rc.1"``.
+            str: For example ``"v7.2.0-rc.1"``.
 
         Raises:
             None

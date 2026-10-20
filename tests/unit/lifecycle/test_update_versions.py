@@ -24,7 +24,7 @@ from vakr.lifecycle.update.releases import (
 from vakr.lifecycle.update.versions import Version
 
 
-@pytest.mark.parametrize("text", ["0.2.0-rc.1", "v0.2.0-rc.1", "0.2.0rc1", "0.2.0~rc.1"])
+@pytest.mark.parametrize("text", ["7.2.0-rc.1", "v7.2.0-rc.1", "7.2.0rc1", "7.2.0~rc.1"])
 def test_all_rc_spellings_parse_to_one_version(text: str) -> None:
     """VER-002: semver, tag, PEP 440, and Debian forms are the same release.
 
@@ -38,12 +38,12 @@ def test_all_rc_spellings_parse_to_one_version(text: str) -> None:
         None
     """
     version = Version.parse(text)
-    assert version == Version(0, 2, 0, 1)
+    assert version == Version(7, 2, 0, 1)
     assert (version.semver(), version.pep440(), version.debian(), version.tag()) == (
-        "0.2.0-rc.1",
-        "0.2.0rc1",
-        "0.2.0~rc.1",
-        "v0.2.0-rc.1",
+        "7.2.0-rc.1",
+        "7.2.0rc1",
+        "7.2.0~rc.1",
+        "v7.2.0-rc.1",
     )
     assert version.is_prerelease
 
@@ -60,7 +60,7 @@ def test_ordering_puts_candidates_before_final() -> None:
     Raises:
         None
     """
-    ordered = ["0.0.0+unknown", "0.2.0-rc.1", "0.2.0rc2", "0.2.0", "0.2.1~rc.1", "0.10.0"]
+    ordered = ["0.0.0+unknown", "7.2.0-rc.1", "7.2.0rc2", "7.2.0", "7.2.1~rc.1", "7.10.0"]
     parsed = [Version.parse(v) for v in ordered]
     assert parsed == sorted(parsed)
     assert str(Version.parse("1.2.3")) == "1.2.3"
@@ -117,21 +117,21 @@ def test_channel_selection_and_hold_ceiling() -> None:
         None
     """
     releases = [
-        _release("v0.4.0", draft=True),
-        _release("v0.3.0-rc.1", pre=True),
-        _release("v0.2.1"),
-        _release("v0.2.2", pre=True),
+        _release("v7.4.0", draft=True),
+        _release("v7.3.0-rc.1", pre=True),
+        _release("v7.2.1"),
+        _release("v7.2.2", pre=True),
     ]
     picked = newest(releases, "prerelease")
     assert picked is not None
-    assert picked.tag == "v0.3.0-rc.1"
+    assert picked.tag == "v7.3.0-rc.1"
     stable = newest(releases, "stable")
     assert stable is not None
-    assert stable.tag == "v0.2.1"
-    held = newest(releases, "prerelease", Version.parse("0.2.2"))
+    assert stable.tag == "v7.2.1"
+    held = newest(releases, "prerelease", Version.parse("7.2.2"))
     assert held is not None
-    assert held.tag == "v0.2.2"
-    assert newest(releases, "stable", Version.parse("0.2.0")) is None
+    assert held.tag == "v7.2.2"
+    assert newest(releases, "stable", Version.parse("7.2.0")) is None
     with pytest.raises(ReleaseError, match="unknown update channel"):
         newest(releases, "nightly")
 
@@ -148,7 +148,7 @@ def test_parse_release_keeps_https_assets_only() -> None:
     Raises:
         None
     """
-    item = release_json("v0.3.0", {"a.deb": "https://x/a.deb", "b": "http://x/b"}, body="notes")
+    item = release_json("v7.3.0", {"a.deb": "https://x/a.deb", "b": "http://x/b"}, body="notes")
     release = parse_release(item)
     assert release is not None
     assert dict(release.assets) == {"a.deb": "https://x/a.deb"}
@@ -169,9 +169,9 @@ def test_asset_lookup_tolerates_github_renaming() -> None:
     Raises:
         None
     """
-    names = asset_names("vakr", Version.parse("0.3.0-rc.2"), "amd64")
-    assert names.package == "vakr_0.3.0~rc.2_amd64.deb"
-    release = Release(Version(0, 3, 0, 2), "v0.3.0-rc.2", assets={"vakr_0.3.0.rc.2_amd64.deb": "u"})
+    names = asset_names("vakr", Version.parse("7.3.0-rc.2"), "amd64")
+    assert names.package == "vakr_7.3.0~rc.2_amd64.deb"
+    release = Release(Version(7, 3, 0, 2), "v7.3.0-rc.2", assets={"vakr_7.3.0.rc.2_amd64.deb": "u"})
     assert release.asset_url(names.package) == "u"
     assert release.asset_url("missing") is None
 
@@ -227,13 +227,13 @@ def test_fetch_releases_parses_and_skips_unknown_tags() -> None:
     Raises:
         None
     """
-    body = as_json([release_json("v0.3.0", {}), release_json("latest", {})])
+    body = as_json([release_json("v7.3.0", {}), release_json("latest", {})])
     stub = _stub({LIST_URL: Response(LIST_URL, 200, {}, body)})
     releases = fetch_releases(stub, "o/r", API)
-    assert [r.tag for r in releases] == ["v0.3.0"]
-    tag_url = f"{API}/repos/o/r/releases/tags/v0.3.0"
-    stub.responses[tag_url] = Response(tag_url, 200, {}, as_json(release_json("v0.3.0", {})))
-    assert fetch_release_by_tag(stub, "o/r", "0.3.0", API).tag == "v0.3.0"
+    assert [r.tag for r in releases] == ["v7.3.0"]
+    tag_url = f"{API}/repos/o/r/releases/tags/v7.3.0"
+    stub.responses[tag_url] = Response(tag_url, 200, {}, as_json(release_json("v7.3.0", {})))
+    assert fetch_release_by_tag(stub, "o/r", "7.3.0", API).tag == "v7.3.0"
 
 
 def test_rate_limit_is_reported_clearly() -> None:
@@ -299,7 +299,7 @@ def test_repository_name_is_validated() -> None:
     """
     with pytest.raises(ReleaseError, match="invalid repository"):
         fetch_releases(_stub({}), "o/r/../../x?y", API)
-    tag_url = f"{API}/repos/o/r/releases/tags/v0.3.0"
+    tag_url = f"{API}/repos/o/r/releases/tags/v7.3.0"
     stub = _stub({tag_url: Response(tag_url, 200, {}, as_json({"tag_name": "junk"}))})
     with pytest.raises(ReleaseError, match="unparseable"):
-        fetch_release_by_tag(stub, "o/r", "v0.3.0", API)
+        fetch_release_by_tag(stub, "o/r", "v7.3.0", API)

@@ -45,6 +45,23 @@ check "journal records a clean stop" \
     grep -q 'collector.stopped' <<<"$(journalctl -u vakr-collector.service --no-pager)"
 check "collector registered its spool" test -d /var/lib/vakr/spool
 
+section "operator applies an inventory as root; database files stay vakr-owned (PKG-003, META-008)"
+community="ci$(head -c8 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+printf '[credentials.lab-v2c]\nversion = "2c"\ncommunity = "%s"\n' "$community" \
+    >/etc/vakr/secrets/credentials.toml
+chown root:vakr /etc/vakr/secrets/credentials.toml
+chmod 0640 /etc/vakr/secrets/credentials.toml
+printf '[[devices]]\nname = "lab-rtr1"\naddress = "192.0.2.1"\ncredential = "lab-v2c"\n' \
+    >/etc/vakr/inventory.toml
+check "vakr inventory validate" vakr inventory validate
+check "vakr inventory apply (run as root)" vakr inventory apply
+check "the device is in the inventory" grep -q lab-rtr1 <<<"$(vakr inventory list)"
+check "metadata database files stay vakr-owned" \
+    bash -c '! find /var/lib/vakr -maxdepth 1 -name "metadata.db*" ! -user vakr | grep -q .'
+check "vakr status shows the device" grep -q lab-rtr1 <<<"$(vakr status --json)"
+check "the community never appears in command output" bash -c \
+    "! { vakr inventory list; vakr inventory plan; vakr status --json; } 2>&1 | grep -qF '$community'"
+
 section "operator enables the daily update timer (UPD-003)"
 check "systemctl enable --now vakr-update.timer" systemctl enable --now vakr-update.timer
 check "timer is active" equals "$(systemctl is-active vakr-update.timer)" active

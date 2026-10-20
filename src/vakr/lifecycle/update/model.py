@@ -11,7 +11,7 @@ Safety:
     Plain data; no I/O at import or construction.
 
 Example:
-    >>> Outcome("updated", "updated 0.2.0 -> 0.3.0").exit_code
+    >>> Outcome("updated", "updated 7.2.0 -> 7.3.0").exit_code
     0
 """
 

@@ -29,8 +29,8 @@ Releases are listed at <https://github.com/robert-patrick-texas/vakr/releases>. 
 Each release has three files you need: the package, `SHA256SUMS`, and its signature `SHA256SUMS.sig`. Release tags use the version as written in `VERSION`, and the package file name uses its Debian form, where `-rc.N` becomes `~rc.N`. Set both, then download:
 
 ```sh
-version=0.2.0          # the release you want, as tagged: v0.2.0 or v0.2.0-rc.1
-debver=0.2.0           # the same version in Debian form: 0.2.0 or 0.2.0~rc.1
+version=1.4.0          # the release you want, as tagged: v1.4.0 or v1.4.0-rc.1
+debver=1.4.0           # the same version in Debian form: 1.4.0 or 1.4.0~rc.1
 base=https://github.com/robert-patrick-texas/vakr/releases/download/v$version
 curl -fL -O "$base/vakr_${debver}_amd64.deb" -O "$base/SHA256SUMS" -O "$base/SHA256SUMS.sig"
 ```

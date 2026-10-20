@@ -30,8 +30,8 @@ def get_version() -> str:
     """Return the version of the installed vakr distribution.
 
     The value is the one the package build read from the repository ``VERSION``
-    file, normalised by Python packaging rules (for example ``0.2.0-rc.1``
-    becomes ``0.2.0rc1``).
+    file, normalised by Python packaging rules (for example ``7.2.0-rc.1``
+    becomes ``7.2.0rc1``).
 
     Args:
         None

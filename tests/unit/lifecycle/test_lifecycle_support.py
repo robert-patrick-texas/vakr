@@ -50,12 +50,12 @@ def test_journal_native_protocol(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(journal, "JOURNAL_SOCKET", path)
     printed: list[str] = []
     sink = journal.EventSink("vakr-update", echo=printed.append, echo_always=False)
-    sink("update.failed", "line one\nline two", journal.PRIORITY_ERROR, version="0.3.0")
+    sink("update.failed", "line one\nline two", journal.PRIORITY_ERROR, version="7.3.0")
     datagram = receiver.recv(65536)
     receiver.close()
     assert b"EVENT_ID=update.failed\n" in datagram
     assert b"SYSLOG_IDENTIFIER=vakr-update\n" in datagram
-    assert b"VERSION=0.3.0\n" in datagram
+    assert b"VERSION=7.3.0\n" in datagram
     message = b"line one\nline two"
     assert b"MESSAGE\n" + struct.pack("<Q", len(message)) + message in datagram
     assert printed == []
@@ -129,7 +129,7 @@ def test_run_command_and_apt_installer(tmp_path: Path) -> None:
         seen.append((list(argv), env))
         return RunResult(0)
 
-    package = tmp_path / "vakr_0.3.0_amd64.deb"
+    package = tmp_path / "vakr_7.3.0_amd64.deb"
     assert apt_installer(fake)(package).returncode == 0
     argv, env = seen[0]
     assert argv == ["/usr/bin/apt-get", "install", "-y", "--allow-downgrades", str(package)]
@@ -218,20 +218,20 @@ def test_cache_prune_keeps_installed_and_two_older(tmp_path: Path) -> None:
         None
     """
     root = tmp_path / "updates"
-    for name in ("0.2.0", "0.3.0-rc.1", "0.3.0", "0.4.0", "0.5.0", "notes"):
+    for name in ("7.2.0", "7.3.0-rc.1", "7.3.0", "7.4.0", "7.5.0", "notes"):
         (root / name).mkdir(parents=True)
-    (root / "0.9.0").write_text("a file, not a version directory")
-    removed = cache.prune(root, Version.parse("0.4.0"))
-    assert removed == [Version.parse("0.2.0"), Version.parse("0.5.0")]
+    (root / "7.9.0").write_text("a file, not a version directory")
+    removed = cache.prune(root, Version.parse("7.4.0"))
+    assert removed == [Version.parse("7.2.0"), Version.parse("7.5.0")]
     remaining = sorted(p.name for p in root.iterdir())
-    assert remaining == ["0.3.0", "0.3.0-rc.1", "0.4.0", "0.9.0", "notes"]
-    assert cache.prune(root, Version.parse("0.4.0"), keep_previous=0) == [
-        Version.parse("0.3.0-rc.1"),
-        Version.parse("0.3.0"),
+    assert remaining == ["7.3.0", "7.3.0-rc.1", "7.4.0", "7.9.0", "notes"]
+    assert cache.prune(root, Version.parse("7.4.0"), keep_previous=0) == [
+        Version.parse("7.3.0-rc.1"),
+        Version.parse("7.3.0"),
     ]
     assert cache.cached_versions(tmp_path / "absent") == []
-    names = asset_names("vakr", Version.parse("0.4.0"), "amd64")
-    assert cache.cached(root, Version.parse("0.4.0"), names) is None
+    names = asset_names("vakr", Version.parse("7.4.0"), "amd64")
+    assert cache.cached(root, Version.parse("7.4.0"), names) is None
     source = tmp_path / "src"
     source.mkdir()
     for name in ("renamed.deb", names.sums, names.signature):
@@ -240,12 +240,12 @@ def test_cache_prune_keeps_installed_and_two_older(tmp_path: Path) -> None:
     with cache.staging(root) as staged_dir:
         staged = cache.copy_in(files, staged_dir, names)
         assert staged.package.name == names.package
-        stored = cache.promote(staged, root, Version.parse("0.4.0"))
+        stored = cache.promote(staged, root, Version.parse("7.4.0"))
     assert not staged_dir.exists()
-    assert cache.cached(root, Version.parse("0.4.0"), names) == stored
+    assert cache.cached(root, Version.parse("7.4.0"), names) == stored
     assert stored.package.read_text() == "renamed.deb"
     (root / ".incoming-stale").mkdir()
-    cache.prune(root, Version.parse("0.4.0"))
+    cache.prune(root, Version.parse("7.4.0"))
     assert not (root / ".incoming-stale").exists()
 
 
@@ -263,7 +263,7 @@ def test_state_round_trip_and_corruption(tmp_path: Path) -> None:
     """
     path = tmp_path / "state/update-state.json"
     assert load_state(path) == UpdateState()
-    record = UpdateState("failed", "t", "0.2.0", "0.3.0", "m", ("0.3.0",), "/b.tar.gz")
+    record = UpdateState("failed", "t", "7.2.0", "7.3.0", "m", ("7.3.0",), "/b.tar.gz")
     save_state(path, record)
     assert load_state(path) == record
     assert path.stat().st_mode & 0o777 == 0o644

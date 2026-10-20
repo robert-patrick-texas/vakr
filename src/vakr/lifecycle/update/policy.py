@@ -21,7 +21,7 @@ Safety:
 
 Example:
     >>> req = Request(unattended=True)
-    >>> gate(Version.parse("0.3.0"), Version.parse("0.2.0"), req, {"0.3.0"}).status
+    >>> gate(Version.parse("7.3.0"), Version.parse("7.2.0"), req, {"7.3.0"}).status
     'skipped'
 """
 

@@ -125,3 +125,45 @@ def test_failed_switch_reports_a_reason(monkeypatch: pytest.MonkeyPatch) -> None
     problem = service_user.drop_to_service_user(euid=0)
     assert problem is not None
     assert "Operation not permitted" in problem
+
+
+def test_inventory_and_interface_commands_run_as_the_service_user(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """PKG-003: `sudo vakr inventory apply` switches to vakr before touching the database.
+
+    Args:
+        monkeypatch: Records the switch and makes it fail.
+        capsys: Output capture.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    from vakr.cli import inventory_support
+    from vakr.cli.main import main
+
+    calls: list[str] = []
+
+    def refuse() -> str:
+        """Fail the switch, as a broken service account would.
+
+        Args:
+            None
+
+        Returns:
+            str: The reason.
+
+        Raises:
+            None
+        """
+        calls.append("switch")
+        return "cannot switch to the vakr service user: Operation not permitted"
+
+    monkeypatch.setattr(inventory_support, "drop_to_service_user", refuse)
+    assert main(["inventory", "list"]) == inventory_support.EXIT_STORAGE
+    assert main(["interface", "review", "list"]) == inventory_support.EXIT_STORAGE
+    assert calls == ["switch", "switch"]
+    assert "cannot switch to the vakr service user" in capsys.readouterr().err

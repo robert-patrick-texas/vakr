@@ -22,8 +22,8 @@ Safety:
     directories, so nothing else in the cache directory is touched.
 
 Example:
-    >>> cached(cache_root, Version.parse("0.2.0"), names)  # doctest: +SKIP
-    Artifacts(package=PosixPath('.../0.2.0/vakr_0.2.0_amd64.deb'), ...)
+    >>> cached(cache_root, Version.parse("7.2.0"), names)  # doctest: +SKIP
+    Artifacts(package=PosixPath('.../7.2.0/vakr_7.2.0_amd64.deb'), ...)
 """
 
 import shutil

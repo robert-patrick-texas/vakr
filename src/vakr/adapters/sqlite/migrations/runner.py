@@ -24,7 +24,7 @@ Safety:
     Failure messages carry the SQLite error name, never its text or the SQL.
 
 Example:
-    >>> runner = MigrationRunner(path, family, SystemClock(), "vakr 0.2.0")  # doctest: +SKIP
+    >>> runner = MigrationRunner(path, family, SystemClock(), "vakr 7.2.0")  # doctest: +SKIP
     >>> runner.run(conn, family.migrations)  # doctest: +SKIP
 """
 

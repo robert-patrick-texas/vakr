@@ -252,7 +252,7 @@ Code is in `src/vakr/ingest/` and `src/vakr/health/spool_check.py`, with tests i
 | OBS-001/003/007, OPS-001 (spool) | In progress | `status.py`, `inspect.py`, `health/spool_check.py` | `test_spool_health::*` | `spool.md` | No Prometheus metrics yet (OBS-005). |
 | SPOOL-T01..T08, QUEUE-T01, INGEST-T01..T03 | Verified | as above | `test_spool_t0N_*`, `test_queue_t01_*`, `test_ingest_t0N_*` | | INGEST-T04 is an Enterprise benchmark, not MVP. |
 
-## Owner decisions of 2026-10-20 (pre-0.2.0)
+## Owner decisions of 2026-10-20
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
 |---|---|---|---|---|---|

@@ -77,10 +77,10 @@ The tool reads all project-specific values from `tools/release/release.toml` (se
 
 | `VERSION` | PEP 440 (`vakr --version`) | Debian/RPM package | Git tag |
 |---|---|---|---|
-| `0.2.0-rc.1` | `0.2.0rc1` | `0.2.0~rc.1` | `v0.2.0-rc.1` |
-| `0.2.0` | `0.2.0` | `0.2.0` | `v0.2.0` |
+| `1.4.0-rc.1` | `1.4.0rc1` | `1.4.0~rc.1` | `v1.4.0-rc.1` |
+| `1.4.0` | `1.4.0` | `1.4.0` | `v1.4.0` |
 
-The `~` makes dpkg and RPM sort a release candidate before the final release, so upgrading from `0.2.0~rc.1` to `0.2.0` works.
+The `~` makes dpkg and RPM sort a release candidate before the final release, so upgrading from `1.4.0~rc.1` to `1.4.0` works.
 
 ## Building and testing packages locally
 

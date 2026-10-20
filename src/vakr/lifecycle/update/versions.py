@@ -15,10 +15,10 @@ Safety:
     rejected rather than guessed at.
 
 Example:
-    >>> Version.parse("v0.2.0-rc.1") < Version.parse("0.2.0") < Version.parse("0.2.1~rc.1")
+    >>> Version.parse("v7.2.0-rc.1") < Version.parse("7.2.0") < Version.parse("7.2.1~rc.1")
     True
-    >>> Version.parse("0.2.0~rc.3").tag()
-    'v0.2.0-rc.3'
+    >>> Version.parse("7.2.0~rc.3").tag()
+    'v7.2.0-rc.3'
 """
 
 import functools
@@ -56,8 +56,8 @@ class Version:
         """Parse any supported spelling: semver, tag, PEP 440, or Debian.
 
         Args:
-            text: For example ``"0.2.0-rc.1"``, ``"v0.2.0-rc.1"``,
-                ``"0.2.0rc1"``, or ``"0.2.0~rc.1"``.
+            text: For example ``"7.2.0-rc.1"``, ``"v7.2.0-rc.1"``,
+                ``"7.2.0rc1"``, or ``"7.2.0~rc.1"``.
 
         Returns:
             Version: The parsed version.

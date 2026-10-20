@@ -26,6 +26,7 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from vakr.adapters.sqlite.metadata import METADATA_FILE, SqliteMetadataStore, sqlite_uow_factory
+from vakr.cli.service_user import drop_to_service_user
 from vakr.config.loader import ConfigError, load_effective_config
 from vakr.domain.errors import DomainError, StorageError
 from vakr.inventory.errors import InventoryError
@@ -145,7 +146,7 @@ def guarded(run: Handler) -> Handler:
     """
 
     def handler(args: argparse.Namespace) -> int:
-        """Run the command and translate failures.
+        """Run the command as the service user and translate failures.
 
         Args:
             args: Parsed arguments.
@@ -156,6 +157,11 @@ def guarded(run: Handler) -> Handler:
         Raises:
             None
         """
+        # `sudo vakr inventory apply` must not leave root-owned database,
+        # WAL, or shared-memory files the collector cannot write (PKG-003).
+        if (problem := drop_to_service_user()) is not None:
+            print(f"vakr: {problem}", file=sys.stderr)
+            return EXIT_STORAGE
         try:
             return run(args)
         except InventoryError as exc:

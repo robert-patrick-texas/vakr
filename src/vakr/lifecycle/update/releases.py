@@ -14,8 +14,8 @@ Safety:
     trusted until the signature and checksum are verified (``verify``).
 
 Example:
-    >>> asset_names("vakr", Version.parse("0.2.0-rc.1"), "amd64").package
-    'vakr_0.2.0~rc.1_amd64.deb'
+    >>> asset_names("vakr", Version.parse("7.2.0-rc.1"), "amd64").package
+    'vakr_7.2.0~rc.1_amd64.deb'
 """
 
 import re
@@ -41,7 +41,7 @@ class AssetNames:
     """File names a release must provide.
 
     Attributes:
-        package: The installable package, for example ``vakr_0.2.0_amd64.deb``.
+        package: The installable package, for example ``vakr_7.2.0_amd64.deb``.
         sums: Checksum list.
         signature: SSH signature over the checksum list.
     """
@@ -57,7 +57,7 @@ class Release:
 
     Attributes:
         version: Version parsed from the tag.
-        tag: Git tag, for example ``v0.2.0``.
+        tag: Git tag, for example ``v7.2.0``.
         prerelease: GitHub's pre-release flag.
         draft: GitHub's draft flag.
         body: Release notes (Markdown).

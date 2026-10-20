@@ -34,7 +34,7 @@ from vakr.lifecycle.update.verify import (
 from vakr.lifecycle.update.versions import Version
 
 V = Version.parse
-DEB = "vakr_0.3.0_amd64.deb"
+DEB = "vakr_7.3.0_amd64.deb"
 
 
 def yes(question: str) -> bool:
@@ -83,9 +83,9 @@ def test_upd_t02_tampered_package_is_refused(harness: Harness) -> None:
     Raises:
         None
     """
-    harness.publish("0.3.0")
-    harness.http.files[harness.asset_url("0.3.0", DEB)] = b"evil payload"
-    outcome = harness.updater.update(V("0.2.0"), Request(), yes)
+    harness.publish("7.3.0")
+    harness.http.files[harness.asset_url("7.3.0", DEB)] = b"evil payload"
+    outcome = harness.updater.update(V("7.2.0"), Request(), yes)
     assert (outcome.status, outcome.exit_code) == ("refused", 1)
     assert "checksum mismatch" in outcome.message
     _assert_unchanged(harness)
@@ -104,12 +104,12 @@ def test_upd_t02_tampered_sums_fail_signature(harness: Harness) -> None:
     Raises:
         None
     """
-    harness.publish("0.3.0")
+    harness.publish("7.3.0")
     evil = b"evil payload"
-    harness.http.files[harness.asset_url("0.3.0", DEB)] = evil
+    harness.http.files[harness.asset_url("7.3.0", DEB)] = evil
     sums = f"{hashlib.sha256(evil).hexdigest()}  {DEB}\n".encode()
-    harness.http.files[harness.asset_url("0.3.0", "SHA256SUMS")] = sums
-    outcome = harness.updater.update(V("0.2.0"), Request(), yes)
+    harness.http.files[harness.asset_url("7.3.0", "SHA256SUMS")] = sums
+    outcome = harness.updater.update(V("7.2.0"), Request(), yes)
     assert outcome.status == "refused"
     assert "signature verification failed" in outcome.message
     _assert_unchanged(harness)
@@ -128,13 +128,13 @@ def test_upd_t02_signature_from_another_key_is_refused(harness: Harness, tmp_pat
     Raises:
         None
     """
-    harness.publish("0.3.0")
+    harness.publish("7.3.0")
     intruder = new_signer(tmp_path / "intruder")
     sums = tmp_path / "SHA256SUMS"
-    sums.write_bytes(harness.http.files[harness.asset_url("0.3.0", "SHA256SUMS")])
+    sums.write_bytes(harness.http.files[harness.asset_url("7.3.0", "SHA256SUMS")])
     forged = intruder.sign(sums).read_bytes()
-    harness.http.files[harness.asset_url("0.3.0", "SHA256SUMS.sig")] = forged
-    assert harness.updater.update(V("0.2.0"), Request(), yes).status == "refused"
+    harness.http.files[harness.asset_url("7.3.0", "SHA256SUMS.sig")] = forged
+    assert harness.updater.update(V("7.2.0"), Request(), yes).status == "refused"
     _assert_unchanged(harness)
 
 
@@ -150,18 +150,18 @@ def test_upd_t02_missing_signature_asset_stops_before_change(harness: Harness) -
     Raises:
         None
     """
-    harness.publish("0.3.0")
+    harness.publish("7.3.0")
     harness.releases[0]["assets"] = [
         a for a in harness.releases[0]["assets"] if a["name"] != "SHA256SUMS.sig"
     ]
     harness.http.publish("https://api.example", "o/r", harness.releases)
     with pytest.raises(ReleaseError, match=r"no asset SHA256SUMS\.sig"):
-        harness.updater.update(V("0.2.0"), Request(), yes)
+        harness.updater.update(V("7.2.0"), Request(), yes)
     assert harness.installer.installed == []
     assert not harness.kit.layout.backups_dir.exists()
 
 
-def _offline_release(tmp_path: Path, signer: Signer, semver: str = "0.3.0") -> Artifacts:
+def _offline_release(tmp_path: Path, signer: Signer, semver: str = "7.3.0") -> Artifacts:
     """Build hand-transferred release files in a download directory.
 
     Args:
@@ -197,18 +197,18 @@ def test_upd_t04_offline_file_install(tmp_path: Path, signer: Signer) -> None:
     files = _offline_release(tmp_path, signer)
     installed_from: list[Path] = []
     h.installer.on_install = installed_from.append
-    outcome = h.updater.install_files(V("0.2.0"), Request(), files, yes)
+    outcome = h.updater.install_files(V("7.2.0"), Request(), files, yes)
     assert outcome.status == "updated"
     assert h.installer.installed == [DEB]
     # The verified copy inside the root-owned cache is installed, never the original.
-    assert installed_from == [h.kit.layout.cache_root / "0.3.0" / DEB]
-    assert (h.kit.layout.cache_root / "0.3.0" / DEB).read_bytes() == b"offline package"
+    assert installed_from == [h.kit.layout.cache_root / "7.3.0" / DEB]
+    assert (h.kit.layout.cache_root / "7.3.0" / DEB).read_bytes() == b"offline package"
     assert "update.rollback.unavailable" in h.ids()
     assert h.http.log == []
-    again = h.updater.install_files(V("0.3.0"), Request(if_newer=True), files, yes)
+    again = h.updater.install_files(V("7.3.0"), Request(if_newer=True), files, yes)
     assert again.status == "up-to-date"
     with pytest.raises(ReleaseError, match="use --file"):
-        h.updater.update(V("0.3.0"), Request(), yes)
+        h.updater.update(V("7.3.0"), Request(), yes)
 
 
 def test_offline_file_refusals(tmp_path: Path, signer: Signer) -> None:
@@ -229,21 +229,21 @@ def test_offline_file_refusals(tmp_path: Path, signer: Signer) -> None:
     renamed = files.package.with_name("vakr-latest.deb")
     files.package.rename(renamed)
     misnamed = h.updater.install_files(
-        V("0.2.0"), Request(), Artifacts(renamed, files.sums, files.signature), yes
+        V("7.2.0"), Request(), Artifacts(renamed, files.sums, files.signature), yes
     )
     assert (misnamed.status, misnamed.exit_code) == ("refused", 1)
     renamed.rename(files.package)
     files.package.write_bytes(b"tampered")
-    assert h.updater.install_files(V("0.2.0"), Request(), files, yes).status == "refused"
+    assert h.updater.install_files(V("7.2.0"), Request(), files, yes).status == "refused"
     files.signature.unlink()
-    unsigned = h.updater.install_files(V("0.2.0"), Request(), files, yes)
+    unsigned = h.updater.install_files(V("7.2.0"), Request(), files, yes)
     assert unsigned.status == "refused"
     assert "missing file(s)" in unsigned.message
     assert "SHA256SUMS.sig" in unsigned.message
     bad_version = Artifacts(
         files.package.with_name("vakr_x.y_amd64.deb"), files.sums, files.signature
     )
-    assert h.updater.install_files(V("0.2.0"), Request(), bad_version, yes).status == "refused"
+    assert h.updater.install_files(V("7.2.0"), Request(), bad_version, yes).status == "refused"
     assert h.installer.installed == []
 
 
@@ -286,7 +286,7 @@ def test_verification_details(tmp_path: Path, signer: Signer) -> None:
 
 
 def test_offline_rc_package_with_github_spelling(tmp_path: Path, signer: Signer) -> None:
-    """A release candidate downloaded as ``0.4.0.rc.1`` installs under its canonical name.
+    """A release candidate downloaded as ``7.4.0.rc.1`` installs under its canonical name.
 
     Args:
         tmp_path: Temporary directory.
@@ -299,9 +299,9 @@ def test_offline_rc_package_with_github_spelling(tmp_path: Path, signer: Signer)
         None
     """
     h = make_harness(tmp_path / "host", signer, None)
-    files = _offline_release(tmp_path, signer, "0.4.0-rc.1")
-    github_name = files.package.with_name("vakr_0.4.0.rc.1_amd64.deb")
+    files = _offline_release(tmp_path, signer, "7.4.0-rc.1")
+    github_name = files.package.with_name("vakr_7.4.0.rc.1_amd64.deb")
     files.package.rename(github_name)
     renamed = Artifacts(github_name, files.sums, files.signature)
-    assert h.updater.install_files(V("0.3.0"), Request(), renamed, yes).status == "updated"
-    assert h.installer.installed == ["vakr_0.4.0~rc.1_amd64.deb"]
+    assert h.updater.install_files(V("7.3.0"), Request(), renamed, yes).status == "updated"
+    assert h.installer.installed == ["vakr_7.4.0~rc.1_amd64.deb"]

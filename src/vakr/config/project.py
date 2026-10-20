@@ -98,8 +98,9 @@ DOC_INTRO = (
     "removed it (CFGM-006).",
     "Useful commands: `vakr config show-effective --sources` prints every effective "
     "value and the file and line that set it; `vakr config validate` checks files "
-    "without starting collectors; `vakr config new-options [--annotate]` lists options "
-    "added since the previous deployed release and can append them as comments to your "
+    "without starting collectors; `vakr config new-options [--describe] [--annotate]` "
+    "lists options added since the previous deployed release, by section (with "
+    "`--describe`, each one's description), and can append them as comments to your "
     "files (CFGM-004); `vakr config template` prints the starter `config.toml`.",
     "*Reload* `live` options apply on a configuration reload; `restart` options need "
     "a service restart. *Added in* names the release tag that introduced the option.",

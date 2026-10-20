@@ -40,6 +40,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | EGRESS-005 | Implemented | `src/vakr/lifecycle/egress/{diagnose,report,strict,peek}.py`, `vakr doctor --network`, `vakr self-update --check`, `tools/fieldkit/fieldkit_egress.py` | `test_egress_tls.py`, `test_selfupdate_cli.py`, `test_egress_strict.py`, `tools/fieldkit/test_fieldkit_egress.py` | `docs/operations/updates.md`, `docs/operations/field-data.md` | Strict-only failures are recognized by OpenSSL 3 verify codes and confirmed with a handshake-only relaxed retry. Real requests never fall back. |
 | EGRESS-006 | Implemented | `src/vakr/lifecycle/egress/expiry.py`, `src/vakr/health/lifecycle_checks.py` | `test_tls_cli.py::test_egress_006_ca_expiry_health` | `docs/operations/updates.md` | |
 | EGRESS-007 | Implemented | `src/vakr/defaults/options.toml` (`network.tls_strict_x509`), `src/vakr/lifecycle/egress/truststore.py` (`build_context(strict_x509=)`), `client.py`, `src/vakr/health/lifecycle_checks.py` (`check_tls_policy`), field kit `--no-strict-x509` | `test_egress_strict.py` (EGRESS-T05), `tests/unit/config/test_render.py`, `tools/fieldkit/test_fieldkit_egress.py` | `docs/operations/configuration.md`, `docs/operations/updates.md`, `docs/operations/field-data.md` | ADR-032. Only `VERIFY_X509_STRICT` is cleared. The strict flag is set explicitly, because `ssl.SSLContext()` never set it. |
+| UPD-T01 (against GitHub) | Implemented | `packaging/github-update-test.sh`, `packaging/container/github-update-inner.sh`, `make github-update-test` | `packaging/tests/test_github_update_test.py`; first run on 2026-10-20, from 0.1.1 to the first monitoring release: 24 checks passed | `docs/development/release.md` | Install from GitHub, self-update, rollback (older release accepts the databases), timer update, no-op second run, collector smoke test. |
 
 ## Configuration
 
@@ -54,6 +55,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | CFGM-007 | In progress | `src/vakr/lifecycle/configmerge/operations.py` | `test_operations.py` | | Inventory, policy, and dashboard files are not loaded yet. |
 | CONF-006 | In progress | `src/vakr/lifecycle/configmerge/layering.py`, `vakr config show-effective --sources` | `test_layering.py::test_precedence_defaults_main_dropins_overrides_with_sources` | `docs/operations/configuration.md` | Environment and CLI overrides are not wired yet. |
 | CONF-009 | In progress | `src/vakr/lifecycle/configmerge/checks.py`, `vakr config validate` | `test_layering.py` | `docs/operations/configuration.md` | Reference, permission, and database checks come later. |
+| CFGM-004 (short summary) | Implemented | `src/vakr/config/option_listing.py`, `cli/selfupdate_extras.new_options_lines` | `tests/unit/config/test_option_listing.py`, `tests/unit/test_update_settle.py` | `docs/operations/updates.md` | New options are listed by section; `--describe` gives the full text. The header line older updaters parse is unchanged. |
 
 ## Credentials
 

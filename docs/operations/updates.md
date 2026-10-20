@@ -24,7 +24,7 @@ The requirements behind this behavior are in the blueprint, sections [28.3 Self-
 8. **Post-install hooks.** These run through the **new** binary, `/opt/vakr/venv/bin/vakr`:
    1. `config upgrade`. Exit status 3 means the command is not available yet; this is logged and skipped.
    2. `systemctl try-restart vakr.target`, which restarts only the services that were running.
-   3. `check health`. A CRITICAL result counts as a failure.
+   3. `check health`. A CRITICAL result counts as a failure, except from a check of a host setting such as ICMP permission (`ping_group_range`): that counts as a warning, because rolling the release back cannot fix the host. Monitoring still sees it as CRITICAL.
 9. **Record.** It writes the outcome to `/var/lib/vakr/update-state.json`. On success it prunes the package cache to the installed version plus the two most recent older versions.
 
 If the install or any hook fails, self-update rolls back automatically. See [Rollback](#rollback).
@@ -36,7 +36,15 @@ vakr self-update: updated: updated 0.4.0 -> 0.5.0
 release notes (0.5.0):
   ## Changes
   - ...
+
+3 new configuration options since 0.4.0 (packaged defaults apply):
+  snmp (2): bulk_walks, max_walk_rows
+  tui (1): refresh_interval
+  descriptions: vakr config new-options --since 0.4.0 --describe
+To add them to your files as commented examples: vakr config new-options --annotate
 ```
+
+New options are listed by section, names only, because every one of them has a packaged default that applies without an edit. `vakr config new-options --since VERSION --describe` shows each option's type, reload behaviour, and description.
 
 ## Checking for updates
 

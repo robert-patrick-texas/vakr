@@ -6,7 +6,7 @@ vakr reads the packaged defaults, then `/etc/vakr/config.toml`, then every `/etc
 
 Each operator file carries `config_version`. After a package upgrade, `vakr config upgrade` (run by `vakr self-update`) applies the release's config migrations, keeps your comments and formatting, writes a timestamped backup under `/var/lib/vakr/config-backups/`, and prints a diff; `--dry-run` only shows the diff (CFGM-002, CFGM-003). An unknown key is a validation error that names the file, line, and key, and suggests the closest valid key or the migration that removed it (CFGM-006).
 
-Useful commands: `vakr config show-effective --sources` prints every effective value and the file and line that set it; `vakr config validate` checks files without starting collectors; `vakr config new-options [--annotate]` lists options added since the previous deployed release and can append them as comments to your files (CFGM-004); `vakr config template` prints the starter `config.toml`.
+Useful commands: `vakr config show-effective --sources` prints every effective value and the file and line that set it; `vakr config validate` checks files without starting collectors; `vakr config new-options [--describe] [--annotate]` lists options added since the previous deployed release, by section (with `--describe`, each one's description), and can append them as comments to your files (CFGM-004); `vakr config template` prints the starter `config.toml`.
 
 *Reload* `live` options apply on a configuration reload; `restart` options need a service restart. *Added in* names the release tag that introduced the option.
 

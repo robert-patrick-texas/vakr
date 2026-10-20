@@ -4,6 +4,14 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Changed
+
+- `vakr config new-options` lists new options by section, names only, so the summary self-update prints after an update stays short (43 options in about a dozen lines). `--describe` shows each option's type, reload behaviour, and description, as before.
+
+### Added
+
+- `make github-update-test` (developers): after a release is published, installs the previous release from GitHub in a systemd container, self-updates to the new one, rolls back, and updates again through the timer unit, checking every step.
+
 ## 0.2.0 - 2026-10-20
 
 First release that monitors devices (milestones M2 and M3): SNMPv2c and ICMP collection for Cisco IOS XE, a durable spool, Compact SQLite storage, file-managed inventory with conservative interface identity, and current state in `vakr status` and `vakr tui`. Graphs, the web UI, and rollups arrive in M4.

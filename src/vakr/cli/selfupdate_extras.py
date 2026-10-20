@@ -75,9 +75,10 @@ def new_options_lines(
     header, *body = listing.splitlines()
     if result.returncode != 0 or header.endswith(": 0") or not body:
         return []
+    count = header.rsplit(": ", 1)[-1]
     return [
         "",
-        f"New configuration options since {from_version} (packaged defaults apply):",
+        f"{count} new configuration options since {from_version} (packaged defaults apply):",
         *body,
         "To add them to your files as commented examples: vakr config new-options --annotate",
     ]

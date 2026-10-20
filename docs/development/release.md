@@ -49,7 +49,14 @@ Until step 2 is done, the shipped signers file is a placeholder, every signature
    uv run tools/release/release.py
    ```
 
-6. Smoke-test a self-update from the previous release in a container (UPD-T01).
+6. Verify the update path against the published release (UPD-T01):
+
+   ```sh
+   make github-update-test        # previous published release -> VERSION
+   make github-update-test FROM=1.3.0 TO=1.4.0
+   ```
+
+   In a systemd-booted `ubuntu:26.04` container it installs the previous release from GitHub, verifying the key fingerprint against this checkout's `packaging/release-signers`, the signature, and the checksum, exactly as the install guide does. It then runs `vakr self-update --yes`, `--rollback`, and the timer's `vakr-update.service` twice. It checks the version, the update record, the databases (current, vakr-owned, and accepted by the older release after the rollback), health, the pre-update backup, that the second timer run changes nothing, and a collector start and stop. It needs Docker, privileged containers, and outbound HTTPS.
 7. Documentation publishes to GitHub Pages automatically.
 
 ## What tools/release does

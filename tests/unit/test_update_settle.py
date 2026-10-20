@@ -214,10 +214,11 @@ def test_new_options_lines_lists_only_real_additions() -> None:
 
         return run
 
-    listing = "options added since 1.4.0: 1\n  update.health_settle_seconds = 30\n"
+    listing = "options added since 1.4.0: 1\n  update (1): health_settle_seconds\n"
     lines = new_options_lines("/v", "1.4.0", fake(listing))
     assert seen[-1] == ("/v", "config", "new-options", "--since", "1.4.0")
-    assert "  update.health_settle_seconds = 30" in lines
+    assert "1 new configuration options since 1.4.0 (packaged defaults apply):" in lines
+    assert "  update (1): health_settle_seconds" in lines
     assert lines[-1].endswith("vakr config new-options --annotate")
     assert new_options_lines("/v", "1.4.1", fake("options added since 1.4.1: 0\n")) == []
     assert new_options_lines("/v", "1.4.0", fake("", 3)) == []

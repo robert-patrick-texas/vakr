@@ -73,7 +73,7 @@ audit:
 		-r "$$reqs" $$(sed -e 's/#.*//' $(AUDIT_IGNORE) | awk 'NF { print "--ignore-vuln", $$1 }')
 
 # Packaging and release (blueprint 28.6, 28.7). These need docker and git.
-.PHONY: deb package-test release-dry-run
+.PHONY: deb package-test release-dry-run github-update-test
 
 # dist/vakr_<deb version>_amd64.deb, built in a clean ubuntu:26.04 container.
 deb:
@@ -87,3 +87,9 @@ package-test:
 # when the release key is absent.
 release-dry-run:
 	uv run tools/release/release.py --dry-run
+
+# After publishing: install the previous release from GitHub in a systemd
+# container, self-update to this one, roll back, and update again by timer.
+# FROM and TO select other releases, e.g. make github-update-test FROM=0.1.1.
+github-update-test:
+	FROM=$(FROM) TO=$(TO) packaging/github-update-test.sh

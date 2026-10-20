@@ -22,11 +22,11 @@ Example:
 
 import argparse
 import sys
-import textwrap
 from collections.abc import Sequence
 
 from vakr.config import project
 from vakr.config.loader import EffectiveConfig
+from vakr.config.option_listing import brief_lines, described_lines
 from vakr.lifecycle.configmerge import (
     Issue,
     UpgradeError,
@@ -38,7 +38,6 @@ from vakr.lifecycle.configmerge import (
     toml_literal,
     upgrade,
 )
-from vakr.lifecycle.configmerge.render import type_label
 from vakr.paths import InstallPaths
 from vakr.version import UNKNOWN_VERSION, get_version
 
@@ -187,7 +186,7 @@ def list_new_options(args: argparse.Namespace) -> int:
 
     Args:
         args: ``config_dir``, ``since`` (``None`` means the previously
-            deployed release), and ``annotate``.
+            deployed release), ``describe``, and ``annotate``.
 
     Returns:
         int: 0 on success, 1 when annotation is refused, 2 for a bad
@@ -212,10 +211,9 @@ def list_new_options(args: argparse.Namespace) -> int:
         print(f"--since: {exc}", file=sys.stderr)
         return 2
     print(f"options added since {since}: {len(options)}")
-    for option in options:
-        print(f"  {option.key} = {toml_literal(option.default)}")
-        meta = f"{type_label(option.spec)}; reload {option.reload}; since {option.since}"
-        print(textwrap.indent(textwrap.fill(f"{meta}. {option.description}", 90), " " * 6))
+    listing = described_lines(options) if args.describe else brief_lines(options, since)
+    if listing:
+        print("\n".join(listing))
     if not args.annotate or not options:
         return 0
     return _annotate(args, paths, options)

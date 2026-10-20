@@ -65,6 +65,7 @@ def register(subparsers: SubParsers) -> None:
     up.set_defaults(func=commands.run_upgrade)
     new = actions.add_parser("new-options", parents=[common], help="list options a release added")
     new.add_argument("--since", metavar="VERSION", help="baseline release (default: previous)")
+    new.add_argument("--describe", action="store_true", help="show each option's description")
     new.add_argument("--annotate", action="store_true", help="add them as comments to your files")
     new.set_defaults(func=commands.list_new_options)
     defaults = actions.add_parser("defaults", help="render the documented defaults")

@@ -1,53 +1,68 @@
-"""``vakr db``: metadata database status, migrations, and backups (5.6, 16.3, MIG-001..005).
+"""``vakr db``: status, migrations, and backups of the metadata and telemetry databases (5.6).
 
-``vakr db status`` shows the database path, its schema version, the range
+``vakr db status`` shows each database's path, schema version, the range
 this release supports, pending migrations, the applied history with
-durations, and ``PRAGMA quick_check``. ``vakr db migrate`` first writes a
-verified online backup to ``backups/`` beside the database, then applies
-pending migrations; destructive ones also need ``--allow-destructive`` and
-``--backup-confirmed`` (MIG-005). ``vakr db backup`` writes a verified online
-backup on demand. All three take ``--database`` to point at another file,
-such as a backup to check before restoring it.
+durations, and ``PRAGMA quick_check``; for telemetry it also shows the WAL
+size and the age of the oldest staged row, and checks only the fixed
+tables unless ``--full`` is given (a full check of 40 GB takes minutes).
+``vakr db migrate`` first writes a verified online backup of each database
+it migrates to ``backups/`` beside it, then applies pending migrations;
+destructive ones also need ``--allow-destructive`` and ``--backup-confirmed``
+(MIG-005). ``vakr db backup`` writes verified online backups on demand.
+
+Every subcommand acts on both databases, metadata first, unless one is
+named (``vakr db status telemetry``). ``--database FILE`` points at another
+file, such as a backup to check before restoring it; its kind is read from
+the file. The package's postinst runs ``vakr db migrate``, so both
+databases are migrated on every install and upgrade.
 
 Dependencies:
-    vakr.adapters.sqlite.metadata: The migration manager for ``metadata.db``.
-    vakr.paths: The default database location.
+    vakr.adapters.sqlite.metadata, telemetry: The migration managers.
+    vakr.cli.db_targets: Target selection and status rendering.
 
 Safety:
-    ``status`` and ``backup`` never change the database. Exit status: 0 OK;
-    1 a problem (no database, pending or failed migrations, a failed
-    integrity check, an unreadable or foreign file); 2 a schema newer than
-    this release supports (MIG-004), or a usage error.
+    ``status`` and ``backup`` never change a database. Run as root, the
+    command first switches to the ``vakr`` service user. Exit status: 0 OK;
+    1 a problem with any database (missing, pending or failed migrations, a
+    failed integrity check, an unreadable or foreign file); otherwise 2 if
+    any schema is newer than this release supports (MIG-004); 2 also for a
+    usage error.
 
 Example:
-    $ vakr db status
-    database:  /var/lib/vakr/metadata.db
+    $ vakr db status telemetry
+    database:  /var/lib/vakr/telemetry.db
     schema:    1 (this release runs 1; upgrades from 0)
     state:     current: schema 1 is current
 """
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
-from vakr.adapters.sqlite.metadata import METADATA_FILE, metadata_migrations
+from vakr.adapters.sqlite.metadata import metadata_migrations
+from vakr.adapters.sqlite.migrations import SqliteMigrationManager
+from vakr.adapters.sqlite.telemetry import telemetry_migrations
 from vakr.cli.common import SubParsers
+from vakr.cli.db_targets import (
+    EXIT_OK,
+    EXIT_PROBLEM,
+    EXIT_TOO_NEW,
+    KINDS,
+    ManagerFactory,
+    Target,
+    combined,
+    integrity,
+    render_status,
+    vitals_lines,
+)
+from vakr.cli.db_targets import targets as resolve_targets
 from vakr.cli.service_user import drop_to_service_user
 from vakr.domain.errors import StorageError
-from vakr.paths import InstallPaths
-from vakr.ports.migrations import (
-    IntegrityReport,
-    MigrationError,
-    SchemaState,
-    SchemaStatus,
-    SchemaTooNewError,
-)
+from vakr.ports.migrations import MigrationError, SchemaState, SchemaTooNewError
 
-EXIT_OK = 0
-EXIT_PROBLEM = 1
-EXIT_TOO_NEW = 2
 BACKUPS_DIR = "backups"
-"""Backup directory beside the database: ``/var/lib/vakr/backups``."""
+"""Backup directory beside the databases: ``/var/lib/vakr/backups``."""
 
 
 def register(subparsers: SubParsers) -> None:
@@ -62,17 +77,18 @@ def register(subparsers: SubParsers) -> None:
     Raises:
         None
     """
-    parser = subparsers.add_parser("db", help="metadata database status, migrations, and backups")
+    parser = subparsers.add_parser("db", help="database status, migrations, and backups")
     parser.set_defaults(func=lambda _args: _usage(parser))
     common = argparse.ArgumentParser(add_help=False)
-    common.add_argument(
-        "--database",
-        type=Path,
-        metavar="FILE",
-        help=f"database file (default: {METADATA_FILE} in /var/lib/vakr, relocated by VAKR_ROOT)",
-    )
+    common.add_argument("which", nargs="?", choices=KINDS, help="one database (default: both)")
+    common.add_argument("--database", type=Path, metavar="FILE",
+                        help="another database file, such as a backup (default: the installed "
+                        "files in /var/lib/vakr, relocated by VAKR_ROOT)")  # fmt: skip
     actions = parser.add_subparsers(title="subcommands", metavar="SUBCOMMAND")
     status = actions.add_parser("status", parents=[common], help="schema, migrations, integrity")
+    status.add_argument(
+        "--full", action="store_true", help="check every telemetry partition (slow when large)"
+    )
     status.set_defaults(func=run_status)
     migrate = actions.add_parser("migrate", parents=[common], help="back up, then migrate")
     migrate.add_argument(
@@ -105,14 +121,30 @@ def _usage(parser: argparse.ArgumentParser) -> int:
     return 2
 
 
-def _database(args: argparse.Namespace) -> Path:
-    """Return ``--database`` or the installed ``metadata.db``.
+def _factories() -> dict[str, ManagerFactory]:
+    """Return the manager factory of each database kind.
 
     Args:
-        args: Parsed arguments with ``database``.
+        None
 
     Returns:
-        Path: The database file.
+        dict[str, ManagerFactory]: Looked up at call time, so tests can
+        substitute a later release's migrations.
+
+    Raises:
+        None
+    """
+    return {"metadata": metadata_migrations, "telemetry": telemetry_migrations}
+
+
+def _targets(args: argparse.Namespace) -> list[tuple[Target, SqliteMigrationManager]]:
+    """Drop to the service user, then resolve the databases and their managers.
+
+    Args:
+        args: Parsed arguments with ``which`` and ``database``.
+
+    Returns:
+        list[tuple[Target, SqliteMigrationManager]]: Metadata first.
 
     Raises:
         SystemExit: When running as root and the switch to the service user
@@ -121,7 +153,9 @@ def _database(args: argparse.Namespace) -> Path:
     if (problem := drop_to_service_user()) is not None:
         _fail(problem)
         raise SystemExit(EXIT_PROBLEM)
-    return args.database or InstallPaths.from_environment().state_dir / METADATA_FILE
+    factories = _factories()
+    chosen = resolve_targets(args.which, args.database, factories)
+    return [(t, factories[t.kind](t.path)) for t in chosen]
 
 
 def _fail(message: str) -> None:
@@ -140,77 +174,62 @@ def _fail(message: str) -> None:
 
 
 def run_status(args: argparse.Namespace) -> int:
-    """Print the schema status and integrity of the database.
+    """Print the schema status and integrity of each database.
 
     Args:
-        args: Parsed arguments.
+        args: Parsed arguments with ``full``.
 
     Returns:
-        int: 0 current and sound, 2 newer schema, otherwise 1.
+        int: 0 all current and sound, 2 a newer schema, otherwise 1.
 
     Raises:
         None
     """
-    path = _database(args)
-    manager = metadata_migrations(path)
-    try:
-        status = manager.status()
-        integrity = None if status.state is SchemaState.MISSING else manager.check_integrity()
-    except StorageError as exc:
-        _fail(f"cannot read {path}: {exc}")
-        return EXIT_PROBLEM
-    print("\n".join(render_status(status, integrity)))
-    if status.state is SchemaState.TOO_NEW:
-        return EXIT_TOO_NEW
-    sound = integrity is not None and integrity.ok
-    return EXIT_OK if status.state is SchemaState.CURRENT and sound else EXIT_PROBLEM
-
-
-def render_status(status: SchemaStatus, integrity: IntegrityReport | None) -> list[str]:
-    """Format a status report.
-
-    Args:
-        status: The schema status.
-        integrity: The ``quick_check`` result, or ``None`` when there is no file.
-
-    Returns:
-        list[str]: Output lines.
-
-    Raises:
-        None
-    """
-    supported = status.supported
-    lines = [
-        f"database:  {status.location}",
-        f"schema:    {status.version} (this release runs {supported.newest}; "
-        f"upgrades from {supported.oldest})",
-        f"state:     {status.state.value}: {status.detail}",
-        "pending:   none" if not status.pending else "pending:",
-    ]
-    for m in status.pending:
-        flag = " [destructive]" if m.destructive else ""
-        lines.append(f"  {m.version:04d} {m.name}{flag}: {m.description}")
-    if integrity is None:
-        lines.append("integrity: not checked (no database)")
-    elif integrity.ok:
-        lines.append("integrity: ok (PRAGMA quick_check)")
-    else:
-        lines.append(f"integrity: FAILED (PRAGMA quick_check): {'; '.join(integrity.problems[:3])}")
-    if status.applied:
-        lines.append("history:")
-    for a in status.applied:
-        when = a.applied_at.strftime("%Y-%m-%dT%H:%M:%SZ")
-        seconds = a.duration.total_seconds()
-        lines.append(
-            f"  {a.version:04d} {a.name} applied {when} in {seconds:.3f} s by {a.applied_by}"
-        )
-    return lines
+    blocks, codes = [], []
+    for target, manager in _targets(args):
+        try:
+            status = manager.status()
+            report, label = (None, "")
+            extra: list[str] = []
+            if status.state is not SchemaState.MISSING:
+                report, label = integrity(target, manager, full=args.full)
+            if target.kind == "telemetry" and status.state is SchemaState.CURRENT:
+                extra = vitals_lines(target, time.time())
+        except StorageError as exc:
+            _fail(f"cannot read {target.path}: {exc}")
+            codes.append(EXIT_PROBLEM)
+            continue
+        blocks.append("\n".join([*render_status(status, report, label), *extra]))
+        sound = report is not None and report.ok
+        current = status.state is SchemaState.CURRENT
+        too_new = status.state is SchemaState.TOO_NEW
+        codes.append(EXIT_TOO_NEW if too_new else EXIT_OK if current and sound else EXIT_PROBLEM)
+    if blocks:
+        print("\n\n".join(blocks))
+    return combined(codes)
 
 
 def run_migrate(args: argparse.Namespace) -> int:
-    """Back up the database, then apply pending migrations.
+    """Back up each database that needs it, then apply pending migrations.
 
     Args:
+        args: Parsed arguments with ``allow_destructive`` and ``backup_confirmed``.
+
+    Returns:
+        int: 0 all current afterwards, 2 a newer schema, otherwise 1.
+
+    Raises:
+        None
+    """
+    return combined([_migrate_one(t.path, m, args) for t, m in _targets(args)])
+
+
+def _migrate_one(path: Path, manager: SqliteMigrationManager, args: argparse.Namespace) -> int:
+    """Back up one database if it holds data, then migrate it.
+
+    Args:
+        path: The database file.
+        manager: Its migration manager.
         args: Parsed arguments with ``allow_destructive`` and ``backup_confirmed``.
 
     Returns:
@@ -219,8 +238,6 @@ def run_migrate(args: argparse.Namespace) -> int:
     Raises:
         None
     """
-    path = _database(args)
-    manager = metadata_migrations(path)
     try:
         status = manager.status()
         if status.state is SchemaState.CURRENT:
@@ -250,22 +267,25 @@ def run_migrate(args: argparse.Namespace) -> int:
 
 
 def run_backup(args: argparse.Namespace) -> int:
-    """Write a verified online backup and print its path.
+    """Write a verified online backup of each database and print its path.
 
     Args:
         args: Parsed arguments with ``output``.
 
     Returns:
-        int: 0 on success, 1 on failure.
+        int: 0 on success, 1 if any backup failed.
 
     Raises:
         None
     """
-    path = _database(args)
-    try:
-        copy = metadata_migrations(path).backup(args.output or path.parent / BACKUPS_DIR)
-    except StorageError as exc:
-        _fail(str(exc))
-        return EXIT_PROBLEM
-    print(copy)
-    return EXIT_OK
+    codes = []
+    for target, manager in _targets(args):
+        try:
+            copy = manager.backup(args.output or target.path.parent / BACKUPS_DIR)
+        except StorageError as exc:
+            _fail(str(exc))
+            codes.append(EXIT_PROBLEM)
+            continue
+        print(copy)
+        codes.append(EXIT_OK)
+    return combined(codes)

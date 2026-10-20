@@ -1,0 +1,27 @@
+#!/bin/sh
+# prerm for vakr (PKG-005).
+#
+# On removal, stop vakr's units before their files disappear; the timer goes
+# first so it cannot start an update meanwhile. On upgrade nothing is stopped:
+# services keep running and the new postinst restarts what was active. That
+# matters because self-update itself runs the upgrade from vakr-update.service.
+set -e
+
+case "$1" in
+    remove)
+        # Service units are PartOf=vakr.target, so stopping the target stops
+        # them; a new unit outside the target must be added to this list.
+        if [ -d /run/systemd/system ]; then
+            deb-systemd-invoke stop vakr-update.timer vakr-update.service vakr.target \
+                >/dev/null || true
+        fi
+        ;;
+    upgrade | deconfigure | failed-upgrade)
+        ;;
+    *)
+        echo "prerm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

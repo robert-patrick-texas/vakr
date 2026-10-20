@@ -1,0 +1,23 @@
+# Unattended self-update from signed GitHub releases (UPD-003), started only by
+# vakr-update.timer. `vakr self-update` verifies SHA256SUMS.sig against
+# /opt/vakr/share/release-signers before changing anything (UPD-001), holds a
+# lock against concurrent updates (UPD-007), and honours [update] hold_version
+# (UPD-008).
+[Unit]
+Description=vakr self-update from signed releases
+Documentation=https://robert-patrick-texas.github.io/vakr/docs/operations/updates.html
+Wants=network-online.target
+After=network-online.target
+# Deliberately not PartOf=vakr.target: the update restarts vakr.target, and it
+# must not restart, and so kill, itself in the middle of apt-get install.
+
+[Service]
+Type=oneshot
+ExecStart=/opt/vakr/venv/bin/vakr self-update --yes --if-newer --unattended
+# apt-get, dpkg, and service restarts need root.
+User=root
+# Bounded so a download stalled behind a proxy cannot block tomorrow's run.
+TimeoutStartSec=1h
+# Updates are background work; collection keeps priority on CPU and disk.
+Nice=10
+IOSchedulingClass=idle

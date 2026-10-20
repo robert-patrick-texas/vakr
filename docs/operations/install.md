@@ -1,0 +1,131 @@
+# Installing vakr
+
+vakr ships as one `.deb` for Ubuntu 26.04 LTS on amd64 (PKG-001). The package is self-contained: it brings its own Python 3.15 interpreter and a locked virtual environment under `/opt/vakr`, so the host's system Python and its upgrades do not affect it. This page covers a first installation from a GitHub release, what the package puts where, the first commands to run, and turning on automatic updates.
+
+## Contents
+
+- [Before you start](#before-you-start)
+- [1. Download a release](#1-download-a-release)
+- [2. Verify the download](#2-verify-the-download)
+- [3. Install the package](#3-install-the-package)
+- [What the package installs](#what-the-package-installs)
+- [First run](#first-run)
+- [Automatic updates](#automatic-updates)
+- [Proxies, TLS inspection, and updates](#proxies-tls-inspection-and-updates)
+- [Upgrade, removal, and purge](#upgrade-removal-and-purge)
+
+## Before you start
+
+You need:
+
+- Ubuntu 26.04 LTS on amd64, with `sudo`;
+- outbound HTTPS to `github.com` and GitHub's download hosts (`*.githubusercontent.com`), directly or through a proxy. A host without GitHub access can install files you copy to it.
+
+Releases are listed at <https://github.com/robert-patrick-texas/vakr/releases>. Until MVP acceptance every release is marked *pre-release*.
+
+## 1. Download a release
+
+Each release has three files you need: the package, `SHA256SUMS`, and its signature `SHA256SUMS.sig`. Release tags use the version as written in `VERSION`, and the package file name uses its Debian form, where `-rc.N` becomes `~rc.N`. Set both, then download:
+
+```sh
+version=0.2.0          # the release you want, as tagged: v0.2.0 or v0.2.0-rc.1
+debver=0.2.0           # the same version in Debian form: 0.2.0 or 0.2.0~rc.1
+base=https://github.com/robert-patrick-texas/vakr/releases/download/v$version
+curl -fL -O "$base/vakr_${debver}_amd64.deb" -O "$base/SHA256SUMS" -O "$base/SHA256SUMS.sig"
+```
+
+With the GitHub CLI, `gh release download v$version --repo robert-patrick-texas/vakr` fetches the same files.
+
+## 2. Verify the download
+
+Releases are trusted through an SSH signature over `SHA256SUMS` (ADR-026). The trusted key is in the repository's `packaging/release-signers` file, which the package later installs as `/opt/vakr/share/release-signers` for self-update. For this first install, fetch that file for the same tag, and compare its key fingerprint with the one the project owner published separately:
+
+```sh
+curl -fLO "https://raw.githubusercontent.com/robert-patrick-texas/vakr/v$version/packaging/release-signers"
+ssh-keygen -lf release-signers      # compare with the published fingerprint
+ssh-keygen -Y verify -f release-signers -I vakr-release -n vakr-release \
+    -s SHA256SUMS.sig < SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+Both commands must succeed: `ssh-keygen` prints `Good "vakr-release" signature`, and `sha256sum` prints `OK` for the package. If either fails, do not install.
+
+## 3. Install the package
+
+```sh
+sudo apt install ./vakr_${debver}_amd64.deb
+```
+
+`apt` installs the dependencies: `ca-certificates`, `openssh-client` (which provides `ssh-keygen` for release verification), `openssl` (field-kit encryption), and `systemd`. It also installs the recommended `snmp` tools unless you pass `--no-install-recommends`.
+
+## What the package installs
+
+| Path | Contents | Owned by |
+|---|---|---|
+| `/opt/vakr/python/` | Bundled CPython 3.15 (python-build-standalone) | package |
+| `/opt/vakr/venv/` | Locked virtual environment containing vakr | package |
+| `/opt/vakr/share/defaults/` | Documented defaults for every option (CFGM-001) | package |
+| `/opt/vakr/share/release-signers` | Trusted release signing keys (UPD-001) | package |
+| `/opt/vakr/share/systemd/`, `share/doc/`, `share/templates/` | Unit sources, license and changelog, config template | package |
+| `/usr/bin/vakr` | Symlink to `/opt/vakr/venv/bin/vakr` | package |
+| `/usr/lib/systemd/system/` | `vakr.target`, `vakr-update.service`, `vakr-update.timer` | package |
+| `/usr/lib/sysusers.d/vakr.conf`, `/usr/lib/tmpfiles.d/vakr.conf` | Account and directory definitions | package |
+| `/etc/vakr/config.toml` | Your settings, overrides only (mode `0640`, `root:vakr`) | you |
+| `/etc/vakr/secrets/` | Credentials (mode `0750`, `root:vakr`) | you |
+| `/etc/vakr/tls/ca.d/` | Extra trusted CA certificates (EGRESS-002) | you |
+| `/var/lib/vakr/` | State and telemetry history (mode `0750`, `vakr:vakr`) | vakr |
+| `/var/cache/vakr/` | Downloaded and previous packages for rollback | vakr |
+
+The package also creates the system user and group `vakr` (home `/var/lib/vakr`, no login shell) and the group `vakr-admin`.
+
+`/etc/vakr/config.toml` is created only if it does not exist, and the package never overwrites it. It is deliberately not a dpkg conffile, so upgrades never stop to ask about it (CFGM-005). Defaults live in `/opt/vakr/share/defaults/`, so the file only needs the settings you change.
+
+## First run
+
+Nothing starts on installation (PKG-003). Check the installation first:
+
+```sh
+vakr --version
+vakr doctor               # one line per self-check
+vakr check health         # Nagios/CheckMK plugin output and exit code
+```
+
+To give an operator administrative access to the local vakr API and TUI, add them to `vakr-admin` (members of `vakr` get operator access):
+
+```sh
+sudo usermod -aG vakr-admin alice
+```
+
+Collection services arrive in later milestones. When they do, `vakr setup` creates the first admin, sets the node role and position, and enables `vakr.target`, the unit that starts and stops all vakr services together.
+
+## Automatic updates
+
+`vakr-update.timer` checks for a newer signed release once a day, at a random time spread over four hours, and catches up after downtime (UPD-003). It ships disabled. To turn it on:
+
+```sh
+sudo systemctl enable --now vakr-update.timer
+systemctl list-timers vakr-update.timer      # shows the next run
+journalctl -u vakr-update.service            # what each run did
+```
+
+`sudo systemctl disable --now vakr-update.timer` turns it off again. To keep a host on one version while the timer runs, set `[update] hold_version` in `/etc/vakr/config.toml` (UPD-008).
+
+## Proxies, TLS inspection, and updates
+
+Self-update, manual updates with `vakr self-update`, offline installs, and rollback are described in the [updates guide](https://robert-patrick-texas.github.io/vakr/docs/operations/updates.html). In short:
+
+- **Proxy:** set `[network] https_proxy` (and `no_proxy`) in `/etc/vakr/config.toml`, or the standard `HTTPS_PROXY` and `NO_PROXY` environment variables (EGRESS-001).
+- **Enterprise TLS inspection:** trust the proxy's CA with `sudo vakr tls trust-ca FILE`, which installs it in `/etc/vakr/tls/ca.d/` after you confirm its fingerprint (EGRESS-003). Certificate verification can never be turned off.
+- **Diagnosis:** `vakr doctor` checks DNS, the proxy, the TLS handshake, and GitHub reachability step by step (EGRESS-005).
+
+## Upgrade, removal, and purge
+
+| Command | What happens |
+|---|---|
+| `sudo apt install ./vakr_<newer>_amd64.deb`, or `vakr self-update` | Replaces `/opt/vakr`. Your configuration is untouched, and `vakr.target` is restarted only if it was running. |
+| `sudo apt remove vakr` | Stops vakr's units and removes `/opt/vakr` and the integration files. Keeps `/etc/vakr`, `/var/lib/vakr`, and `/var/cache/vakr` (PKG-005). |
+| `sudo apt purge vakr` | Also removes `/etc/vakr`, `/var/cache/vakr`, and your enablement links for vakr units. Keeps the telemetry history in `/var/lib/vakr` and prints a notice (PKG-005). |
+
+The `vakr` user and groups stay after a purge, so files left in `/var/lib/vakr` keep an owner. To delete the history as well, run `vakr data purge` (once that command exists) before removing the package, or delete `/var/lib/vakr` yourself afterwards.
+
+Maintainers: the build and release process is in [Releasing vakr](../development/release.md).

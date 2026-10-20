@@ -1,0 +1,69 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: vakr
+Upstream-Contact: https://github.com/robert-patrick-texas/vakr/issues
+Source: https://github.com/robert-patrick-texas/vakr
+Comment:
+ The package bundles its own Python runtime under /opt/vakr (ADR-025). Each
+ bundled component's full license text ships beside it; the paragraphs below
+ say where.
+
+Files: *
+Copyright: 2026 Robert Patrick
+License: Apache-2.0
+
+Files: opt/vakr/python/*
+Copyright: 2001-2026 Python Software Foundation and contributors
+License: PSF-2.0
+Comment:
+ CPython built by the python-build-standalone project
+ (https://github.com/astral-sh/python-build-standalone), which links several
+ libraries into the interpreter (among them OpenSSL, SQLite, zlib, bzip2, xz,
+ zstd, libffi, expat, ncurses, and mpdecimal), each under its own permissive
+ license as documented by that project.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/cryptography*
+Copyright: Individual contributors to the cryptography project
+License: Apache-2.0 or BSD-3-Clause
+Comment: Full texts are in the cryptography-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/cffi* opt/vakr/venv/lib/python3.*/site-packages/_cffi_backend*
+Copyright: Armin Rigo, Maciej Fijalkowski, and contributors
+License: MIT
+Comment: The full text is in the cffi-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/pycparser*
+Copyright: Eli Bendersky and contributors
+License: BSD-3-Clause
+Comment: The full text is in the pycparser-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/tomlkit*
+Copyright: Sébastien Eustace and contributors
+License: MIT
+Comment: The full text is in the tomlkit-*.dist-info/licenses directory.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ use this file except in compliance with the License. You may obtain a copy of
+ the License at https://www.apache.org/licenses/LICENSE-2.0
+ .
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ License for the specific language governing permissions and limitations under
+ the License.
+ .
+ On Debian systems, the complete text of the Apache License, Version 2.0 can
+ be found in "/usr/share/common-licenses/Apache-2.0".
+
+License: PSF-2.0
+ Python Software Foundation License Version 2. The complete text, with the
+ history of the software and the licenses of earlier Python releases, is in
+ /opt/vakr/python/lib/python3.15/LICENSE.txt.
+
+License: BSD-3-Clause
+ The 3-clause BSD license. The complete text for each component is in its
+ dist-info/licenses directory named above.
+
+License: MIT
+ The MIT (Expat) license. The complete text for each component is in its
+ dist-info/licenses directory named above.

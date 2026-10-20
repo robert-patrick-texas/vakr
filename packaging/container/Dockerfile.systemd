@@ -1,0 +1,14 @@
+# ubuntu:26.04 that boots systemd as PID 1, for packaging/container/systemd-test.sh.
+# It needs a privileged container (see packaging/package-test.sh). Nothing
+# vakr-specific is preinstalled, so the test starts from a clean system.
+FROM ubuntu:26.04
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        dbus systemd systemd-sysv \
+    && rm -rf /var/lib/apt/lists/*
+# Docker's Ubuntu images ship a policy-rc.d that forbids maintainer scripts
+# from starting or stopping services. A real host has none, and deb-systemd-
+# invoke (used by prerm) honours it, so remove it to test real behaviour.
+RUN rm -f /usr/sbin/policy-rc.d
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

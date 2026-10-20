@@ -1,0 +1,14 @@
+# The common start/stop/enable contract for every vakr service (blueprint 6.2).
+#
+# Service units join it with both WantedBy=vakr.target and PartOf=vakr.target,
+# so `systemctl restart vakr.target` (which the package runs on upgrade, but
+# only when the target was active) reaches each of them. The package never
+# enables it: collection starts only after `vakr setup` (PKG-003).
+[Unit]
+Description=vakr network performance and reachability monitor
+Documentation=https://robert-patrick-texas.github.io/vakr/docs/operations/install.html
+Wants=network-online.target
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

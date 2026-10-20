@@ -1,0 +1,100 @@
+# nfpm spec for the vakr package (PKG-001, ADR-025).
+#
+# One spec builds the .deb now and the RHEL-family .rpm later (PKG-006): the
+# top level is format-neutral, and everything Debian-specific (dependency
+# names, maintainer scripts with Debian's argument conventions, lintian and
+# copyright files) sits under `overrides.deb` or `packager: deb`. The RPM
+# work adds `overrides.rpm` beside it.
+#
+# packaging/container/build.sh runs nfpm from the repository root inside the
+# build container, after it has assembled /opt/vakr. It sets:
+#   VAKR_DEB_VERSION  Debian form of VERSION, e.g. 0.2.0~rc.1 (VER-002)
+#   SOURCE_DATE_EPOCH commit time; nfpm stamps it on generated archive members
+name: vakr
+arch: amd64
+platform: linux
+version: ${VAKR_DEB_VERSION}
+# The version is already in package form; nfpm must not re-parse it as SemVer.
+version_schema: none
+section: net
+priority: optional
+# Owner: confirm the public contact address before the first release.
+maintainer: Robert Patrick <robert-patrick-texas@users.noreply.github.com>
+vendor: vakr
+homepage: https://robert-patrick-texas.github.io/vakr/
+license: Apache-2.0
+description: |-
+  network performance and reachability monitor
+  vakr succeeds MRTG and SmokePing: it polls interface counters over SNMP,
+  measures ICMP latency and loss, discovers devices and interfaces, keeps a
+  persistent identity for each interface, and serves a web UI and a TUI.
+  .
+  The package is self-contained under /opt/vakr, with its own Python
+  interpreter and locked virtual environment, independent of the system
+  Python.
+umask: 0o022
+
+contents:
+  # Interpreter, venv, defaults, signers, unit sources, docs (PKG-002).
+  - src: /opt/vakr
+    dst: /opt/vakr
+    type: tree
+
+  # OS integration points, the only files outside /opt/vakr (PKG-002).
+  - src: packaging/systemd/vakr.target
+    dst: /usr/lib/systemd/system/vakr.target
+    file_info: {mode: 0o644}
+  - src: packaging/systemd/vakr-update.service
+    dst: /usr/lib/systemd/system/vakr-update.service
+    file_info: {mode: 0o644}
+  - src: packaging/systemd/vakr-update.timer
+    dst: /usr/lib/systemd/system/vakr-update.timer
+    file_info: {mode: 0o644}
+  - src: packaging/sysusers.d/vakr.conf
+    dst: /usr/lib/sysusers.d/vakr.conf
+    file_info: {mode: 0o644}
+  - src: packaging/tmpfiles.d/vakr.conf
+    dst: /usr/lib/tmpfiles.d/vakr.conf
+    file_info: {mode: 0o644}
+  - src: /opt/vakr/venv/bin/vakr
+    dst: /usr/bin/vakr
+    type: symlink
+
+  # Debian policy files: lintian overrides with their justifications
+  # (PKG-004), and the copyright file and changelog every Debian package
+  # must carry. build.sh writes changelog.gz from CHANGELOG.md.
+  - src: packaging/lintian/vakr
+    dst: /usr/share/lintian/overrides/vakr
+    packager: deb
+    file_info: {mode: 0o644}
+  - src: packaging/copyright
+    dst: /usr/share/doc/vakr/copyright
+    packager: deb
+    file_info: {mode: 0o644}
+  - src: /build/doc/changelog.gz
+    dst: /usr/share/doc/vakr/changelog.gz
+    packager: deb
+    file_info: {mode: 0o644}
+
+overrides:
+  deb:
+    depends:
+      - ca-certificates
+      # ssh-keygen verifies release signatures (UPD-001, ADR-026).
+      - openssh-client
+      # openssl cms encrypts field bundles (FIELD-006, ADR-028).
+      - openssl
+      - systemd
+      # Bundled interpreter and wheels need at least this glibc; build.sh
+      # fails if any packaged ELF file needs a newer symbol version.
+      - libc6 (>= 2.34)
+    recommends:
+      # snmpwalk for field-kit captures and operator troubleshooting.
+      - snmp
+    scripts:
+      postinstall: packaging/scripts/deb/postinst
+      preremove: packaging/scripts/deb/prerm
+      postremove: packaging/scripts/deb/postrm
+
+deb:
+  compression: zstd

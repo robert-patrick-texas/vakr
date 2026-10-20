@@ -34,3 +34,19 @@ docs:
 docs-check:
 	uv run tools/md2html/md2html.py . $(SITE) --check --title vakr \
 		--repo-url https://github.com/robert-patrick-texas/vakr --branch main
+
+# Packaging and release (blueprint 28.6, 28.7). These need docker and git.
+.PHONY: deb package-test release-dry-run
+
+# dist/vakr_<deb version>_amd64.deb, built in a clean ubuntu:26.04 container.
+deb:
+	packaging/build-deb.sh dist
+
+# Static packaging checks, then install/remove/upgrade/purge tests in containers.
+package-test:
+	packaging/package-test.sh
+
+# Every release step except tag, push, and publish; signs with a throwaway key
+# when the release key is absent.
+release-dry-run:
+	uv run tools/release/release.py --dry-run

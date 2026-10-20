@@ -1,0 +1,46 @@
+# Build the .deb in a clean ubuntu:26.04 container and run the container
+# install, upgrade, and removal tests on every push to main and every pull
+# request (PKG-001..PKG-005, blueprint 28.6). The package is uploaded as a
+# workflow artifact for testing only. CI never signs anything: the release
+# key lives only on the development host (ADR-026), and releases are cut
+# with tools/release.
+name: Package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deb:
+    # The supported platform itself (PROD-005); ubuntu-latest is still 24.04.
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # setup-uv publishes no floating major tag; pinned to the v10.3.0 commit.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Build the .deb in a clean ubuntu:26.04 container
+        run: make deb
+      - name: Install, upgrade, and removal tests in fresh containers
+        run: |
+          deb=(dist/vakr_*_amd64.deb)
+          PACKAGE_TEST_DEB_N="${deb[0]}" make package-test
+      - uses: actions/upload-artifact@v7
+        with:
+          name: vakr-deb-${{ github.sha }}
+          path: |
+            dist/vakr_*_amd64.deb
+            dist/vakr-fieldkit.pyz
+          if-no-files-found: error
+          retention-days: 14

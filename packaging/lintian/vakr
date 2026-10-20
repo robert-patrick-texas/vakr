@@ -1,0 +1,45 @@
+# lintian overrides for the vakr binary package (PKG-004). Each override is
+# justified below. Every other lintian error fails the build (build.sh runs
+# `lintian --fail-on error`). Installed as /usr/share/lintian/overrides/vakr.
+
+# The owner decided that vakr installs everything under /opt/vakr (ADR-025,
+# PKG-002): a self-contained runtime with its own interpreter and locked
+# virtual environment, independent of the system Python and its upgrades.
+# Only OS integration points (units, sysusers.d, tmpfiles.d, /usr/bin/vakr,
+# and Debian's copyright, changelog, and lintian files) live elsewhere.
+vakr: dir-or-file-in-opt [opt/vakr/*]
+
+# Bundled interpreter: python-build-standalone links bzip2, expat, ncurses,
+# zlib, and zstd statically so the interpreter is relocatable and does not
+# depend on system library versions. It is updated with each release
+# (TOOLS-001, TOOLS-003), not by the distribution's security updates.
+vakr: embedded-library * [opt/vakr/python/*]
+
+# Bundled interpreter and wheels: these ELF files ship exactly as upstream
+# built them and as their hashes in uv.lock and the wheels' RECORD files
+# say. They carry no debug sections, only symbol tables. binutils `strip`
+# corrupts the python-build-standalone executable ("undefined symbol"), and
+# stripping wheel binaries would break their recorded hashes.
+vakr: unstripped-binary-or-object [opt/vakr/python/*]
+vakr: unstripped-binary-or-object [opt/vakr/venv/lib/python3.*/site-packages/*]
+
+# Bundled interpreter: python-build-standalone builds the interpreter
+# executable without PIE; this is its upstream build configuration.
+vakr: hardening-no-pie [opt/vakr/python/bin/python3.*]
+
+# Bundled interpreter: entry points in the private venv must run the bundled
+# /opt/vakr interpreter, never /usr/bin/python3, so they need no python3
+# dependency and their interpreter path is intentionally not /usr/bin/python3.
+vakr: python3-script-but-no-python3-dep /opt/vakr/venv/bin/python3 * [opt/vakr/venv/bin/*]
+vakr: wrong-path-for-interpreter /opt/vakr/venv/bin/python3 != /usr/bin/python3 [opt/vakr/venv/bin/*]
+
+# Bundled interpreter: the standard library and venv ship bytecode compiled
+# at build time with hash-based invalidation. It is reproducible, covered by
+# dpkg's checksums, and means nothing under /opt/vakr is ever written at run
+# time, so removal and upgrades leave no unowned files. Debian's py3compile
+# mechanism only serves /usr/bin/python3 packages.
+vakr: package-installs-python-pycache-dir [opt/vakr/*/__pycache__/]
+
+# Bundled interpreter: an upstream CPython standard-library module that still
+# carries a historical "#!/usr/bin/env python" line; it is never executed.
+vakr: unusual-interpreter python [opt/vakr/python/lib/python3.*/encodings/rot_13.py]

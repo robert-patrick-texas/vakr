@@ -105,10 +105,15 @@ def validate(args: argparse.Namespace) -> int:
         return 1
     # Lazy import: vakr.policy imports vakr.config.loader (POLICY-005 keyword safety).
     from vakr.config.keyword_check import keyword_problems
+    from vakr.scheduler.settings import scheduler_problems
 
-    if problems := keyword_problems(EffectiveConfig(result.nested(), result.sources)):
-        print("\n".join([*problems, "configuration invalid: unsafe or invalid interface keyword"]))
-        return 1
+    effective = EffectiveConfig(result.nested(), result.sources)
+    checks = {"unsafe or invalid interface keyword": keyword_problems}
+    checks["inconsistent scheduler settings"] = scheduler_problems
+    for what, check in checks.items():
+        if problems := check(effective):
+            print("\n".join([*problems, f"configuration invalid: {what}"]))
+            return 1
     current = project.catalog().config_version
     for path, version in result.versions.items():
         if version < current:

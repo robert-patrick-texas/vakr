@@ -1,4 +1,4 @@
-"""``vakr config validate`` rejects unsafe interface-keyword patterns (POLICY-005).
+"""``vakr config validate`` rejects unsafe keywords and inconsistent scheduler settings.
 
 Dependencies:
     pytest: Temporary configuration directories and output capture.
@@ -70,3 +70,28 @@ def test_safe_keyword_validates(tmp_path: Path, capsys: pytest.CaptureFixture[st
     _write(tmp_path, "TRANSIT")
     assert main(["config", "validate", "--config-dir", str(tmp_path)]) == 0
     assert "configuration valid" in capsys.readouterr().out
+
+
+def test_inconsistent_scheduler_settings_fail_validation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``late_after`` beyond ``max_start_delay`` is a cross-key error (E.25, SCHED-017).
+
+    Args:
+        tmp_path: Temporary configuration directory.
+        capsys: Pytest output capture.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    (tmp_path / "config.toml").write_text(
+        "config_version = 1\n\n[scheduler]\nlate_after = '60s'\nmax_start_delay = '30s'\n",
+        encoding="utf-8",
+    )
+    assert main(["config", "validate", "--config-dir", str(tmp_path)]) == 1
+    out = capsys.readouterr().out
+    assert "scheduler.late_after (1m) must not exceed scheduler.max_start_delay (30s)" in out
+    assert "inconsistent scheduler settings" in out

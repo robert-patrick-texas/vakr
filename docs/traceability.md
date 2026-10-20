@@ -166,6 +166,28 @@ The decision and its evidence are in [ADR-021](adr/ADR-021-compact-sqlite-teleme
 | STATE-001/002/003 | In progress | `sqlc_current.latest_by_seek` | `test_current_state_seek_matches_projection` | ADR-021 | No projection table: it halved ingest. |
 | MVP-ACC-05 | In progress | — | `bench_rollup_store` | report §9, blueprint 27.3 | 400-day graph 36 ms warm, 84 ms cold; 33.9-37.5 GB per node. Final acceptance needs the adapter and UI. |
 
+## Scheduler and poll planning (M3)
+
+Code is in `src/vakr/scheduler/`, with tests in `tests/unit/scheduler/`. See [the scheduler architecture](architecture/scheduler.md) and Appendix E.25. The ICMP and SNMP steps are protocols in `scheduler/steps.py`; the collection adapters are wired to them in M3.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| SCHED-001 | Implemented | `hashing.py`, `settings.py` | SCHED-T01 `test_hostname_phase_ignores_dns_suffix_and_case`, `test_configured_collector_name_is_used_verbatim` | `scheduler.md`, E.25 | |
+| SCHED-002..006 | Implemented | `phase.py` | SCHED-T02 `test_phase_and_order_are_independent_controls`, `test_golden_offsets` | `scheduler.md`, E.25 #1 | ADR-007. Golden vectors in `golden_phase_vectors.json` for a future Go collector. |
+| SCHED-007/008 | Implemented | `phase.py`, `plan.py` | SCHED-T07 `test_hundred_devices_spread_across_the_interval`, `test_replan_of_new_devices_does_not_burst` | `scheduler.md` | |
+| SCHED-009 | Implemented | `machine.py`, `runner.py`, `steps.py` | SCHED-T08 `test_stage2_depends_on_current_stage1`, `test_run_poll_walks_the_table` | `scheduler.md` | ADR-005 |
+| SCHED-010 | Implemented | `plan.py` | SCHED-T03 `test_cadence_is_anchored_to_intended_slots`, `test_falling_behind_pops_every_missed_slot` | `scheduler.md` | |
+| SCHED-011/018, TIME-001 | Implemented (scheduler) | `timeline.py`, `records.py` | SCHED-T04 `test_wall_clock_step_does_not_move_the_schedule` | E.25 #3 | The blueprint defines no TIME-T IDs. |
+| SCHED-012 | Implemented | `admission.py`, `records.py` | SCHED-T05 `test_slow_poll_records_missed_overrun_and_never_overlaps` | `scheduler.md` | |
+| SCHED-013 | Implemented | `plan.py` | SCHED-T06 `test_mixed_intervals_interleave_in_one_queue` | | |
+| SCHED-014/015 | Deferred | — | SCHED-T09, T11 not written | E.25 #9 | Multi-worker scheduling is past the MVP (27.4). |
+| SCHED-016/017 | Implemented | `admission.py`, `dispatch.py`, `settings.py` | SCHED-T10 `test_worker_exhaustion_is_not_attempted_and_overloaded`; `test_inconsistent_scheduler_settings_fail_validation` | `scheduler.md` | `vakr config validate` checks `late_after` ≤ `max_start_delay`. |
+| ICMP-006/007/013/014 | Implemented (scheduler) | `machine.py` (calls `vakr.logic.icmp.snmp_plan`) | `test_gating_table`, `test_fallback_is_one_low_cost_attempt_and_icmp_evidence_is_kept` | `scheduler.md` | ADR-017 |
+| OBS-001/003/004/007 | Implemented (scheduler) | `stats.py`, `lag.py`, `health.py`, `driver.snapshot` | `test_snapshot_fills_a_valid_collector_health_observation`, `test_event_loop_lag_is_measured_and_degrades_the_collector`, `test_step_errors_read_as_collector_trouble_and_polling_continues` | `scheduler.md` | Prometheus export is pending. |
+| SVC-003 (16.4 steps 1–5) | Implemented | `driver.py` | `test_shutdown_records_waiting_cancelled_and_due_slots`, `test_shutdown_lets_short_polls_finish_and_keeps_partial_evidence` | `scheduler.md` | Steps 6–9 come with the service and spool wiring. |
+| STORE-004 (6.4 outbox) | Implemented | `outbox.py` | QUEUE-T01 `test_full_outbox_applies_reported_backpressure_without_loss` | | |
+| TEST-004 | Simulated | — | `test_hundred_devices_for_a_simulated_day` | `scheduler.md` | 24 simulated hours: p95 2.12 s, p99 2.54 s, every slot recorded. |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

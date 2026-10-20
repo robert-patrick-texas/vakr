@@ -4,6 +4,12 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Added
+
+- The scheduler (`vakr.scheduler`): SHA-256 phase placement, a due-time plan, bounded workers, the poll state machine with ICMP gating, and an asyncio driver with graceful shutdown. A missed or overrun poll is recorded as not attempted or missed, never as a device outage (SCHED-001..013, SCHED-016..018). It is not yet wired to collection.
+- New options: `polling.default_interval`, `polling.reachability_strategy`, and the `scheduler.*` group (collector name, phase and order modes, workers, queue capacity, lateness, start delay, poll deadline, shutdown grace). `vakr config validate` checks that `scheduler.late_after` does not exceed `scheduler.max_start_delay`.
+- Compact SQLite telemetry layout decided by benchmark (ADR-021, Appendix E.21); measured sizing in blueprint 27.3.
+
 ## 0.1.1 - 2026-10-20
 
 Second pre-release, cut to prove the self-update path from `0.1.0` on production hosts.

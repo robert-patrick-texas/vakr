@@ -93,7 +93,7 @@ python-version = "3.15"
 [tool.pytest.ini_options]
 testpaths = ["tests", "tools"]
 # Portable tools import their sibling modules the way their scripts do at runtime.
-pythonpath = ["tools/md2html", "tools/check-loc", "tools/check-version"]
+pythonpath = ["tools/md2html", "tools/check-loc", "tools/check-version", "tools/fieldkit"]
 addopts = ["-ra", "--strict-markers", "--import-mode=importlib"]
 
 [tool.coverage.run]

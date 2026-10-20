@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Go
+/bin/
+
+# Generated documentation site (built by tools/md2html in CI)
+_site/
+
+# Packaging output
+*.deb
+*.rpm
+
+# Field bundles and secrets must never be committed
+inbox/
+*.age
+*.gpg
+secrets/
+credentials.toml
+
+# Editors
+.idea/
+.vscode/
+*.swp

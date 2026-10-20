@@ -1,0 +1,33 @@
+# vakr
+
+*vakr* (Old Norse: wakeful, alert, vigilant) is an open-source, Linux-native network performance and reachability monitor. It is built to take over the jobs of MRTG and SmokePing:
+
+- interface traffic, packet, and error history without artificial reset spikes;
+- SmokePing-style latency, jitter, and loss graphs;
+- SNMP discovery with persistent interface identity across `ifIndex` changes;
+- modern web dashboards and a terminal UI;
+- collection that keeps running through database outages and network partitions.
+
+> **Status:** pre-alpha. The design is complete and implementation is starting. Nothing here is ready to monitor a network yet.
+
+## Documents
+
+- [Blueprint](tool-blueprint.md): the authoritative requirements, architecture, test plan, and roadmap. Start with [section 27, the MVP definition](tool-blueprint.md#27-mvp-definition).
+- [Changelog](CHANGELOG.md)
+- [md2html](tools/md2html/README.md): the portable Markdown-to-HTML tool that publishes these documents.
+
+Rendered documentation: <https://robert-patrick-texas.github.io/vakr/>
+
+## MVP at a glance
+
+| | |
+|---|---|
+| Scale | 100 Cisco IOS XE devices, about 1,600 active interfaces |
+| Protocols | ICMP (5-probe groups) and SNMPv2c |
+| Retention | 30 days at native resolution plus 400 days of 15-minute rollups |
+| Positions | One required; two (east/west) for collection that survives a partition |
+| Platform | Ubuntu 26.04 LTS `.deb`, self-updating from GitHub releases |
+
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

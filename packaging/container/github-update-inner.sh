@@ -8,6 +8,13 @@
 set -uo pipefail
 
 has_db_command() { vakr db --help >/dev/null 2>&1; }
+recommends_installed() {
+    # apt-get installs a release's new Recommends on update, as on a real host.
+    local pkg
+    for pkg in $(dpkg-query -W -f='${Recommends}' vakr | tr ',' '\n' | sed 's/[|(].*//'); do
+        installed "$pkg" || return 1
+    done
+}
 newest_backup() { find /var/lib/vakr/backups -name 'pre-update-*.tar.gz' | sort | tail -1; }
 
 section "install v$FROM from GitHub (docs/operations/install.md)"
@@ -43,6 +50,7 @@ check "the pre-update backup holds no telemetry" \
     bash -c '! tar -tzf "$1" | grep -q telemetry.db' _ "$(newest_backup)"
 check "the collector is installed and disabled" \
     equals "$(systemctl is-enabled vakr-collector.service 2>&1)" disabled
+check "the packages $TO recommends are installed" recommends_installed
 
 section "vakr self-update --rollback --yes ($TO -> $FROM)"
 vakr self-update --rollback --yes 2>&1 | grep '^vakr self-update:'

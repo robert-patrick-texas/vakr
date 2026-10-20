@@ -2,7 +2,9 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
-## Unreleased
+## 0.2.1 - 2026-10-20
+
+Fixes from the first production walk-through (0.2.0 installed from GitHub, a device polled, and a field bundle collected and decrypted). No configuration options or database schemas change.
 
 ### Changed
 
@@ -16,6 +18,12 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 - The package recommends `iputils-ping`, which the field kit's `paths` profile needs. Minimal images lack it.
 - `make github-update-test` (developers): after a release is published, installs the previous release from GitHub in a systemd container, self-updates to the new one, rolls back, and updates again through the timer unit, checking every step.
+
+### Notes for operators updating from 0.2.0
+
+- `sudo vakr self-update`, or the update timer, installs it. Nothing needs editing: there are no new options and no migrations.
+- The update also installs `iputils-ping` if it is missing, unless apt is configured not to install recommended packages. In that case, run `sudo apt install iputils-ping` before collecting a field bundle.
+- Field bundles collected with this release report HTTP 200 for the GitHub release API, where 0.2.0's field kit reported 404.
 
 ## 0.2.0 - 2026-10-20
 

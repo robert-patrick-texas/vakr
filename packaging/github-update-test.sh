@@ -8,7 +8,8 @@
 #      SSH signature, and the checksum, as docs/operations/install.md says;
 #   2. runs `vakr self-update --yes` to TO and checks the result: version,
 #      update record, databases current and vakr-owned, new options listed,
-#      health not CRITICAL, no telemetry in the pre-update backup;
+#      recommended packages installed, health not CRITICAL, no telemetry in
+#      the pre-update backup;
 #   3. rolls back to FROM, and checks the older release accepts the databases;
 #   4. lets vakr-update.service (the timer's unit) update to TO again, then
 #      checks a second run changes nothing;

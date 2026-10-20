@@ -3789,3 +3789,25 @@ These configuration keys arrive with M3, when the collector uses them. Until the
 - the rate maximum-gap multiplier and plausibility factor.
 
 M3 validation must also require at least 2 ICMP probes under `icmp_gated`; otherwise SNMP would never run.
+
+### E.18 Collection policy limits and rules (POLICY-002, POLICY-005, POLICY-007)
+
+| Setting or limit | Allowed range |
+|---|---|
+| `polling_interval` | 30 s – 1 h |
+| `discovery_interval` | 30 s – 30 d |
+| `snmp_timeout` | 1 s – 30 s |
+| `snmp_retries` | 0 – 5 |
+| `stale_after` | 1 d – 365 d |
+| Rule `priority` | −1000 – 1000 |
+| Rules per policy file / keywords / patterns per list | 2,000 / 256 / 256 |
+| Facts per explain file / policy or facts file size | 10,000 / 4 MiB |
+| `re:` pattern length / matched value length | 256 / 512 characters |
+
+Rules adopted with the M2 policy engine:
+
+- **Precedence.** A site rule shares the group/tag tier, because POLICY-002 doesn't name site. Within a tier, higher priority wins, then the later rule in the file. Each setting resolves independently.
+- **Matching.** Globs and `re:` patterns match the whole value, case-insensitively, on every text field. `exact:` is case-sensitive. Addresses match in canonical `address/prefix` form. An unknown fact matches no pattern.
+- **Default and tag scope.** The default is to monitor. A `tag` scope matches device tags, vakr tags, and description tags. Suppressed interfaces stay inventoried (DISC-007).
+- **Keywords.** A plain keyword is one word of letters and digits; a `re:` keyword matches one whole token. When keywords disagree on interest, the later one wins, so operator keywords override the packaged ones. Keywords only ever set `wan_circuit` and `sticky` to true.
+- **Regex safety.** `re:` patterns are checked when they load, by analysing CPython's own regex parse tree. The check rejects overlapping nested quantifiers, overlapping alternatives inside a repeat, repeats of something that can be empty, more than 2 overlapping open-ended repeats, more than 1,024 overlapping choices, an estimated step count above 2^21, backreferences, conditionals, and any parse node it doesn't recognise. The slowest pattern the limits allow takes about 8 ms on 512 characters. It relies on the private `re._parser` module: re-verify it with each Python minor upgrade (TOOLS-003). `vakr config validate` and `vakr policy validate` both apply these checks.

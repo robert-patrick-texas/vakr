@@ -26,6 +26,7 @@ import textwrap
 from collections.abc import Sequence
 
 from vakr.config import project
+from vakr.config.loader import EffectiveConfig
 from vakr.lifecycle.configmerge import (
     Issue,
     UpgradeError,
@@ -101,6 +102,18 @@ def validate(args: argparse.Namespace) -> int:
     result = project.inspect(args.config_dir or InstallPaths.from_environment().config_dir)
     if result.issues:
         _report(result.issues, "configuration invalid")
+        return 1
+    # The portable catalog only checks that a re: keyword compiles; vakr's
+    # policy package also rejects unsafe (backtracking) patterns (POLICY-005).
+    from vakr.policy.errors import PolicyError
+    from vakr.policy.keywords import keywords_from_config
+
+    try:
+        keywords_from_config(EffectiveConfig(result.nested(), result.sources))
+    except PolicyError as exc:
+        for issue in exc.issues:
+            print(f"{issue.path}: {issue.reason}")
+        print("configuration invalid: unsafe or invalid interface keyword")
         return 1
     current = project.catalog().config_version
     for path, version in result.versions.items():

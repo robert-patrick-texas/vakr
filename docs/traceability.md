@@ -90,6 +90,26 @@ Code lives in `src/vakr/logic/` and tests in `tests/unit/logic/`. Rules and the 
 | RET-004 | In progress | `stats.py` (`p95`) | `test_logic_stats.py::test_nearest_rank` | `quality-states.md` | Rollups must import `p95` from here. |
 | QG-006 | In progress | `vakr.logic` | `--cov-branch` 100% | | Not yet enforced as a CI gate. |
 
+## Collection policy and classification
+
+Code lives in `src/vakr/policy/` and tests in `tests/unit/policy/`. `vakr.policy` has 100% line and branch coverage. The operator guide is `docs/operations/policies.md`; limits and rules are in Appendix E.18.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| POLICY-001 | Implemented | `rules.py`, `rules_parse.py`, `engine.py` | `test_engine.py`, `test_rules.py` | `policies.md` | The §11.3 `exclude_<field>_patterns` shorthand is accepted. |
+| POLICY-002 | Implemented | `rules.py`, `engine.py`, `resolve.py` | `test_engine.py::test_tier_outranks_priority_and_file_order` | `policies.md` | E.18 |
+| POLICY-003 | Implemented | `facts.py`, `facts_parse.py` | `test_engine.py::test_every_match_field_reads_its_fact` | `policies.md` | Facts come from a file until the M3 inventory exists. |
+| POLICY-004 | In progress | `engine.py`, `trace.py`, `render.py`, `src/vakr/cli/cmd_policy.py` | `test_explain_cli.py` (CFG-009) | `policies.md` | The CLI is done; UI and API explain are pending. |
+| POLICY-005 | Implemented | `patterns.py`, `regex_safety.py`, `charsets.py`, `src/vakr/config/commands.py` (validate) | `test_patterns.py`, `test_regex_safety.py`, `test_charsets.py` (CFG-005), `tests/unit/config/test_validate_keywords.py` | `policies.md` | E.18. Uses the private `re._parser` module. |
+| POLICY-006 | Implemented | `engine.py` | `test_engine.py::test_evaluation_is_deterministic` | `policies.md` | |
+| POLICY-007 | In progress | `settings.py` | `test_rules.py::test_settings_outside_documented_limits_fail` | `policies.md` | Limits are in E.18; the scheduler applies them in M3. |
+| META-011 | In progress | `resolve.py`, `settings.py` | `test_engine.py::test_meta_012_annotation_then_keyword_then_rule_then_default` | `policies.md` | Storage is pending. |
+| META-012 | In progress | `keywords.py`, `classify.py`, `resolve.py` | `test_classify.py`, `test_engine.py` | `policies.md` | ADR-033. Description-tag storage and DISC-011 refresh are pending. |
+| META-013 | In progress | `classify.py` (`not_yet_classified`) | `test_classify.py` | `policies.md` | The UI filter and `vakr interface tag` are pending. |
+| DISC-007 | In progress | `trace.py` (`Decision.inventoried`) | `test_engine.py::test_suppressed_interfaces_stay_inventoried` | `policies.md` | Discovery itself is M3. |
+| LIFE-007 | In progress | `ordering.py` | `test_ordering.py` | `policies.md` | The device page and TUI are pending. |
+| SEC-019 | In progress | `patterns.py`, `regex_safety.py` | `test_patterns.py`, `test_regex_safety.py` | `policies.md` | Covers patterns only. |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

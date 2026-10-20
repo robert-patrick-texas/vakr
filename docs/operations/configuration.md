@@ -143,3 +143,9 @@ Packaged entries:
 | `snmp.max_walk_rows` | int, >= 100, <= 100000 | `10000` | live | v0.1.1 | Most rows one discovery walk of a table column may return. A walk that reaches it stops, keeps the rows it has, and marks the table partial (Appendix E.23). |
 | `snmp.rediscovery_interval` | duration, >= 30s, <= 2.592e+06s | `"24h"` | live | v0.1.1 | How often each device is rediscovered (DISC-002). Policy rules and devices can override it within 30s to 30d (Appendix E.18). |
 | `snmp.capability_reprobe_interval` | duration, >= 3600s, <= 7.776e+06s | `"7d"` | live | v0.1.1 | How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9). |
+
+### `[tui]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `tui.refresh_interval` | duration, >= 2s, <= 600s | `"10s"` | restart | v0.1.1 | How often vakr tui reads current state again (13.1, Appendix E.29). vakr tui --refresh overrides it. At the 60s default poll interval, 10s shows a new poll within a few seconds and keeps database reads trivial. |

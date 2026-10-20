@@ -17,6 +17,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - `vakr snmp discover` and `vakr snmp poll TARGET --credential NAME`, which check one device and report in plain language. A community is never accepted on the command line.
 - New `[snmp]` options: `port`, `timeout`, `retries`, `max_varbinds`, `max_repetitions`, `max_walk_rows`, `rediscovery_interval`, and `capability_reprobe_interval` (Appendix E.23). Their defaults apply without any edit.
 - A synthetic 100-device IOS XE simulator served by snmpsim, and `tools/snmpsim/walk2rec.py`, which turns field-kit walks into snmpsim data.
+- `vakr status [DEVICE] [--json]` and a read-only `vakr tui` (Textual) show current state from the local databases: devices with Attention first, each status as an icon and a label, the age and freshness of every value, and "—" with a reason wherever data is missing, never zero. Collector or storage trouble reads as Unknown, never Down. `vakr status` exits with Nagios codes (0 OK, 1 attention, 3 unknown). New option `tui.refresh_interval` (10 s). See [the status and TUI guide](docs/operations/status-and-tui.md) (TUI-001..008, Appendix E.29).
 
 ## 0.1.1 - 2026-10-20
 

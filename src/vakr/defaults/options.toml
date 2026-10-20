@@ -585,3 +585,16 @@ default = "7d"
 since = "0.1.1"
 reload = "live"
 description = "How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9)."
+
+# Status CLI and TUI (milestone M3, blueprint 13 and Appendix E.29). vakr status and
+# vakr tui read the local databases through the query services; they never write.
+
+[[options]]
+key = "tui.refresh_interval"
+type = "duration"
+min = 2
+max = 600
+default = "10s"
+since = "0.1.1"
+reload = "restart"
+description = "How often vakr tui reads current state again (13.1, Appendix E.29). vakr tui --refresh overrides it. At the 60s default poll interval, 10s shows a new poll within a few seconds and keeps database reads trivial."

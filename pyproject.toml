@@ -22,6 +22,7 @@ classifiers = [
 dependencies = [
     "cryptography>=50.0.2",  # certificate inspection for enterprise CAs (EGRESS-003)
     "pysnmp>=7.1.30",        # asyncio SNMPv2c collection and discovery (SNMP-015, ADR-034)
+    "textual>=8.2.8",        # read-only terminal UI, vakr tui (TUI-001, ADR-013)
     "tomlkit>=0.15.2",       # comment-preserving TOML edits for config upgrades (CFGM-002)
 ]
 

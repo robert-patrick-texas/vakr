@@ -26,6 +26,7 @@ Example:
 
 import asyncio
 import contextlib
+import dataclasses
 import logging
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING
@@ -33,6 +34,7 @@ from typing import TYPE_CHECKING
 from vakr.app.collector.baseline_codec import encode_store
 from vakr.app.collector.checkpoint import save_checkpoint
 from vakr.app.collector.health import health_observation, probe_state
+from vakr.domain.enums import CollectorState
 from vakr.ingest import SpoolError
 from vakr.version import get_version
 
@@ -131,11 +133,12 @@ async def write_checkpoint(service: CollectorService) -> None:
         )
 
 
-async def health_tick(service: CollectorService) -> None:
+async def health_tick(service: CollectorService, *, stopping: bool = False) -> None:
     """Spool a collector-health observation and run the capability re-probe check.
 
     Args:
         service: The running service.
+        stopping: This is the last report before a clean stop.
 
     Returns:
         None
@@ -156,6 +159,8 @@ async def health_tick(service: CollectorService) -> None:
         service.tally.take_period(),
         len(service.plans.interface_ids()),
     )
+    if stopping:  # devices read "collector unavailable" while it is stopped, not "degraded"
+        observation = dataclasses.replace(observation, state=CollectorState.UNAVAILABLE)
     service.plans.reprobe_expired(now, service.snmp_step.config.capability_reprobe_interval)
     try:
         await service.parts.spool.append([observation])

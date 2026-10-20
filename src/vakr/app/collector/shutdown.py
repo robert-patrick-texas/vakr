@@ -6,7 +6,8 @@
    rest are cancelled and recorded with what their finished steps produced,
    and every slot that will not run is recorded as not attempted.
 3. Drain the outbox into the spool, then spool a last collector-health
-   observation, which shows the collector draining.
+   observation marked ``UNAVAILABLE``, so its devices read "collector
+   unavailable" while it is stopped instead of a stale "degraded".
 4. Close the spool: queued records are written and fsynced, and the
    clean-stop marker is set.
 5. Stop the ingester after one last write of everything spooled.
@@ -66,7 +67,7 @@ async def shut_down(service: CollectorService, tasks: dict[str, asyncio.Task[Non
     await asyncio.gather(tasks["spool pump"], return_exceptions=True)
     await service.pump.drain()
     with contextlib.suppress(Exception):
-        await health_tick(service)
+        await health_tick(service, stopping=True)
     service.upkeep.stop()
     await asyncio.gather(*tasks.values(), *service.reloads, return_exceptions=True)
     await service.parts.spool.close()

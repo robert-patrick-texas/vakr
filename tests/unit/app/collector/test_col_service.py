@@ -47,7 +47,7 @@ from vakr.app.collector.preflight import PreflightError
 from vakr.app.collector.service import CollectorService
 from vakr.app.collector.timings import EX_PREFLIGHT, ServiceTimings
 from vakr.credentials import FileCredentialProvider
-from vakr.domain.enums import ObservationType
+from vakr.domain.enums import CollectorState, ObservationType
 from vakr.domain.paging import PageRequest
 from vakr.domain.series import TimeWindow
 from vakr.paths import InstallPaths
@@ -112,6 +112,8 @@ def test_empty_inventory_starts_idles_and_stops_cleanly(tmp_path: Path) -> None:
     store.close()
     assert latest is not None
     assert latest.active_devices == 0
+    # The last report of a clean stop says the collector is gone, not degraded.
+    assert latest.state is CollectorState.UNAVAILABLE
 
 
 def test_a_failing_component_stops_the_service_with_status_one(

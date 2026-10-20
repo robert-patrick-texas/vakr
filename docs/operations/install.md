@@ -19,6 +19,7 @@ vakr ships as one `.deb` for Ubuntu 26.04 LTS on amd64 (PKG-001). The package is
 You need:
 
 - Ubuntu 26.04 LTS on amd64, with `sudo`;
+- `curl` and `ssh-keygen` for the download and signature check. Minimal images may lack them: `sudo apt install curl openssh-client`. The package itself depends on `openssh-client`, so later self-updates need nothing extra;
 - outbound HTTPS to `github.com` and GitHub's download hosts (`*.githubusercontent.com`), directly or through a proxy. A host without GitHub access can install files you copy to it.
 
 Releases are listed at <https://github.com/robert-patrick-texas/vakr/releases>. Until MVP acceptance every release is marked *pre-release*.

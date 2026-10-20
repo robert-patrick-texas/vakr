@@ -3899,6 +3899,36 @@ Decisions taken with the M3 ICMP adapter:
 - **`icmp.impaired_rtt_ms = 0` means off**, because the option catalog has no unset value.
 - **Health severity.** The `icmp` check is WARNING, not CRITICAL, when the range excludes the collector's group: `check health` gates self-update (UPD-006), and a rollback cannot fix a host setting.
 
+### E.23 SNMP adapter (ADR-034, SNMP-011, SNMP-012, SNMP-017, SNMP-018, DISC-008, DISC-009)
+
+| Setting | Default | Allowed |
+|---|---|---|
+| `snmp.port` | 161 | 1 – 65535 |
+| `snmp.timeout` / `snmp.retries` | 2 s / 1 (E.9) | 1 – 30 s / 0 – 5 (E.18) |
+| `snmp.max_varbinds`, at the start of each session | 30, halving after `tooBig` down to 5 (E.4) | 5 – 100 |
+| `snmp.max_repetitions` (discovery GETBULK) | 25 (E.9), never above the current varbind limit | 1 – 100 |
+| `snmp.max_walk_rows`, rows one column walk may return | 10,000 | 100 – 100,000 |
+| `snmp.rediscovery_interval` | 24 h (E.9) | 30 s – 30 d (E.18) |
+| `snmp.capability_reprobe_interval` | 7 d (E.9) | 1 h – 90 d |
+| Consecutive unanswered requests before the rest of one GET, or of Stage 2, is abandoned | 2 | 1 – 10 (not an operator option) |
+| Size halvings after a timeout that suggests size trouble | 1 per GET, and only after the agent has answered in the session | — |
+| Varbinds excluded after error-status answers | 3 per GET | — |
+| DNS lookup of an SNMP target | 5 s | — |
+| Extra wait past `snmp.timeout` before vakr stops waiting for PySNMP | 1 s | — |
+| `vakr snmp poll --rate-after` | none | 1 – 300 s |
+
+Decisions taken with the M3 SNMP adapter:
+
+- **Complete-attempt retries.** PySNMP's own retries are off. Each retry is a new request with a new request ID, and every attempt is counted (SNMP-018).
+- **tooBig reductions last for the session.** `SnmpSession.max_varbinds` reports the current size, so a caller can remember it per device.
+- **Discovery liveness check.** After two consecutive column walks of one table time out without a row, one GET of `sysUpTime.0` asks whether the agent is still there. If it answers, only the rest of that table is skipped. If not, all remaining walks are.
+- **Stage 2 packs whole interfaces into each request**, stamped at send time with UTC and monotonic time. When both HC octet counters answer `noSuchObject`/`noSuchInstance`, `hc_octets = False` is learned and the 32-bit counters are fetched in the same cycle. When only the HC packet components are absent, packet totals are left unavailable rather than mixing counter widths. A counter of the wrong SNMP type is missing.
+- **A failed capability probe is unknown, not unsupported**, and the interface is still tried with HC counters.
+- **Physical interfaces by ifType.** Physical: 6, 7, 18, 19, 22, 30, 39, 62, 69, 71, 117, unless `ifName` contains a dot (a subinterface). Logical: 24, 53, 131, 135, 136, 150, 161, 166. Any other type is unknown.
+- **Device SNMP state** (10.2): no answer is `TIMEOUT`. A collector-side failure (credential, DNS, socket, unsupported version) is `UNKNOWN` with `COLLECTOR_DEGRADED`. An answer with no usable value is `ERROR`. An answer with any unanswered request is `PARTIAL`. Otherwise the state is `RESPONDING`; `MISSING_FIELDS` alone does not make it partial.
+- **An unknown IP prefix** (a `zeroDotZero` pointer) is stored as a host prefix, with `address_prefix` recorded as a missing field.
+- **Communities are never accepted on the command line.**
+
 ### E.24 Spool and ingestion (STORE-004 to STORE-011, 6.4, E.8)
 
 | Setting | Default |

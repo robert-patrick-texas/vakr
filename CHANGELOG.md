@@ -12,6 +12,10 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - Durable observation spool and batched ingestion (`vakr.ingest`, STORE-004 to STORE-011): collectors hand observations to an fsynced, append-only spool under `/var/lib/vakr/spool/<collector UUID>/`, and ingestion writes them to the telemetry database in idempotent batches. Losses are recorded as telemetry-loss incidents (STORE-007). See [the spool guide](docs/operations/spool.md).
 - `[spool]` options (`directory`, `max_size_mib`, `segment_size_mib`, `fsync_interval`, `fsync_records`, `queue_capacity`, `warning_pct`, `critical_pct`, `exhausted_pct`, `ingest_interval`, `ingest_max_rows`). Their defaults apply without any edit.
 - A `spool` check in `vakr check health` and `vakr doctor`: fill level, backlog age, database write failures, recent loss incidents, and quarantined files.
+- SNMPv2c collection with PySNMP's asyncio API (ADR-034): discovery of the system group, IF-MIB, and IP-MIB with per-table completeness; Stage 1 status polling by exact OID; Stage 2 counters for up/up interfaces with HC preference, 32-bit fallback, and learned capabilities; one request in flight per device, tooBig size halving, and counted retries (SNMP-001..019, DISC-004..009).
+- `vakr snmp discover` and `vakr snmp poll TARGET --credential NAME`, which check one device and report in plain language. A community is never accepted on the command line.
+- New `[snmp]` options: `port`, `timeout`, `retries`, `max_varbinds`, `max_repetitions`, `max_walk_rows`, `rediscovery_interval`, and `capability_reprobe_interval` (Appendix E.23). Their defaults apply without any edit.
+- A synthetic 100-device IOS XE simulator served by snmpsim, and `tools/snmpsim/walk2rec.py`, which turns field-kit walks into snmpsim data.
 
 ## 0.1.1 - 2026-10-20
 

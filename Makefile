@@ -1,7 +1,7 @@
 # Quality gates (blueprint section 17.8). CI runs `make check`; run it locally
 # before pushing. Every target runs through uv so the locked toolchain is used.
 SITE ?= _site
-TY_PATHS := --extra-search-path tools/md2html
+TY_PATHS := --extra-search-path tools/md2html --extra-search-path tools/snmpsim
 
 .PHONY: check fmt lint types test loc version docs docs-check
 
@@ -31,6 +31,12 @@ version:
 .PHONY: docstrings
 docstrings:
 	uv run python tools/check-docstrings/check_docstrings.py src tests tools
+
+# Opt-in SNMP load check: the 100-device MVP fleet from snmpsim within one 60 s
+# interval (blueprint 4.2, 27.2). Takes about 30 s; not part of `make check`.
+.PHONY: snmp-load
+snmp-load:
+	VAKR_SNMP_LOAD=1 uv run pytest -p no:cacheprovider -s tests/simulators/snmp/test_snmp_load.py
 
 docs:
 	uv run tools/md2html/md2html.py . $(SITE) --title vakr \

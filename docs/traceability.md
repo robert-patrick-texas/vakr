@@ -183,6 +183,32 @@ The port is `src/vakr/ports/icmp.py` (raw result types in `ports/icmp_types.py`)
 | OBS-001/002/003 (ICMP) | In progress | `IcmpCounters`, `CollectorFault`, `cycle.collector_state` | `test_icmp_faults.py`, `test_icmp_errqueue.py` | ADR-023 | Collector trouble is never target loss; metrics export comes later. |
 | 16.3 preflight (ICMP) | Implemented | `adapters/icmp/health.check_icmp` in `CHECKS` | `test_icmp_preflight.py` | `icmp.md` | WARNING, not CRITICAL, so self-update is not rolled back on an unfixed host. |
 
+## SNMP collection and discovery (M3)
+
+The port is the `src/vakr/ports/snmp/` package. The PySNMP transport is `src/vakr/adapters/snmp/`; discovery is `src/vakr/discovery/`, and Stage 1/2 polling `src/vakr/collectors/snmp/`. The CLI is `vakr snmp discover|poll` (`cli/cmd_snmp.py`). The simulator is in `tests/simulators/snmp/`, and the field-walk converter is `tools/snmpsim/walk2rec.py`. See [ADR-034](adr/ADR-034-snmp-library-and-simulator.md), [SNMP operations](operations/snmp.md), and Appendix E.23.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| SNMP-001 | In progress | `adapters/snmp/factory.py` | `test_snmpsim_collection.py` (SNMP-T01) | `snmp.md` | v2c done; v3 is refused as unsupported (27.4). |
+| SNMP-004/005/006 | Implemented | `collectors/snmp/stage1.py`, `poll.py` | `test_snmp_agent_polling.py::test_snmp_t03_t04_*` | `snmp.md` | ADR-005 |
+| SNMP-007 | Implemented | `stage2.py`, `counters.py` | `test_snmp_t05_*` | `snmp.md` | 32-bit fallback within the same cycle. |
+| SNMP-008/009 | Implemented | `counters.py` | `test_snmp_t06_*`, `test_counter_discontinuity_*` | `snmp.md` | ADR-006 |
+| SNMP-010 | In progress | `plan.py`, `batches.py` | `test_snmp_t05_t07_*` | E.23 | The pipeline persists the per-device plan. |
+| SNMP-011/012/018 | Implemented | `adapters/snmp/engine.py`, `session.py` (`DeviceLocks`) | `test_snmp_t08_*`, `test_snmp_012_*`, `test_snmp_t10_*` | E.9, E.23 | One outstanding PDU per device; vakr's engine retries, not PySNMP's. |
+| SNMP-013/014 | Implemented | `poll.py`, `getbatch.py`, `walking.py` | `test_snmp_state_*`, `test_snmp_t09_*`, `test_snmp_014_*` | `snmp.md` | |
+| SNMP-015 | Implemented | `adapters/snmp/*` | `test_snmp_t12_*` | ADR-034 | |
+| SNMP-016 | In progress | `ports/snmp/target.py` | `test_snmp_t11_*` | `snmp.md` | A per-device port needs an inventory field. |
+| SNMP-017 | Implemented | `engine.py`, `getbatch.py` | `test_snmp_t10_*` | E.4, E.23 | tooBig halves the request and flags `REQUEST_SIZE_REDUCED`. |
+| SNMP-019 | Implemented | `target.py`, `values.py`, `cli/snmp_args.py` | `test_snmp_019_*`, `test_parse_oid_*` | `snmp.md` | |
+| DISC-002/009 | In progress | `collectors/snmp/config.py`, `plan.py` | `test_plan_entries_*`, `test_snmp_t05_t07_*` | `configuration.md` | Intervals exist; scheduling them is M3 wiring. |
+| DISC-003 | In progress | `cli/cmd_snmp.py` | `test_snmp_cli.py` | `snmp.md` | Diagnostic only; does not change the inventory. |
+| DISC-004..006 | Implemented | `discovery/*` | `test_snmp_t01_*`, `test_discovery_parse.py` | `snmp.md` (OID catalog) | |
+| DISC-007 | In progress | `discovery/facts.py` | `test_discovery_facts_*` | `snmp.md` | Storing results in the inventory is pending. |
+| DISC-008 | Implemented | `discovery/discover.py`, `model.py` | `test_disc_t04_*` | E.23 | Partial walks are explicit. |
+| UPTIME-001/002 | Implemented | `collectors/snmp/observations.py` | `test_uptime_continuity_*`, `test_agent_restart_*` | `snmp.md` | Uses `vakr.logic.uptime`. |
+| SEC-003 (SNMP) | Implemented | `adapters/snmp/guards.py` | `test_snmp_canary.py` | ADR-034 | A canary community never appears in logs, reprs, tracebacks, or output. Re-run on every PySNMP or pyasn1 upgrade. |
+| 4.2/27.2 load (SNMP) | Verified (simulator) | — | `make snmp-load` (`VAKR_SNMP_LOAD=1`) | ADR-034 | 100 devices / 1,600 interfaces: discovery 20.1 s, one poll cycle 8.5 s, per-device p95 5.0 s (snmpsim queueing). |
+
 ## Spool and ingestion (M3)
 
 Code is in `src/vakr/ingest/` and `src/vakr/health/spool_check.py`, with tests in `tests/unit/ingest/`. See [the spool guide](operations/spool.md) and Appendix E.24. Records keep the M2 JSON envelope; MessagePack (ADR-014) is not used (E.24).

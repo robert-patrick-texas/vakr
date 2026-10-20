@@ -21,6 +21,7 @@ classifiers = [
 ]
 dependencies = [
     "cryptography>=50.0.2",  # certificate inspection for enterprise CAs (EGRESS-003)
+    "pysnmp>=7.1.30",        # asyncio SNMPv2c collection and discovery (SNMP-015, ADR-034)
     "tomlkit>=0.15.2",       # comment-preserving TOML edits for config upgrades (CFGM-002)
 ]
 
@@ -35,9 +36,11 @@ vakr = "vakr.cli.main:main"
 dev = [
     "coverage>=7.16.2",
     "hypothesis>=6.170.5",
+    "pysmi>=2.0.0",  # imported by snmpsim 1.2.2 but not declared by it (ADR-034)
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.1",
+    "snmpsim>=1.2.2",  # SNMP agent simulator for tests (blueprint 23, ADR-034)
     "ty>=0.0.89",
 ]
 # Dependencies of the portable tools under tools/, so ty and pytest can resolve them.
@@ -97,7 +100,7 @@ python-version = "3.15"
 [tool.pytest.ini_options]
 testpaths = ["tests", "tools", "packaging/tests"]
 # Portable tools import their sibling modules the way their scripts do at runtime.
-pythonpath = ["tools/md2html", "tools/check-loc", "tools/check-version", "tools/check-docstrings", "tools/check-updates", "tools/fieldkit", "tools/release"]
+pythonpath = ["tools/md2html", "tools/check-loc", "tools/check-version", "tools/check-docstrings", "tools/check-updates", "tools/fieldkit", "tools/release", "tools/snmpsim"]
 addopts = ["-ra", "--strict-markers", "--import-mode=importlib"]
 
 [tool.coverage.run]

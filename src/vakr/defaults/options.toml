@@ -499,3 +499,89 @@ default = 1024
 since = "0.1.1"
 reload = "restart"
 description = "Most ICMP probes the collector waits on at once, across all devices (Appendix E.22). A probe that cannot be sent in time is recorded as collector overload, never as packet loss. 1,024 is about twice what 100 unreachable devices need."
+
+# SNMP collection and discovery (SNMP-011, SNMP-016, SNMP-017, DISC-002, DISC-009;
+# Appendix E.4, E.9, E.18, E.23). Communities never go here: they live in
+# /etc/vakr/secrets/credentials.toml and devices name them by reference.
+# since: set to the release that ships these when VERSION is bumped (it may
+# not name a release newer than VERSION, so it reads 0.1.1 until then).
+
+[[options]]
+key = "snmp.port"
+type = "int"
+min = 1
+max = 65535
+default = 161
+since = "0.1.1"
+reload = "live"
+description = "UDP port of SNMP agents (SNMP-016)."
+
+[[options]]
+key = "snmp.timeout"
+type = "duration"
+min = 1
+max = 30
+default = "2s"
+since = "0.1.1"
+reload = "live"
+description = "How long to wait for each SNMP answer before the attempt counts as unanswered (SNMP-011, Appendix E.9)."
+
+[[options]]
+key = "snmp.retries"
+type = "int"
+min = 0
+max = 5
+default = 1
+since = "0.1.1"
+reload = "live"
+description = "Complete new attempts after an unanswered SNMP request. Each retry is counted and flagged in the poll's quality (SNMP-018)."
+
+[[options]]
+key = "snmp.max_varbinds"
+type = "int"
+min = 5
+max = 100
+default = 30
+since = "0.1.1"
+reload = "live"
+description = "Varbinds per SNMP request at the start of each session. After a tooBig answer vakr halves it, down to 5, for the rest of the session (SNMP-017, Appendix E.4)."
+
+[[options]]
+key = "snmp.max_repetitions"
+type = "int"
+min = 1
+max = 100
+default = 25
+since = "0.1.1"
+reload = "live"
+description = "GETBULK max-repetitions for discovery walks (Appendix E.9). It never exceeds snmp.max_varbinds."
+
+[[options]]
+key = "snmp.max_walk_rows"
+type = "int"
+min = 100
+max = 100000
+default = 10000
+since = "0.1.1"
+reload = "live"
+description = "Most rows one discovery walk of a table column may return. A walk that reaches it stops, keeps the rows it has, and marks the table partial (Appendix E.23)."
+
+[[options]]
+key = "snmp.rediscovery_interval"
+type = "duration"
+min = 30
+max = 2592000
+default = "24h"
+since = "0.1.1"
+reload = "live"
+description = "How often each device is rediscovered (DISC-002). Policy rules and devices can override it within 30s to 30d (Appendix E.18)."
+
+[[options]]
+key = "snmp.capability_reprobe_interval"
+type = "duration"
+min = 3600
+max = 7776000
+default = "7d"
+since = "0.1.1"
+reload = "live"
+description = "How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9)."

@@ -1,4 +1,4 @@
-"""Unit tests for collectors, which turn raw protocol results into observations.
+"""Unit tests for the collectors, one subpackage per protocol.
 
 Dependencies:
     pytest.

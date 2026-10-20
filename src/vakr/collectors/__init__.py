@@ -1,22 +1,19 @@
-"""Collectors: turn raw protocol results into canonical observations (6.1, 9.1).
+"""Collectors: the code that measures devices and produces observations.
 
-A collector sits between an adapter that talks to the network and the
-scheduler that plans polls. It applies the measurement rules in
-``vakr.logic`` to what the adapter measured and returns domain
-observations, so the math lives in one place and every adapter feeds it
-the same way.
-
-- ``vakr.collectors.icmp``: ICMP probe groups to ``IcmpObservation``.
+Each subpackage turns one protocol's exchanges into canonical observations
+(blueprint 6.1): ``snmp`` for Stage 1/Stage 2 SNMP polling, and ``icmp`` for
+reachability. Collectors talk to the network only through ports, so they
+can be tested against simulators.
 
 Dependencies:
-    vakr.ports, vakr.logic, vakr.domain: Adapter contracts, rules, records.
+    vakr.ports: Network ports and the clock.
 
 Safety:
-    Collectors never touch storage; they hand observations back to the
-    caller, which owns the spool.
+    Collector or storage trouble is never reported as target-down
+    (invariants 2 and 3).
 
 Example:
-    >>> import vakr.collectors.icmp
-    >>> vakr.collectors.icmp.__name__
-    'vakr.collectors.icmp'
+    >>> import vakr.collectors
+    >>> vakr.collectors.__name__
+    'vakr.collectors'
 """

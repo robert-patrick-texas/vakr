@@ -201,3 +201,53 @@ class IfOperStatus(IntEnum):
     DORMANT = 5
     NOT_PRESENT = 6
     LOWER_LAYER_DOWN = 7
+
+
+# Appended by M2-core (domain model, ports, envelope). Existing members above
+# are unchanged; these classes extend the shared vocabulary.
+
+
+class ManagedByKind(StrEnum):
+    """Which source owns a configurable record (META-008, blueprint 11.2)."""
+
+    FILE = "file"
+    API = "api"
+
+
+class AuditOutcome(StrEnum):
+    """Result of an audited action (SEC-018)."""
+
+    SUCCESS = "success"
+    FAILURE = "failure"
+    DENIED = "denied"
+
+
+class IdentityDecisionSource(StrEnum):
+    """Who decided an interface identity outcome (IFID-005, IFID-007)."""
+
+    AUTOMATIC = "automatic"
+    ADMIN = "admin"
+
+
+class ObservationType(StrEnum):
+    """Kind of observation carried by the language-neutral envelope (6.3, ARCH-002)."""
+
+    DEVICE_POLL = "device_poll"
+    ICMP = "icmp"
+    SNMP_DEVICE = "snmp_device"
+    INTERFACE = "interface"
+    COLLECTOR_HEALTH = "collector_health"
+
+
+class Freshness(StrEnum):
+    """Whether current state is recent enough to present as current (TIME-005, E.3)."""
+
+    FRESH = "fresh"
+    STALE = "stale"
+
+
+class SeriesSource(StrEnum):
+    """Which storage tier produced part of a series (STATE-005, 10.6)."""
+
+    NATIVE = "native"
+    ROLLUP = "rollup"

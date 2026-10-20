@@ -1,0 +1,3 @@
+# Golden observation fixtures are compared byte for byte (ARCH-002); never
+# normalise their line endings or add trailing newlines.
+tests/fixtures/observations/** -text

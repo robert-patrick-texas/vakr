@@ -3811,3 +3811,21 @@ Rules adopted with the M2 policy engine:
 - **Default and tag scope.** The default is to monitor. A `tag` scope matches device tags, vakr tags, and description tags. Suppressed interfaces stay inventoried (DISC-007).
 - **Keywords.** A plain keyword is one word of letters and digits; a `re:` keyword matches one whole token. When keywords disagree on interest, the later one wins, so operator keywords override the packaged ones. Keywords only ever set `wan_circuit` and `sticky` to true.
 - **Regex safety.** `re:` patterns are checked when they load, by analysing CPython's own regex parse tree. The check rejects overlapping nested quantifiers, overlapping alternatives inside a repeat, repeats of something that can be empty, more than 2 overlapping open-ended repeats, more than 1,024 overlapping choices, an estimated step count above 2^21, backreferences, conditionals, and any parse node it doesn't recognise. The slowest pattern the limits allow takes about 8 ms on 512 characters. It relies on the private `re._parser` module: re-verify it with each Python minor upgrade (TOOLS-003). `vakr config validate` and `vakr policy validate` both apply these checks.
+
+### E.19 Query, paging, and envelope bounds (API-005, API-006, 10.6, STORE-011)
+
+| Bound | Value |
+|---|---|
+| Page size default / maximum | 100 / 500 |
+| Points per series (before downsampling) | 1,200 |
+| Paging cursor length | 1,024 characters |
+| Envelope payload JSON nesting depth | 32 |
+| Observations per write batch | 50,000 (the STORE-011 upper target) |
+
+Decisions taken with the M2 domain model:
+
+- **Envelope checksum.** The checksum is SHA-256 over the canonical bytes of the whole envelope minus its `checksum` key, written `sha256:<hex>`. Covering the header too catches header corruption in the spool.
+- **Repository split.** Tags and groups get separate repositories, so the unit of work exposes both `tags` and `groups`. `DuplicateError` (a natural-key collision) is separate from `ConflictError` (a stale version only).
+- **Error precedence.** Ownership is checked before version: editing a file-managed record with a stale version reports ownership, because retrying can't help.
+- **Gaps in native series.** A native series has one point per stored observation. The M4 query layer shall insert an explicit `None` point wherever consecutive points are more than 1.5 × the effective poll interval apart, so graphs break the line instead of drawing across an outage (STORE-012, UI-010). Rollup series already emit every bucket.
+- **Claiming interfaces from files.** Discovered interfaces start API-managed. A file-managed annotation for an existing interface needs an explicit, audited ownership-transfer operation (META-008). This lands with the M3 inventory loader.

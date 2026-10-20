@@ -110,6 +110,33 @@ Code lives in `src/vakr/policy/` and tests in `tests/unit/policy/`. `vakr.policy
 | LIFE-007 | In progress | `ordering.py` | `test_ordering.py` | `policies.md` | The device page and TUI are pending. |
 | SEC-019 | In progress | `patterns.py`, `regex_safety.py` | `test_patterns.py`, `test_regex_safety.py` | `policies.md` | Covers patterns only. |
 
+## Domain model, ports, and envelope
+
+Code lives in `src/vakr/domain/`, `src/vakr/ports/`, and `src/vakr/adapters/memory/`. The contract suites are in `tests/contract/` and the golden fixtures in `tests/fixtures/observations/`. See `docs/architecture/domain.md` and `docs/architecture/storage.md`, and Appendix E.19.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| ARCH-001 | Implemented | `src/vakr/domain/`, `src/vakr/ports/` | `tests/unit/domain/test_domain_boundaries.py` | `domain.md`, `storage.md` | Imports only the standard library, `vakr.domain`, and `vakr.ports`. |
+| ARCH-002 | Implemented | `domain/{envelope,codec,codec_fields,codec_values,json_values,timestamps}.py` | `test_domain_envelope.py`, golden fixtures | `domain.md` | Schema v1. Timestamps are integer µs. The checksum covers the whole envelope (E.19). |
+| META-001/002 | Implemented | `domain/{ids,inventory,interfaces}.py` | `test_domain_records.py`, DB-001 suite | `domain.md` | IDs are UUIDv7; `if_index` is an observed attribute. |
+| META-003..007 | Implemented | `domain/{inventory,interfaces,catalog}.py`, `ports/metadata/filters.py` | DB-001 suite, `test_domain_records.py` | `domain.md`, `storage.md` | Interface field `is_wan_circuit`; config key `wan_circuit`. |
+| META-008 | Implemented | `domain/ownership.py`, repository `update(writer=)` | `contract_metadata_rules.py::test_meta008_*` | `storage.md` | Ownership is checked before version (E.19). |
+| META-009 | Implemented | `set_admin_state`, `set_lifecycle`; the ports have no delete | `test_meta009_retiring_keeps_records_and_history` | `storage.md` | |
+| META-011/013 | Implemented | `InterfaceAnnotation.interest`, `Interface.tags` vs `description_tags` | DB-001, `test_meta008_interface_write_paths` | `domain.md` | |
+| IFID-005 | Implemented | `domain/control.py` (`IdentityHistoryEntry`), `InterfaceRepository` history methods | `test_ifid005_identity_history` | `domain.md` | |
+| SEC-018 | In progress | `AuditEvent`, `AuditRepository` | `test_sec018_audit_events` | `storage.md` | The application layer emits events. |
+| STORE-008/009/012 | Implemented | `domain/{observations,interface_observations,series,series_assembly}.py`, `ObservationWriter` | codec completeness, `test_store009_*`, `test_store012_*`, `test_db006_*` | `domain.md`, `storage.md` | E.19 adds the native-gap rule for M4. |
+| STORE-010/013 | In progress | `ObservationWriter` contract, memory adapter | `test_store010_*`, `TelemetryWriteContract` | `storage.md` | Needs the SQLite parity run. |
+| STATE-001/002 | In progress | `CurrentStateQuery`, `domain/projections.py` | `TelemetryStateContract` | `storage.md` | |
+| STATE-003/004/005 | Implemented | state read models, collector-scoped series, `resolution_spans` | DB-005, `test_state004_*`, `test_db006_*` | `domain.md`, `storage.md` | |
+| API-002/005 | Implemented | UUID-only read models, `domain/paging.py` keyset cursors | DB-007, `test_db001_paging_*`, `test_api005_*` | `storage.md` | Enforced at the port level; the HTTP API comes in M4. |
+| API-006 | In progress | `TimeWindow`, `max_points`, `Series.truncated` / `resolutions` | `test_api006_point_cap_and_metric_family` | `domain.md` | Timezone rendering comes in M4. |
+| TIME-001/005/006 | Implemented | `domain/timestamps.py`, state read models | `test_timestamps_are_utc_and_exact`, DB-005, `test_e3_freshness_threshold` | `domain.md` | |
+| ICMP-004/005 | In progress | The domain uses `None`; `-1` is a storage detail | golden fixtures, `test_icmp_series_metrics` | `storage.md` | The SQLite adapter will store `-1`. |
+| RATE-004, LIFE-002 | Implemented | `InterfaceObservation` baseline check, `set_lifecycle` | `test_interface_sample_invariants`, `test_meta009_*` | `domain.md` | |
+| RET-007 | In progress | `RetentionManager` | `test_retention_follows_policy` | `storage.md` | Audited purge comes in M4. |
+| DB-001..007 | In progress | `tests/contract/` suites | The memory adapter passes all of them | `storage.md` | SQLite metadata and telemetry runs are next. |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

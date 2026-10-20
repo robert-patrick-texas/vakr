@@ -10,10 +10,11 @@ set -e
 case "$1" in
     remove)
         # Service units are PartOf=vakr.target, so stopping the target stops
-        # them; a new unit outside the target must be added to this list.
+        # them; a new unit outside the target must be added to this list. The
+        # collector is named too, because an operator may have started it alone.
         if [ -d /run/systemd/system ]; then
-            deb-systemd-invoke stop vakr-update.timer vakr-update.service vakr.target \
-                >/dev/null || true
+            deb-systemd-invoke stop vakr-update.timer vakr-update.service \
+                vakr-collector.service vakr.target >/dev/null || true
         fi
         ;;
     upgrade | deconfigure | failed-upgrade)

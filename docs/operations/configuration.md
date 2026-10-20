@@ -162,3 +162,10 @@ Packaged entries:
 |---|---|---|---|---|---|
 | `security.allowed_target_cidrs` | list[str] | `[]` | live | v0.1.1 | Networks, in CIDR form, that every poll target must fall in (15.5, SEC-015). Empty allows any unicast address. Multicast, unspecified, and broadcast addresses are always refused. |
 | `security.denied_target_addresses` | list[str] | `["169.254.169.254/32", "fd00:ec2::254/128", "100.100.100.200/32"]` | live | v0.1.1 | Addresses or CIDR networks that are never polled (15.5, SEC-015). The defaults are the cloud metadata services, which answer anyone on the host. Setting this list replaces the defaults. |
+
+### `[rates]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `rates.max_gap_intervals` | float, >= 2, <= 20 | `5.0` | live | v0.1.1 | Longest gap between two counter samples, in effective polling intervals, across which a rate is still derived (Appendix E.4). A longer gap leaves the rate unavailable with BASELINE_GAP instead of averaging over the outage (RATE-003). 32-bit counters are further limited to half their wrap time at line rate. |
+| `rates.plausibility_factor` | float, >= 1, <= 10 | `1.1` | live | v0.1.1 | A derived rate above this multiple of the interface's effective capacity is kept and flagged RATE_EXCEEDS_CAPACITY, never clipped (RATE-009, Appendix E.4). |

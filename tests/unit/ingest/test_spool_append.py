@@ -57,10 +57,11 @@ def test_store004_append_returns_only_after_the_covering_fsync(tmp_path: Path) -
         spool = Spool(spool_settings(tmp_path), COLLECTOR, ops=ops)
         await spool.open()
         before = len(ops.fsyncs)
+        assert before >= 1  # open returns only once the first segment's header is fsynced
         receipt = await spool.append(interface_samples(5))
         assert (receipt.first_seq, receipt.last_seq, receipt.count) == (1, 5, 5)
         assert spool.durable_seq >= receipt.last_seq
-        assert len(ops.fsyncs) - before >= 2  # segment header, then the data
+        assert len(ops.fsyncs) - before >= 1  # then the data
         (segment,) = list_segments(spool.directory)
         assert scan_segment(segment.path).last_seq == 5
         assert spool.appended == 5
@@ -101,7 +102,7 @@ def test_e8_fsync_every_1000_records(tmp_path: Path) -> None:
         before = len(ops.fsyncs)
         batches = [interface_samples(100) for _ in range(20)]
         receipts = await asyncio.gather(*(spool.append(b) for b in batches))
-        assert len(ops.fsyncs) - before == 1 + 2  # header, then at 1,000 and 2,000 records
+        assert len(ops.fsyncs) - before == 2  # at 1,000 and 2,000 records; open fsynced the header
         assert spool.thread is not None
         assert spool.thread.commit.fsyncs == 2
         assert sorted(r.last_seq for r in receipts)[-1] == 2000

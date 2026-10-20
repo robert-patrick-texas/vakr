@@ -297,6 +297,30 @@ The inventory file is handled by `src/vakr/inventory/` (`InventoryService` for t
 | LIFE-005 | Implemented | `reconcile/match.py` | `test_ifid_t08_missing_then_returning` | | |
 | MIG-002 (metadata 0002) | Implemented | `adapters/sqlite/metadata/sql/0002_identity_review.sql` | upgrade-with-data test | `database.md` | Self-update backs up `metadata.db`, so rollback restores schema 1. |
 
+## Collector service (M3)
+
+The composition root is `src/vakr/app/collector/`, wired to `InventoryService` through `inventory_service.py`. It provides `vakr collector run|once` (`cli/cmd_collector.py`), the unit `packaging/systemd/vakr-collector.service`, and sd_notify, signals, and logs in `src/vakr/service/`. See [collector operations](operations/collector.md) and Appendix E.27.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| SVC-001/002 | Implemented (collector) | `vakr-collector.service`, `cmd_collector.py` | `test_units.py::test_collector_unit…`, `systemd-test.sh` | `collector.md` | `WantedBy`/`PartOf` `vakr.target`; shipped disabled. |
+| SVC-003 (16.4) | Implemented | `shutdown.py`, `service.py` | SVC-T03 `test_empty_inventory_starts_idles_and_stops_cleanly`, E2E | `collector.md`, E.27 | Shutdown runs in the 16.4 order; `TimeoutStopSec` 120 s. |
+| SVC-004 | Partial | `service/sdnotify.py` | `test_notify…` | `collector.md` | `Type=notify` READY/STOPPING. |
+| SVC-005 (16.3) | Implemented | `preflight.py`, `build.py` | SVC-T02 `test_preflight_refuses_unsafe_starts_before_any_poll`, `test_invalid_policies_fail_preflight` | `collector.md` | Exit 78 (no restart). ICMP permission and a missing credentials file only warn. No time-sync check yet. |
+| SVC-006 | Partial (collector) | `service/logs.py` | `test_log_lines…` | `collector.md` | Event-id lines with redaction. |
+| SVC-009 | Implemented | unit restart limits, `RestartPreventExitStatus=78` | `test_units.py` | E.27 | |
+| MPOL-001/006 | Implemented | `identity.py` | SVC-T04, `test_registration_and_health_cadence`, `test_identity_survives…` | `collector.md`, E.27 #2 | One UUID for the collector record, spool, and observations. |
+| DISC-001/002 | Implemented | `discovery.py`, `discovery_due.py` | DISC-T01, DISC-T02, `test_failed_discoveries_back_off…` | E.27 | Rediscovery after the interval even when no plan results; failures back off 60 s doubling to 1 h. |
+| RATE-001..010 (collector) | Implemented | `derive.py`, `baselines.py`, `checkpoint.py`, `capacity.py` | RATE-T01/T02/T06 `test_col_rates.py`, E2E | E.27 #11-12 | `rates.max_gap_intervals`, `rates.plausibility_factor`. |
+| RATE-004 (6.2 checkpoint) | Implemented | `checkpoint.py`, `timers.py` | `test_restart_resumes…`, E2E | `collector.md` | Baselines checkpointed atomically every minute and at stop. |
+| 6.2 inventory and poll plans | Implemented | `inventory.py`, `inventory_service.py`, `replan.py` | `test_collector_uses_the_inventory_service_and_reloads_its_rules` | E.27 | Re-plans when the metadata change counter moves (read every 5 s) and on SIGHUP. |
+| CONF-003, TEST-008 | Implemented (collector) | `reload.py`, `service/signals.py` | `test_reload_refuses_an_invalid_candidate_and_applies_a_valid_one` | `collector.md` | |
+| 6.4, SPOOL-T07, SCHED-T10 | Implemented | `scheduler/dispatch.py` admission hook, `pipeline.py` | `test_col_admission.py` | E.27 #3 | A full spool records slots as not attempted (`MissReason.STORAGE_FULL`). |
+| ICMP-007/012/013 (runtime) | Implemented | `icmp_step.py`, `snmp_parts.py` | `test_col_steps.py`, `systemd-test.sh` | E.27 #8-10 | E.25 #5: a collector-side ICMP failure lets SNMP run. |
+| OBS-001/003 (collector) | Partial | `health.py`, `timers.py` | `test_registration_and_health_cadence` | E.27 #14 | Health every poll interval; Prometheus export (OBS-005) is later. |
+| PKG-003 | Implemented | `nfpm.yaml`, `prerm` | `test_package_spec.py`, `systemd-test.sh` | `install.md`, `collector.md` | |
+| STORE-006 (spool open race) | Fixed at merge | `ingest/spool.py`, `writer_thread.py`, `cursor.py` | `test_spool_open_race.py::test_store006_ingester_started_at_once_stores_every_record` | E.24 | `Spool.open()` waits for the first segment's header; a reader never renames a segment the writer may still be appending to. |
+
 ## Current state: query services, `vakr status`, `vakr tui` (M3)
 
 Read services are in `src/vakr/query/` (`StatusQueries`). The Textual app is `src/vakr/tui/`, and the CLIs are `cli/cmd_status.py` and `cli/cmd_tui.py`. See [status and TUI](operations/status-and-tui.md) and Appendix E.29. Until the M4 API exists, both read through the ports in-process (TUI-007).

@@ -80,6 +80,7 @@ class WriterThread(threading.Thread):
         self._requests = RequestQueue()
         self._pending: list[AppendRequest] = []
         self.closed_cleanly = False
+        self.prepared = threading.Event()  # set once the first segment has its header
 
     def submit(self, request: AppendRequest) -> None:
         """Queue a request; called on the event loop.
@@ -124,7 +125,10 @@ class WriterThread(threading.Thread):
             None
         """
         try:
-            self.writer.prepare()
+            try:
+                self.writer.prepare()
+            finally:
+                self.prepared.set()
             while (batch := self._requests.take(self._wait_s)) is not None:
                 for request in batch:
                     self._write(request)

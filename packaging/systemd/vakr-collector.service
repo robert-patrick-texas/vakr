@@ -1,0 +1,72 @@
+# The Compact (MVP) collector (blueprint 6.2): scheduler, ICMP and SNMP
+# collection, discovery, the durable spool, ingestion into telemetry.db, and
+# telemetry upkeep. It is the only writer of telemetry.
+#
+# Shipped disabled, like every vakr unit (PKG-003): the package never starts
+# polling on its own. Once inventory exists, enable it with
+#   sudo systemctl enable --now vakr-collector.service vakr.target
+# and vakr.target starts and stops it from then on. Started with an empty
+# inventory it runs and idles until devices appear. See
+# docs/operations/collector.md.
+[Unit]
+Description=vakr collector (polling, spool, and telemetry storage)
+Documentation=https://robert-patrick-texas.github.io/vakr/docs/operations/collector.html
+Wants=network-online.target
+After=network-online.target
+PartOf=vakr.target
+# At most five failed starts in ten minutes, then systemd stops trying, so a
+# crash cannot become a restart storm (SVC-009, SVC-T05).
+StartLimitIntervalSec=10min
+StartLimitBurst=5
+
+[Service]
+# READY=1 is sent once the startup preflight passed and polling began.
+Type=notify
+NotifyAccess=main
+ExecStart=/opt/vakr/venv/bin/vakr collector run
+# SIGHUP reloads the configuration; an invalid file is refused and the
+# running configuration stays (CONF-003, TEST-008).
+ExecReload=/bin/kill -HUP $MAINPID
+User=vakr
+Group=vakr
+SyslogIdentifier=vakr-collector
+Restart=on-failure
+RestartSec=10s
+# Exit 78 is a failed startup check (configuration, schema, unsafe secrets):
+# an operator must act, so systemd does not restart it.
+RestartPreventExitStatus=78
+TimeoutStartSec=120s
+# The drain takes scheduler.shutdown_grace (15 s) plus at most 45 s to
+# spool, ingest, checkpoint, and close (Appendix E.27); 120 s leaves margin.
+TimeoutStopSec=120s
+KillSignal=SIGTERM
+# Resource limits for the 100-device Compact workload (SVC-009, E.27).
+MemoryMax=2G
+TasksMax=512
+LimitNOFILE=16384
+
+# Hardening (15.3). ICMP uses unprivileged ping sockets, so the collector
+# holds no capability; the documented raw-socket fallback is a drop-in in
+# packaging/examples/vakr-collector.service.d/, never part of this unit.
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/vakr
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+UMask=0027
+
+[Install]
+WantedBy=vakr.target

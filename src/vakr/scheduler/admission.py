@@ -10,6 +10,7 @@ recorded as missed with a reason. Nothing is dropped silently:
   ``max_start_delay`` late (a stalled event loop or a full output queue).
 * ``SUPERSEDED``: the device's next slot came due while this one waited.
 * ``DRAINING``: shutdown began before the slot could start (16.4).
+* ``STORAGE_FULL``: the spool stopped admitting new work (EXHAUSTED, 6.4).
 
 All but ``OVERRUN`` are recorded as ``NOT_ATTEMPTED``: unknown, never a
 target failure (SCHED-017, OBS-003). The wait queue holds at most one slot
@@ -48,10 +49,11 @@ class MissReason(StrEnum):
     LATE_DISPATCH = "late_dispatch"
     SUPERSEDED = "superseded"
     DRAINING = "draining"
+    STORAGE_FULL = "storage_full"
 
 
 CAPACITY_REASONS = frozenset(
-    {MissReason.NO_WORKER, MissReason.LATE_DISPATCH, MissReason.SUPERSEDED}
+    {MissReason.NO_WORKER, MissReason.LATE_DISPATCH, MissReason.SUPERSEDED, MissReason.STORAGE_FULL}
 )
 """Misses caused by collector capacity; they also carry ``COLLECTOR_DEGRADED``."""
 

@@ -208,7 +208,9 @@ class SegmentCursor:
             return
         lost = ref.path.stat().st_size - self._offset
         self.close()
-        if ref.first_seq == self._spool.active_first_seq:
+        active = self._spool.active_first_seq
+        # Never rename a segment the writer may still be appending to.
+        if active is None or ref.first_seq >= active:
             self._spool.request_rotation()
             ref = SegmentRef(ref.path, ref.first_seq, damaged=True)  # quarantined when released
         else:

@@ -197,6 +197,8 @@ class Spool:
                                    asyncio.get_running_loop(), self._settle,
                                    lambda _seq: self._durable.set())  # fmt: skip
         self.thread.start()
+        # A reader opening a header-less first segment would quarantine it (E.24).
+        await asyncio.to_thread(self.thread.prepared.wait, 30.0)
         return opened.recovery
 
     async def append(

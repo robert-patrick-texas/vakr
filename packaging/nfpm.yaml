@@ -44,6 +44,9 @@ contents:
   - src: packaging/systemd/vakr.target
     dst: /usr/lib/systemd/system/vakr.target
     file_info: {mode: 0o644}
+  - src: packaging/systemd/vakr-collector.service
+    dst: /usr/lib/systemd/system/vakr-collector.service
+    file_info: {mode: 0o644}
   - src: packaging/systemd/vakr-update.service
     dst: /usr/lib/systemd/system/vakr-update.service
     file_info: {mode: 0o644}

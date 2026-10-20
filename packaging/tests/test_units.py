@@ -118,6 +118,35 @@ def test_update_service_runs_unattended_self_update_outside_the_target() -> None
     assert "Install" not in service
 
 
+def test_collector_unit_joins_the_target_hardened_and_disabled() -> None:
+    """6.2, 15.3, SVC-009, PKG-003: vakr user, no capability, reload by SIGHUP, no 78 restarts.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If the collector unit's contract changes.
+    """
+    collector = unit("vakr-collector.service")
+    settings = dict(collector["Service"])
+    assert settings["ExecStart"] == "/opt/vakr/venv/bin/vakr collector run"
+    assert (settings["Type"], settings["User"], settings["Group"]) == ("notify", "vakr", "vakr")
+    assert settings["ExecReload"] == "/bin/kill -HUP $MAINPID"
+    assert settings["RestartPreventExitStatus"] == "78"
+    assert settings["TimeoutStopSec"] == "120s"  # > shutdown_grace + stop budget (E.27)
+    for key, value in (("NoNewPrivileges", "yes"), ("ProtectSystem", "strict"),
+                       ("ReadWritePaths", "/var/lib/vakr"), ("ProtectHome", "yes"),
+                       ("PrivateTmp", "yes"), ("CapabilityBoundingSet", "")):  # fmt: skip
+        assert settings[key] == value, key
+    assert ("PartOf", "vakr.target") in collector["Unit"]
+    assert collector["Install"] == [("WantedBy", "vakr.target")]
+    drop_in = PKG / "examples/vakr-collector.service.d"
+    assert drop_in.is_dir()  # the ICMP fallback names this unit (ICMP-012)
+
+
 def test_target_is_the_common_contract() -> None:
     """Section 6.2: vakr.target hangs off multi-user.target and is not auto-enabled.
 

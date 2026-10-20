@@ -274,6 +274,27 @@ Code is in `src/vakr/scheduler/`, with tests in `tests/unit/scheduler/`. See [th
 | STORE-004 (6.4 outbox) | Implemented | `outbox.py` | QUEUE-T01 `test_full_outbox_applies_reported_backpressure_without_loss` | | |
 | TEST-004 | Simulated | — | `test_hundred_devices_for_a_simulated_day` | `scheduler.md` | 24 simulated hours: p95 2.12 s, p99 2.54 s, every slot recorded. |
 
+## Current state: query services, `vakr status`, `vakr tui` (M3)
+
+Read services are in `src/vakr/query/` (`StatusQueries`). The Textual app is `src/vakr/tui/`, and the CLIs are `cli/cmd_status.py` and `cli/cmd_tui.py`. See [status and TUI](operations/status-and-tui.md) and Appendix E.29. Until the M4 API exists, both read through the ports in-process (TUI-007).
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| TUI-001 | Implemented | `cli/cmd_tui.py`, `tui/app.py` | TUI-T01, `test_tui_command_line` | `status-and-tui.md` | ADR-013 (Textual 8.2.8). Read-only. |
+| TUI-002, 7.7 | Implemented | `query/listing.py`, `query/service.py`, `tui/list_screen.py` | TUI-T01 `test_default_screen_orders_buckets_with_text_and_icons`, `test_default_order_is_attention_active_offline_then_severity_then_natural_name` | `status-and-tui.md` | E.29 #1. The "most recent change" key waits for state-change times. |
+| TUI-003 | Implemented | `query/listing.py`, `tui/list_controls.py` | `test_search_filter_sort_and_refresh`, `test_bucket_filter_and_paging`, `test_order_is_deterministic_whatever_the_input_order` | `status-and-tui.md` | Refresh every 10 s (E.29). |
+| TUI-004 | Implemented | `query/detail.py`, `tui/device_screen.py` | TUI-T02 | `status-and-tui.md` | `sys*` facts are not stored yet (port gap). |
+| TUI-005, RATE-008/010 (display) | Implemented | `query/interface_rows.py`, `tui/columns.py` | `test_utilization_is_never_computed_against_an_unknown_capacity`, `test_missing_rates_say_why_and_are_never_zero` | `status-and-tui.md` | E.29 #7 |
+| TUI-006 | Implemented | `query/interface_rows.py` (`order_key`) | `test_interfaces_are_ordered_sticky_wan_primary_rank_then_natural_name` | E.29 #6 | |
+| TUI-007 | Implemented | `vakr.query.StatusQueries` | TUI-T05 `test_query_architecture.py` | E.29 #10 | No adapter, driver, or SQL in `query` or `tui`. |
+| TUI-008 | Implemented | `tui/columns.py`, `tui/tables.py` | TUI-T03 | E.29 #9 | 120×30 usable; narrow terminals drop low-priority columns. |
+| TUI-009 | In progress | `query/service.py`, `tui/modals.py` | TUI-T04 tests | `status-and-tui.md` | Collector health and spool %; no DB-latency screen yet. |
+| TUI-010 | Implemented | views carry no credential fields | `test_views_never_carry_credential_references` | | |
+| E.2 status, OBS-002/003 (display) | Implemented | `query/evidence.py`, `query/device_rows.py` via `vakr.logic.status` | `test_query_status.py` (every E.2 row) | `status-and-tui.md` | E.29: ICMP and SNMP evidence must come from the newest poll; a stale collector-health report reads as collector unavailable. E.2 row 8's discovery and identity-review parts need port data. |
+| TIME-002..006 (display) | Implemented | `query/text.py`, `labels.mark_stale` | `test_stale_evidence_is_marked_stale_and_never_current`, `test_display_zone_follows_time_timezone` | `status-and-tui.md` | |
+| STATE-003/004, MPOS-007 (display) | Implemented | `query/evidence.py`, `PositionView` | `test_partition_between_positions_is_amber_not_red` | E.29 #2-4 | |
+| `vakr status` (OPS) | Implemented | `cli/cmd_status.py`, `status_render.py`, `status_json.py`, `status_stores.py` | `test_status_cli.py` | `status-and-tui.md` | Nagios-style exit codes 0/1/3 (2 is a usage error). Opens no database that does not exist. |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

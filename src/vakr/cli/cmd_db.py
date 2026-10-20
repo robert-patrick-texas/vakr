@@ -238,6 +238,9 @@ def _migrate_one(path: Path, manager: SqliteMigrationManager, args: argparse.Nam
     Raises:
         None
     """
+    if not path.parent.is_dir():
+        _fail(f"{path.parent} does not exist; the package creates it (for development, create it)")
+        return EXIT_PROBLEM
     try:
         status = manager.status()
         if status.state is SchemaState.CURRENT:

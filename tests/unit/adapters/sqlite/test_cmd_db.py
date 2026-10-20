@@ -252,3 +252,26 @@ def test_db_without_subcommand_is_a_usage_error(capsys: pytest.CaptureFixture[st
     """
     assert main(["db"]) == 2
     assert "status" in capsys.readouterr().err
+
+
+def test_migrate_names_a_missing_state_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A missing ``/var/lib/vakr`` is named, not reported as ``SQLITE_CANTOPEN``.
+
+    Args:
+        tmp_path: An empty relocated root.
+        monkeypatch: Sets ``VAKR_ROOT``.
+        capsys: Output capture.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    monkeypatch.setenv("VAKR_ROOT", str(tmp_path))
+    assert main(["db", "migrate"]) == 1
+    err = capsys.readouterr().err
+    assert "var/lib/vakr does not exist" in err
+    assert "SQLITE_CANTOPEN" not in err

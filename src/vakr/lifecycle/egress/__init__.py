@@ -16,7 +16,9 @@ Safety:
     Certificate and hostname verification is always on. The single exception
     is ``peek.peek_presented_certificate``, which reads the certificate a
     server presented after verification already failed and never sends
-    application data (EGRESS-004, enforced by a static test).
+    application data (EGRESS-004, enforced by a static test). Relaxing the
+    strict X.509 profile (``strict_x509=False``, EGRESS-007) clears only
+    ``VERIFY_X509_STRICT`` and keeps every other check.
 
 Example:
     >>> from vakr.lifecycle.egress import proxy

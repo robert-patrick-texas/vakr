@@ -97,6 +97,8 @@ The `host` profile checks whether this host could reach GitHub for vakr's self-u
 - **Proxy.** Use `--proxy http://[user:pass@]proxy:port`, or the usual `HTTPS_PROXY` and `NO_PROXY` variables. Recorded URLs never contain the credentials.
 - **Enterprise TLS inspection.** If your proxy re-signs TLS with its own CA, pass that CA with `--ca-file inspection-ca.pem`. The trust store is the OS bundle plus that file. Certificate verification is never disabled for the request itself.
 - **When verification fails**, the report names the issuer and subject of the certificate this host was actually shown, which tells the developers which CA vakr needs (`vakr tls trust-ca`). Learning this takes one extra TLS handshake without verification. That connection is closed right after the handshake, and nothing is sent over it.
+- **Strict X.509 profile.** The test checks certificates the way vakr does, with the strict X.509 profile that Python 3.13 and later enforce. Some inspection CAs, and the certificates their proxies issue, fail that profile even when the CA is trusted. Typical reasons are `Missing Authority Key Identifier` and `CA cert does not include key usage extension`. When that happens, the test makes one more handshake with only the strict profile relaxed. That handshake still verifies the certificate and the host name, and it sends nothing. If it succeeds, the report says `only the strict X.509 profile rejects it`, suggests `--no-strict-x509` for comparison, and names vakr's fallback setting, `network.tls_strict_x509 = false`. The real fix is a reissued CA. See [The strict X.509 profile](updates.md#the-strict-x509-profile).
+- `--no-strict-x509` runs the test with only the strict profile relaxed, as vakr does with `network.tls_strict_x509 = false`. Certificate and host-name verification stay on.
 - `--no-egress` skips the test.
 
 ## Pseudonymization
@@ -195,6 +197,7 @@ To replace the recipient, generate a new key pair, commit the new certificate in
 | `--journal-lines` | 5000 | journald lines in the `vakr` profile |
 | `--egress-timeout` | 15 s | Per stage of the reachability test |
 | `--egress-url`, `--egress-head` | GitHub release API, releases page | Replace the reachability targets |
+| `--no-strict-x509` | off (strict) | Relax only the strict X.509 profile in the reachability test |
 | `--openssl` | `openssl` | OpenSSL program to use |
 | `--recipient` | built in | Encrypt to a different certificate |
 

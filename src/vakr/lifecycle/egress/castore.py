@@ -32,6 +32,7 @@ from vakr.lifecycle.egress.certinfo import (
     CertificateRejectedError,
     CertSummary,
     load_single_pem,
+    strict_profile_gaps,
     summarize,
     validate_ca,
 )
@@ -114,7 +115,9 @@ def default_name(source: Path) -> str:
     return cleaned or "ca"
 
 
-def install(pem: bytes, name: str, ca_dir: Path, now: datetime) -> Path:
+def install(
+    pem: bytes, name: str, ca_dir: Path, now: datetime, *, strict_x509: bool = True
+) -> Path:
     """Validate ``pem`` and write it to ``ca_dir/<name>.pem`` at mode 0644.
 
     Args:
@@ -122,6 +125,8 @@ def install(pem: bytes, name: str, ca_dir: Path, now: datetime) -> Path:
         name: Safe name (see ``check_name``).
         ca_dir: Application CA directory; created if missing.
         now: Current UTC time for the validity check.
+        strict_x509: Refuse a CA that fails the strict X.509 profile; the
+            caller passes ``False`` only under its relaxed policy (EGRESS-007).
 
     Returns:
         Path: The installed file.
@@ -130,7 +135,9 @@ def install(pem: bytes, name: str, ca_dir: Path, now: datetime) -> Path:
         CertificateRejectedError: When validation fails or the name is taken.
         OSError: When the directory or file cannot be written.
     """
-    validate_ca(pem, now)
+    cert = validate_ca(pem, now)
+    if strict_x509 and (gaps := strict_profile_gaps(cert)):
+        raise CertificateRejectedError(f"fails the strict X.509 profile: {'; '.join(gaps)}")
     target = ca_dir / f"{check_name(name)}.pem"
     if any(p.stem == name for p in ca_files(ca_dir)):
         raise CertificateRejectedError(f"a CA named {name!r} is already installed; remove it first")

@@ -6,7 +6,9 @@ The report must say which hop failed, and when TLS verification fails it
 must name the issuer of the certificate the host was shown, which is how
 development spots an enterprise TLS-inspection proxy. A loopback TLS server
 signed by a throwaway "inspection CA" and a loopback CONNECT proxy stand in
-for GitHub and the enterprise proxy.
+for GitHub and the enterprise proxy. A second server presents a leaf
+without an authority key identifier, which only the strict X.509 profile
+rejects (EGRESS-T05).
 
 Dependencies:
     pytest: Test runner.
@@ -20,13 +22,16 @@ Example:
     $ uv run pytest tools/fieldkit/test_fieldkit_egress.py
 """
 
+import ast
+import socket
 import ssl
 from pathlib import Path
 from typing import Any
 
+import fieldkit_egress
 import pytest
 from fieldkit_der import certificate_names
-from fieldkit_egress import probe
+from fieldkit_egress import _strict_profile, probe, tls_context
 from fieldkit_testkit import Pki
 from fieldkit_tunnel import bypasses_proxy, choose_proxy, redact_url
 
@@ -243,3 +248,102 @@ def test_der_names_match_the_ssl_module(pki: Pki) -> None:
     assert names["not_after"].endswith("Z")
     with pytest.raises(ValueError, match="DER"):
         certificate_names(b"\x04\x01x")
+
+
+def test_strict_profile_failure_names_both_fallbacks(pki: Pki, tls_server_no_aki: int) -> None:
+    """EGRESS-T05: a proxy leaf without AKI is reported as a strict-profile failure.
+
+    Args:
+        pki: Session PKI.
+        tls_server_no_aki: Server presenting a leaf without an AKI.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    url = f"https://localhost:{tls_server_no_aki}/r"
+    record = probe("GET", url, options(ca_file=pki.ca))
+    assert record["error"].startswith(
+        "tls: certificate verification failed: Missing Authority Key Identifier"
+    )
+    assert "only the strict X.509 profile rejects it" in record["error"]
+    assert "--no-strict-x509" in record["error"]
+    assert "network.tls_strict_x509 = false" in record["error"]
+    assert (record["strict_x509"], record["tls"]["verify_code"]) == (True, 85)
+    assert record["tls"]["passes_without_strict"] is True
+    assert "http" not in record
+    relaxed = probe("GET", url, options(ca_file=pki.ca, strict_x509=False))
+    assert "error" not in relaxed, relaxed
+    assert (relaxed["strict_x509"], relaxed["http"]["status"]) == (False, 200)
+
+
+def test_wrong_host_fails_in_both_modes(pki: Pki, tls_server: int, tls_server_no_aki: int) -> None:
+    """EGRESS-T05: ``--no-strict-x509`` keeps verification and host name checks on.
+
+    Args:
+        pki: Session PKI.
+        tls_server: Server with a compliant chain.
+        tls_server_no_aki: Server whose leaf passes only with the profile relaxed.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    for strict, port in ((True, tls_server), (False, tls_server_no_aki)):
+        context, _ = tls_context(pki.ca, strict)
+        assert context.verify_mode == ssl.CERT_REQUIRED
+        assert context.check_hostname is True
+        assert bool(context.verify_flags & ssl.VERIFY_X509_STRICT) is strict
+        with (
+            socket.create_connection(("127.0.0.1", port), timeout=5) as sock,
+            pytest.raises(ssl.SSLCertVerificationError, match="mismatch"),
+        ):
+            context.wrap_socket(sock, server_hostname="wrong.example")
+
+
+def test_unconfirmed_strict_failure_keeps_the_reason() -> None:
+    """EGRESS-T05: if the relaxed confirmation fails, the report says why and gives no hint.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    record: dict[str, Any] = {"error": "tls: certificate verification failed: x", "tls": {}}
+    _strict_profile(record, "localhost", 1, None, options(timeout=2.0))
+    assert record["tls"]["passes_without_strict"] is False
+    assert "without it: confirmation failed" in record["error"]
+    assert "--no-strict-x509" not in record["error"]
+
+
+def test_strict_confirmation_sends_nothing() -> None:
+    """EGRESS-004: the relaxed confirmation only handshakes and closes.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    tree = ast.parse(Path(fieldkit_egress.__file__).read_text(encoding="utf-8"))
+    function = next(
+        n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "_strict_profile"
+    )
+    called = {
+        node.func.attr
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    assert called.isdisjoint({"send", "sendall", "write", "makefile", "request"})
+    assert {"wrap_socket", "close"} <= called

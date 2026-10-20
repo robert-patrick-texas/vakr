@@ -29,8 +29,9 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from vakr.cli.cmd_tls import DIAGNOSIS_TIMEOUT, TRUST_HINT, build_egress_settings
+from vakr.cli.cmd_tls import DIAGNOSIS_TIMEOUT, STRICT_HINT, TRUST_HINT, build_egress_settings
 from vakr.cli.common import SubParsers
+from vakr.cli.tls_strict import FALLBACK
 from vakr.config.loader import EffectiveConfig, load_effective_config
 from vakr.health.lifecycle_checks import check_update  # noqa: F401 - re-export for callers
 from vakr.lifecycle.egress.client import HttpsClient
@@ -234,7 +235,7 @@ def _updater(
 
 
 def _print_diagnosis(paths: InstallPaths, config: EffectiveConfig) -> bool:
-    """Print the step-by-step egress diagnosis for the API host (EGRESS-005).
+    """Print the step-by-step egress diagnosis for the API host (EGRESS-005, EGRESS-007).
 
     Args:
         paths: Installation paths.
@@ -251,9 +252,11 @@ def _print_diagnosis(paths: InstallPaths, config: EffectiveConfig) -> bool:
     except EgressError as exc:
         print(f"egress configuration: {exc}")
         return False
-    result = diagnose(f"{API_BASE}/", settings, TRUST_HINT)
+    result = diagnose(f"{API_BASE}/", settings, TRUST_HINT, STRICT_HINT)
     for line in render(result):
         print(line)
+    if not settings.strict_x509:
+        print(f"  note: strict X.509 checks relaxed for outbound HTTPS ({FALLBACK})")
     return result.ok
 
 

@@ -50,6 +50,7 @@ class EgressSettings:
         max_body_bytes: Limit for in-memory responses such as API JSON.
         max_redirects: Redirects followed before giving up.
         user_agent: ``User-Agent`` header (GitHub requires one).
+        strict_x509: Whether ``context`` enforces the strict X.509 profile.
     """
 
     context: ssl.SSLContext
@@ -58,6 +59,7 @@ class EgressSettings:
     max_body_bytes: int = 4 * 1024 * 1024
     max_redirects: int = 5
     user_agent: str = "lifecycle-egress"
+    strict_x509: bool = True
 
 
 @dataclass(frozen=True, slots=True)

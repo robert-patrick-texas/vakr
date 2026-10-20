@@ -61,6 +61,7 @@ No Python changes are needed. The modules import nothing from vakr.
 - The field kit only reads. It writes the bundle into `--output-dir` and, with `--pseudonymize`, a key at `~/.config/<tool_name>/pseudonym.key`. net-snmp's state directory is redirected into the private temporary directory as well.
 - External commands are always started from argument lists, never through a shell.
 - `peek_presented_certificate_unverified` in `fieldkit_egress.py` is the only TLS handshake without verification. It runs only after a verification failure, it reads the presented certificate's issuer, and it closes without sending data.
+- `--no-strict-x509` clears only OpenSSL's strict X.509 profile flag; certificate and host-name verification stay on. After a strict-profile failure, `_strict_profile` makes one confirmation handshake with the same relaxation. It also closes without sending data, and it only changes the wording of the report.
 
 ## License
 

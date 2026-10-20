@@ -21,6 +21,7 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[3] / "src"
 PEEK_FILE = SRC / "vakr/lifecycle/egress/peek.py"
+STRICT_FILE = SRC / "vakr/lifecycle/egress/strict.py"
 ALLOWED_FUNCTION = "peek_presented_certificate"
 BYPASS = re.compile(r"CERT_NONE|check_hostname\s*=\s*False|verify\s*=\s*False")
 SENDING_CALLS = {"send", "sendall", "sendto", "write", "makefile", "request"}
@@ -95,6 +96,31 @@ def test_peek_never_sends_application_data() -> None:
     }
     assert called.isdisjoint(SENDING_CALLS)
     assert "getpeercert" in called
+
+
+def test_strict_confirmation_never_sends_application_data() -> None:
+    """EGRESS-005/EGRESS-007: the relaxed confirmation handshake only handshakes.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    tree = ast.parse(STRICT_FILE.read_text())
+    function = next(
+        n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "confirm_relaxed"
+    )
+    called = {
+        node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call)
+    }
+    assert called.isdisjoint(SENDING_CALLS)
+    assert {"tls_wrap", "close"} <= called
 
 
 def test_no_configuration_can_disable_verification() -> None:

@@ -5,17 +5,21 @@ This module repeats what the HTTPS client does, one step at a time, and
 reports the first step that breaks. When TLS verification fails it reads the
 certificate the server presented and names its subject and issuer, which
 reveals a TLS-inspection proxy and points the operator at the command that
-trusts its CA (EGRESS-005).
+trusts its CA (EGRESS-005). A failure that only the strict X.509 profile
+causes is named as such, with the caller's fallback hint (EGRESS-007).
 
 Dependencies:
     vakr.lifecycle.egress.transport: The same steps the client uses.
     vakr.lifecycle.egress.peek: Presented certificate after a failure.
+    vakr.lifecycle.egress.strict: Strict-profile failure assessment.
     vakr.lifecycle.egress.certinfo: Subject and issuer names.
+    vakr.lifecycle.egress.report: Result types and ``render``.
 
 Safety:
     Sends only a ``HEAD`` request after a verified handshake. The presented
-    certificate is displayed, never trusted. Output contains host names,
-    addresses, and certificate names only.
+    certificate is displayed, never trusted, and a relaxed confirmation
+    handshake only chooses the hint: diagnosis never relaxes real requests.
+    Output contains host names, addresses, and certificate names only.
 
 Example:
     >>> for line in render(diagnose("https://api.github.com/", settings)):  # doctest: +SKIP
@@ -26,67 +30,31 @@ Example:
 import socket
 import ssl
 import time
-from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from vakr.lifecycle.egress import strict
 from vakr.lifecycle.egress.certinfo import CertificateRejectedError, summarize_der
 from vakr.lifecycle.egress.client import EgressSettings
 from vakr.lifecycle.egress.errors import CertificateVerifyError, EgressError
 from vakr.lifecycle.egress.peek import peek_presented_certificate
 from vakr.lifecycle.egress.proxy import ProxyEndpoint
+from vakr.lifecycle.egress.report import Diagnosis, Step, render
 from vakr.lifecycle.egress.transport import connect_tcp, proxy_connect, resolve, tls_wrap
 
 DEFAULT_HINT = "add the issuing CA to the trusted CA directory"
+DEFAULT_STRICT_HINT = "have the certificates reissued, or relax only the strict X.509 profile"
 UNTRUSTED_ISSUER_MARKERS = ("issuer", "self-signed", "self signed")
 """OpenSSL reasons meaning the chain ends at a CA this host does not trust."""
 
-
-@dataclass(frozen=True, slots=True)
-class Step:
-    """Result of one diagnosis step.
-
-    Attributes:
-        name: ``"dns"``, ``"tcp"``, ``"proxy"``, ``"tls"``, or ``"http"``.
-        ok: Whether the step succeeded.
-        detail: What was observed.
-    """
-
-    name: str
-    ok: bool
-    detail: str
+__all__ = ["Diagnosis", "Step", "diagnose", "render"]
 
 
-@dataclass(frozen=True, slots=True)
-class Diagnosis:
-    """All steps run for one URL, stopping at the first failure.
-
-    Attributes:
-        url: The URL diagnosed.
-        steps: Steps in execution order.
-        hint: Suggested remedy, when one is known.
-    """
-
-    url: str
-    steps: tuple[Step, ...]
-    hint: str | None = None
-
-    @property
-    def ok(self) -> bool:
-        """Whether every step succeeded.
-
-        Args:
-            None
-
-        Returns:
-            bool: ``True`` when no step failed.
-
-        Raises:
-            None
-        """
-        return all(step.ok for step in self.steps)
-
-
-def diagnose(url: str, settings: EgressSettings, trust_hint: str = DEFAULT_HINT) -> Diagnosis:
+def diagnose(
+    url: str,
+    settings: EgressSettings,
+    trust_hint: str = DEFAULT_HINT,
+    strict_hint: str = DEFAULT_STRICT_HINT,
+) -> Diagnosis:
     """Run each egress step for ``url`` and report where it fails.
 
     Args:
@@ -94,6 +62,8 @@ def diagnose(url: str, settings: EgressSettings, trust_hint: str = DEFAULT_HINT)
         settings: The same settings the real client uses.
         trust_hint: Remedy suggested when an untrusted issuer is presented,
             for example ``"run: vakr tls trust-ca FILE"``.
+        strict_hint: Remedy suggested when only the strict X.509 profile
+            rejects the chain, naming the caller's fallback setting.
 
     Returns:
         Diagnosis: Steps up to and including the first failure.
@@ -111,9 +81,12 @@ def diagnose(url: str, settings: EgressSettings, trust_hint: str = DEFAULT_HINT)
         sock = _connect_steps(host, port, proxy, settings.timeout, steps)
         tls = _tls_step(sock, host, port, settings, steps)
     except CertificateVerifyError as exc:
-        steps.append(_presented_step(exc, proxy, settings.timeout))
+        verdict = strict.assess(exc, proxy, settings.timeout, settings.context)
+        steps.append(_presented_step(exc, proxy, settings.timeout, verdict.note))
+        if verdict.strict_only:
+            return Diagnosis(url, tuple(steps), strict_hint, strict_profile=True)
         # Expiry or a host-name mismatch is not fixed by trusting another CA.
-        untrusted = any(marker in exc.reason for marker in UNTRUSTED_ISSUER_MARKERS)
+        untrusted = any(marker in verdict.reason for marker in UNTRUSTED_ISSUER_MARKERS)
         return Diagnosis(url, tuple(steps), trust_hint if untrusted else None)
     except EgressError as exc:
         steps.append(Step(exc.step, False, str(exc).partition(": ")[2]))
@@ -180,12 +153,13 @@ def _tls_step(
     """
     tls = tls_wrap(sock, settings.context, host, port)
     issuer = _issuer_of(tls.getpeercert(binary_form=True))
-    steps.append(Step("tls", True, f"{tls.version()} verified; issuer {issuer}"))
+    relaxed = "" if settings.strict_x509 else " with the strict X.509 profile relaxed"
+    steps.append(Step("tls", True, f"{tls.version()} verified{relaxed}; issuer {issuer}"))
     return tls
 
 
 def _presented_step(
-    exc: CertificateVerifyError, proxy: ProxyEndpoint | None, timeout: float
+    exc: CertificateVerifyError, proxy: ProxyEndpoint | None, timeout: float, note: str
 ) -> Step:
     """Describe a failed verification, naming the certificate the server presented.
 
@@ -193,6 +167,7 @@ def _presented_step(
         exc: The verification failure.
         proxy: Proxy used for the failed attempt.
         timeout: Socket timeout for the peek handshake.
+        note: Strict-profile assessment appended to the reason, or ``""``.
 
     Returns:
         Step: Failed ``tls`` step naming subject and issuer when obtainable.
@@ -200,7 +175,7 @@ def _presented_step(
     Raises:
         None
     """
-    detail = f"certificate verify failed: {exc.reason}"
+    detail = f"certificate verify failed: {exc.reason}{note}"
     try:
         summary = summarize_der(peek_presented_certificate(exc.host, exc.port, proxy, timeout))
     except (EgressError, CertificateRejectedError) as peek_exc:
@@ -262,24 +237,3 @@ def _issuer_of(der: bytes | None) -> str:
         return repr(summarize_der(der).issuer)
     except CertificateRejectedError:
         return "unknown"
-
-
-def render(diagnosis: Diagnosis) -> list[str]:
-    """Format a diagnosis as lines for a terminal or ticket.
-
-    Args:
-        diagnosis: Result of ``diagnose``.
-
-    Returns:
-        list[str]: Header, one line per step, and the hint when present.
-
-    Raises:
-        None
-    """
-    verdict = "ok" if diagnosis.ok else "FAILED"
-    lines = [f"egress {diagnosis.url}: {verdict}"]
-    lines += [f"  [{'ok' if s.ok else 'FAIL':<4}] {s.name}: {s.detail}" for s in diagnosis.steps]
-    if diagnosis.hint:
-        lines.append("  hint: if that issuer is your organization's TLS-inspection CA,")
-        lines.append(f"        {diagnosis.hint}")
-    return lines

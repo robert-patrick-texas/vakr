@@ -34,11 +34,11 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | UPD-008 | Implemented | `src/vakr/lifecycle/update/{releases,policy}.py` | `test_update_flow.py::test_upd_t05_timer_updates_once_then_noops_and_respects_hold` | `docs/operations/updates.md` | |
 | EGRESS-001 | Implemented | `src/vakr/lifecycle/egress/{proxy,transport,client}.py`, `src/vakr/defaults/options.toml` (`network.*`) | `test_egress_proxy.py` (EGRESS-T03), `test_egress_tls.py` | `docs/operations/updates.md` | ADR-032. Credentials in proxy URLs are refused until the credential provider exists. |
 | EGRESS-002 | Implemented | `src/vakr/lifecycle/egress/truststore.py` | `test_egress_tls.py` (EGRESS-T01) | `docs/operations/updates.md` | |
-| EGRESS-003 | Implemented | `src/vakr/lifecycle/egress/{certinfo,castore}.py`, `src/vakr/cli/cmd_tls.py` | `test_tls_cli.py` (EGRESS-T02) | `docs/operations/updates.md` | The strict-profile checks (EGRESS-007) are in progress. |
+| EGRESS-003 | Implemented | `src/vakr/lifecycle/egress/certinfo.py` (`validate_ca`, `strict_profile_gaps`), `castore.py` (`install(strict_x509=)`), `src/vakr/cli/cmd_tls.py`, `src/vakr/cli/tls_strict.py` | `test_tls_cli.py` (EGRESS-T02), `test_egress_tls.py` (EGRESS-T01), `test_egress_strict.py` (EGRESS-T05, cross-checked with `openssl verify -x509_strict`) | `docs/operations/updates.md` | ADR-032. A CA with `keyUsage` but no `keyCertSign` is refused in both modes, because OpenSSL rejects it in every mode. |
 | EGRESS-004 | Verified | `src/vakr/lifecycle/egress/peek.py` (the single allowlisted function) | `test_static_rules.py` (EGRESS-T04) | `docs/operations/updates.md` | |
-| EGRESS-005 | Implemented | `src/vakr/lifecycle/egress/diagnose.py`, `vakr doctor --network`, `vakr self-update --check` | `test_egress_tls.py`, `test_selfupdate_cli.py::test_doctor_network_names_untrusted_issuer` | `docs/operations/updates.md` | |
+| EGRESS-005 | Implemented | `src/vakr/lifecycle/egress/{diagnose,report,strict,peek}.py`, `vakr doctor --network`, `vakr self-update --check`, `tools/fieldkit/fieldkit_egress.py` | `test_egress_tls.py`, `test_selfupdate_cli.py`, `test_egress_strict.py`, `tools/fieldkit/test_fieldkit_egress.py` | `docs/operations/updates.md`, `docs/operations/field-data.md` | Strict-only failures are recognized by OpenSSL 3 verify codes and confirmed with a handshake-only relaxed retry. Real requests never fall back. |
 | EGRESS-006 | Implemented | `src/vakr/lifecycle/egress/expiry.py`, `src/vakr/health/lifecycle_checks.py` | `test_tls_cli.py::test_egress_006_ca_expiry_health` | `docs/operations/updates.md` | |
-| EGRESS-007 | In progress | | | | Owner-approved strict X.509 policy (2026-10-20); being implemented. |
+| EGRESS-007 | Implemented | `src/vakr/defaults/options.toml` (`network.tls_strict_x509`), `src/vakr/lifecycle/egress/truststore.py` (`build_context(strict_x509=)`), `client.py`, `src/vakr/health/lifecycle_checks.py` (`check_tls_policy`), field kit `--no-strict-x509` | `test_egress_strict.py` (EGRESS-T05), `tests/unit/config/test_render.py`, `tools/fieldkit/test_fieldkit_egress.py` | `docs/operations/configuration.md`, `docs/operations/updates.md`, `docs/operations/field-data.md` | ADR-032. Only `VERIFY_X509_STRICT` is cleared. The strict flag is set explicitly, because `ssl.SSLContext()` never set it. |
 
 ## Configuration
 
@@ -73,7 +73,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
 |---|---|---|---|---|---|
-| OPS-001 | In progress | `src/vakr/health/`, `src/vakr/cli/cmd_check.py`, `src/vakr/config/health.py` | `tests/unit/test_cli.py`, `test_selfupdate_cli.py::test_check_update_health`, `tests/unit/config/test_cli_config.py::test_check_config_statuses` | Blueprint 8.22 | Current checks: version, python, config, update, trusted CAs. The list grows with each subsystem. |
+| OPS-001 | In progress | `src/vakr/health/`, `src/vakr/cli/cmd_check.py`, `src/vakr/config/health.py` | `tests/unit/test_cli.py`, `test_selfupdate_cli.py::test_check_update_health`, `tests/unit/config/test_cli_config.py::test_check_config_statuses` | Blueprint 8.22 | Current checks: version, python, config, update, trusted CAs, TLS policy. The list grows with each subsystem. |
 | SVC-007 | In progress | `src/vakr/cli/cmd_doctor.py` (`--network`) | `tests/unit/test_cli.py` | Blueprint 8.22 | |
 | TOOLS-001 | Implemented | `tools/check-updates/`, `make updates` | `tools/check-updates/test_*.py` | `tools/check-updates/README.md`, `docs/development/updates.md` | |
 | TOOLS-002 | Implemented | `docs/development/updates.md`, `.github/dependabot.yml` | Process step | `docs/development/updates.md` | Deferred updates are recorded in `CHANGELOG.md`. |

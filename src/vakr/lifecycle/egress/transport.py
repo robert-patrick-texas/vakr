@@ -189,7 +189,8 @@ def tls_wrap(
         return context.wrap_socket(sock, server_hostname=host)
     except ssl.SSLCertVerificationError as exc:
         sock.close()
-        raise CertificateVerifyError(host, port, exc.verify_message or str(exc)) from exc
+        reason = exc.verify_message or str(exc)
+        raise CertificateVerifyError(host, port, reason, exc.verify_code) from exc
     except (ssl.SSLError, OSError) as exc:
         sock.close()
         raise EgressError("tls", f"handshake with {host}:{port} failed: {exc}") from exc

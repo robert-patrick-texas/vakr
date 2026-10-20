@@ -152,6 +152,7 @@ def _egress(ctx: Context) -> None:
     options = {
         "proxy": args.proxy,
         "ca_file": args.ca_file,
+        "strict_x509": not args.no_strict_x509,
         "timeout": args.egress_timeout,
         "agent": f"{info.tool_name}/{info.version}",
         "environ": dict(os.environ),

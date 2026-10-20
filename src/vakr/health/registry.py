@@ -24,7 +24,7 @@ import platform
 from collections.abc import Callable
 
 from vakr.config.health import check_config
-from vakr.health.lifecycle_checks import check_trusted_cas, check_update
+from vakr.health.lifecycle_checks import check_tls_policy, check_trusted_cas, check_update
 from vakr.health.model import CheckResult, Status
 from vakr.version import UNKNOWN_VERSION, get_version
 
@@ -71,6 +71,7 @@ CHECKS: tuple[Check, ...] = (
     check_config,
     check_update,
     check_trusted_cas,
+    check_tls_policy,
 )
 
 

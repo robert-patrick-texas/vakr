@@ -1,0 +1,26 @@
+[
+ {
+  "tag_name": "v5.0.1",
+  "html_url": "https://github.com/actions/deploy-pages/releases/tag/v5.0.1",
+  "draft": false,
+  "prerelease": false
+ },
+ {
+  "tag_name": "v5.0.0",
+  "html_url": "https://github.com/actions/deploy-pages/releases/tag/v5.0.0",
+  "draft": false,
+  "prerelease": false
+ },
+ {
+  "tag_name": "v3.0.2-node.24",
+  "html_url": "https://github.com/actions/deploy-pages/releases/tag/v3.0.2-node.24",
+  "draft": false,
+  "prerelease": false
+ },
+ {
+  "tag_name": "v4.0.5",
+  "html_url": "https://github.com/actions/deploy-pages/releases/tag/v4.0.5",
+  "draft": false,
+  "prerelease": false
+ }
+]

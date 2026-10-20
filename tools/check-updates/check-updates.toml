@@ -1,0 +1,104 @@
+# What tools/check-updates reports for this repository (TOOLS-001).
+#
+# check-updates is a portable tool (blueprint section 29): another project
+# reuses it by copying tools/check-updates/ and editing only this file.
+# Paths are relative to the repository root (--root, default: the current
+# directory). Delete a section to stop checking it.
+
+# Vendored front-end assets, each compared with its npm or GitHub releases.
+# None are vendored yet; ECharts and HTMX arrive in milestone M4, e.g.:
+#   assets = [
+#       { name = "echarts", version = "6.0.0", npm = "echarts" },
+#       { name = "htmx", version = "2.0.7", github = "bigskysoftware/htmx" },
+#   ]
+assets = []
+
+[settings]
+timeout_seconds = 20  # per HTTPS request or local command
+max_workers = 8       # concurrent checks; small enough to stay under API rate limits
+
+[python]
+# Latest stable CPython, compared with the pinned minor series, the
+# requires-python floor, and the interpreter uv actually selects (TOOLS-003).
+releases_url = "https://www.python.org/api/v2/downloads/release/?is_published=true&pre_release=false"
+version_file = ".python-version"
+requires_python = "pyproject.toml"
+uv_interpreter = true
+
+[go]
+# Latest stable Go, compared with `go version` and every go.mod directive;
+# with `modules`, each go.mod's direct requirements via `go list -m -u`.
+# There is no go.mod yet; Go components arrive under blueprint section 24.
+releases_url = "https://go.dev/dl/?mode=json"
+binary = ["go", "version"]
+go_mod = ["**/go.mod"]
+modules = true
+
+[pypi]
+# Every direct dependency and dependency-group member in pyproject.toml,
+# compared with the version locked in uv.lock. `extra` adds more locked
+# names, such as transitive packages worth watching.
+pyproject = "pyproject.toml"
+lockfile = "uv.lock"
+direct_dependencies = true
+extra = []
+
+[lockfile]
+# Everything `uv lock --upgrade` would change, including transitive
+# packages. --dry-run leaves uv.lock untouched.
+lockfile = "uv.lock"
+command = ["uv", "lock", "--upgrade", "--dry-run"]
+
+[actions]
+# `uses:` pins in workflows. Tag pins (@v7) compare at the precision written;
+# commit pins compare the version in their trailing "# vX.Y.Z" comment.
+workflows = [".github/workflows/*.yml", ".github/workflows/*.yaml"]
+
+# Tools and other pins. The current version comes from one of:
+#   command = [...]          an installed binary's output (first version-like
+#                            token, or the first group of `regex`);
+#   file = "..." + regex     a version written in a file;
+#   version = "..."          a literal;
+# or from none of them, in which case the row shows the latest release for
+# reference. The latest version comes from exactly one of pypi, github, npm.
+# GitHub lookups use `gh api` when gh is installed and logged in.
+
+[[tools]]
+name = "uv"
+command = ["uv", "--version"]
+pypi = "uv"
+
+[[tools]]
+name = "nfpm"
+command = ["nfpm", "--version"]
+regex = 'GitVersion:\s*v?(\S+)'
+github = "goreleaser/nfpm"
+
+[[tools]]
+name = "gitleaks"
+command = ["gitleaks", "version"]
+github = "gitleaks/gitleaks"
+
+[[tools]]
+# The relocatable CPython the .deb bundles (PKG-002); pinned once packaging lands.
+name = "python-build-standalone"
+github = "astral-sh/python-build-standalone"
+per_page = 3  # each release lists about a thousand assets, so keep the page small
+
+[[tools]]
+name = "pip-audit (make audit)"
+file = "Makefile"
+regex = 'pip-audit==(\S+)'
+pypi = "pip-audit"
+
+[[tools]]
+name = "markdown-it-py (tools/md2html inline metadata)"
+file = "tools/md2html/md2html.py"
+regex = '"markdown-it-py==([^"]+)"'
+pypi = "markdown-it-py"
+
+[[tools]]
+name = "mdit-py-plugins (tools/md2html inline metadata)"
+file = "tools/md2html/md2html.py"
+regex = '"mdit-py-plugins==([^"]+)"'
+pypi = "mdit-py-plugins"

@@ -1,0 +1,32 @@
+# Weekly automated update pull requests (TOOLS-002). They supplement, and
+# never replace, running `make updates` before each release: Dependabot does
+# not see Python and Go toolchain versions, PEP 723 inline script pins
+# (tools/md2html), the pip-audit pin in the Makefile, or vendored assets.
+# See docs/development/updates.md.
+version: 2
+updates:
+  # Workflow `uses:` pins. Dependabot also rewrites the "# vX.Y.Z" comment
+  # after a commit-SHA pin, which tools/check-updates relies on.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  # pyproject.toml and uv.lock: runtime dependencies and every dependency group.
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # Minor and patch updates arrive together; major versions stay separate
+      # because they may need code changes and a changelog entry.
+      python-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps

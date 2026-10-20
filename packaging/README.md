@@ -13,6 +13,7 @@ Sources for the vakr `.deb` (blueprint 28.6, ADR-025). The package installs ever
 | `sysusers.d/vakr.conf`, `tmpfiles.d/vakr.conf` | The `vakr` user and groups, and the directories with their modes |
 | `scripts/deb/` | `postinst`, `prerm`, `postrm` (PKG-003, PKG-005, CFGM-005) |
 | `templates/config.toml` | Fallback `/etc/vakr/config.toml` when `vakr config template` is unavailable |
+| `examples/` | Optional files operators install by hand, never packaged: the collector-only `CAP_NET_RAW` drop-in for hosts that cannot enable unprivileged ICMP ([ICMP operations](../docs/operations/icmp.md), ADR-023) |
 | `release-signers` | Trusted release keys in `allowed_signers` format; a placeholder until the owner adds the key |
 | `lintian/vakr` | Lintian overrides, each with its justification (PKG-004) |
 | `copyright` | Debian copyright file covering vakr and the bundled runtime |

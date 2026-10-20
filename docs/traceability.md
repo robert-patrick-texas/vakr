@@ -166,6 +166,23 @@ The decision and its evidence are in [ADR-021](adr/ADR-021-compact-sqlite-teleme
 | STATE-001/002/003 | In progress | `sqlc_current.latest_by_seek` | `test_current_state_seek_matches_projection` | ADR-021 | No projection table: it halved ingest. |
 | MVP-ACC-05 | In progress | — | `bench_rollup_store` | report §9, blueprint 27.3 | 400-day graph 36 ms warm, 84 ms cold; 33.9-37.5 GB per node. Final acceptance needs the adapter and UI. |
 
+## ICMP collection (M3)
+
+The port is `src/vakr/ports/icmp.py` (raw result types in `ports/icmp_types.py`). The socket transport is `src/vakr/adapters/icmp/`, the observation builder `src/vakr/collectors/icmp/`, and the CLI `vakr icmp probe` (`cli/cmd_icmp.py`). See [ADR-023](adr/ADR-023-unprivileged-icmp.md), [ICMP operations](operations/icmp.md), and Appendix E.22.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| ICMP-001 | Implemented | `collectors/icmp/settings.py`, `icmp.probes` | `test_icmp_settings.py`, `test_icmp_cycle.py` (ICMP-T01) | `icmp.md`, `configuration.md` | E.9, E.22 |
+| ICMP-002 | Implemented | `adapters/icmp/transport.py`, `icmp.spacing` | `test_icmp_loopback.py::test_e9_hundred_targets…` | `icmp.md` | 100 × 5 probes in 0.81 s on loopback. |
+| ICMP-003 | Implemented | `ports/icmp_types.py` (`ProbeSample`) | `test_icmp_transport.py::test_icmp_t01_out_of_order…` | `icmp.md` | |
+| ICMP-004 | Implemented (collector) | `ports/icmp_types.NO_REPLY_US`, `collectors/icmp/cycle.py` | `test_icmp_transport.py`, `test_icmp_cycle.py` (ICMP-T04) | `icmp.md` | 1-5 RTTs per observation; storage must keep the exact count. |
+| ICMP-005/008/010 | Implemented | `collectors/icmp/cycle.py` via `vakr.logic.icmp` | `test_icmp_cycle.py` (ICMP-T01..T04) | `icmp.md` | E.1, E.7 |
+| ICMP-006/007 | Implemented | `cycle.py` (`snmp_plan`), `settings.require_gate_probes` | `test_icmp_cycle.py`, `test_icmp_settings.py` | `icmp.md` | E.17: `icmp_gated` needs at least 2 probes. A collector-side ICMP failure lets SNMP run (E.25 #5). |
+| ICMP-011 | Implemented | `adapters/icmp/{pool,sockets}.py`, `cycle.py` | ICMP-T06 in `test_icmp_transport.py`, `test_icmp_loopback.py` | `icmp.md` | IPv4 and IPv6, optional source binding. |
+| ICMP-012 | Implemented | `adapters/icmp/{sockets,pool,sysctl,health}.py`, `packaging/examples/vakr-collector.service.d/50-icmp-cap-net-raw.conf` | `test_icmp_preflight.py`, `test_icmp_faults.py`, `test_icmp_packaging.py` (ICMP-T07, static half) | `icmp.md` | ADR-023. The runtime half of ICMP-T07 needs the service units. |
+| OBS-001/002/003 (ICMP) | In progress | `IcmpCounters`, `CollectorFault`, `cycle.collector_state` | `test_icmp_faults.py`, `test_icmp_errqueue.py` | ADR-023 | Collector trouble is never target loss; metrics export comes later. |
+| 16.3 preflight (ICMP) | Implemented | `adapters/icmp/health.check_icmp` in `CHECKS` | `test_icmp_preflight.py` | `icmp.md` | WARNING, not CRITICAL, so self-update is not rolled back on an unfixed host. |
+
 ## Scheduler and poll planning (M3)
 
 Code is in `src/vakr/scheduler/`, with tests in `tests/unit/scheduler/`. See [the scheduler architecture](architecture/scheduler.md) and Appendix E.25. The ICMP and SNMP steps are protocols in `scheduler/steps.py`; the collection adapters are wired to them in M3.

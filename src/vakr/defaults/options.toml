@@ -330,3 +330,63 @@ default = "15s"
 since = "0.1.1"
 reload = "restart"
 description = "On shutdown, how long running polls get to finish before they are cancelled; every cancelled poll is still recorded, with the results of its finished steps (section 16.4). Keep it well below the service's systemd stop timeout."
+
+[[options]]
+key = "icmp.probes"
+type = "int"
+min = 2
+max = 5
+default = 5
+since = "0.1.1"
+reload = "live"
+description = "ICMP Echo probes sent to each device per reachability cycle (ICMP-001). At least 2: under the default icmp_gated strategy SNMP runs only after two replies, and a single probe can never show a device as reachable (Appendix E.17). At most 5, the per-probe RTT columns of Compact storage (ADR-021)."
+
+[[options]]
+key = "icmp.spacing"
+type = "duration"
+min = 0.02
+max = 5
+default = "200ms"
+since = "0.1.1"
+reload = "live"
+description = "Time between the starts of consecutive probes to one device (ICMP-002). Probes go out on a fixed schedule from the start of the cycle, so a late probe does not delay the next one."
+
+[[options]]
+key = "icmp.timeout"
+type = "duration"
+min = 0.1
+max = 5
+default = "1s"
+since = "0.1.1"
+reload = "live"
+description = "How long to wait for each probe's reply before counting that probe as lost (Appendix E.9). With the defaults a cycle finishes within about 2 seconds."
+
+[[options]]
+key = "icmp.impaired_loss_percent"
+type = "float"
+min = 1
+max = 100
+default = 40.0
+since = "0.1.1"
+reload = "live"
+description = "Packet loss, in percent of the probes sent, at or above which a device that still answers is shown as impaired instead of reachable (Appendix E.1). The default 40 tolerates one lost probe in five, which Control Plane Policing causes routinely."
+
+[[options]]
+key = "icmp.impaired_rtt_ms"
+type = "float"
+min = 0
+max = 5000
+default = 0.0
+since = "0.1.1"
+reload = "live"
+description = "Median round-trip time, in milliseconds, above which a device is shown as impaired (Appendix E.1). 0, the default, turns the latency check off."
+
+[[options]]
+key = "icmp.max_in_flight"
+type = "int"
+min = 16
+max = 16384
+default = 1024
+since = "0.1.1"
+reload = "restart"
+description = "Most ICMP probes the collector waits on at once, across all devices (Appendix E.22). A probe that cannot be sent in time is recorded as collector overload, never as packet loss. 1,024 is about twice what 100 unreachable devices need."

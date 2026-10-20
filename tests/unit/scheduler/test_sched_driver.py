@@ -258,6 +258,7 @@ def test_step_errors_read_as_collector_trouble_and_polling_continues() -> None:
     records = run_for(clock, scheduler, 200)
     broken = [r for r in _by_device(records, 0) if r.miss is None]
     assert len(broken) >= 3
-    assert all(r.poll.execution is PollExecution.FAILED for r in broken)
+    # ICMP failed inside vakr, so SNMP still ran and its evidence is kept (E.25 #5).
+    assert all(r.poll.execution is PollExecution.PARTIAL for r in broken)
     assert all(r.poll.quality & Quality.COLLECTOR_DEGRADED for r in broken)
     assert scheduler.snapshot().collector_state() is CollectorState.DEGRADED

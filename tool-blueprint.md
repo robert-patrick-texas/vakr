@@ -3784,9 +3784,8 @@ Building `vakr.logic` exposed edge cases the text above doesn't settle. The deci
 | 13 | Rankings | In and out p95 are computed separately; on a tie the inbound direction is reported. Errors per million packets is shown only when every counted sample has packet deltas. Interfaces with zero errors still rank, at the bottom. p95 is nearest-rank (`vakr.logic.stats.p95`), and rollups (RET-004) must use the same function. Neither of SQLite's `percentile_cont` (interpolated) or `percentile_disc` matches nearest-rank, so rollups compute p95 in Python (ADR-021 amendment). |
 | 14 | E.3 freshness | A negative age (a future timestamp) is not stale and gets no flag. A clock-skew threshold would be a new default and is deferred. |
 
-These configuration keys arrive with M3, when the collector uses them. Until then the defaults above apply in code:
+`icmp.impaired_loss_percent` and `icmp.impaired_rtt_ms` arrived with the M3 ICMP adapter (E.22). These keys arrive with M3, when the collector uses them. Until then the defaults above apply in code:
 
-- `icmp.impaired_loss_percent` and `icmp.impaired_rtt_ms`;
 - `status.recent_restart_window`;
 - `lifecycle.stale_after`;
 - the freshness multiplier and minimum margin;
@@ -3874,6 +3873,32 @@ Decisions taken with the ADR-021 benchmark:
 - **Dictionary keys are node-local.** Replication and the API carry UUIDs. Vocabulary codes are pinned in a `vocab_code` table and are append-only, like `Quality` bits.
 - **HC counters at or above 2^63** are stored as signed 64-bit integers (`v - 2**64`) and mapped back on read.
 
+### E.22 ICMP adapter (ADR-023, ICMP-001..012)
+
+| Setting | Default |
+|---|---|
+| Socket | One unprivileged ping socket (`SOCK_DGRAM`, `IPPROTO_ICMP`/`IPPROTO_ICMPV6`) per address family and pinned source, shared by all targets; a raw socket only when the collector-only `CAP_NET_RAW` drop-in is installed |
+| `icmp.probes` | 5, allowed 2–5: at least 2 for `icmp_gated` (E.17), at most the 5 RTT columns of Compact storage (ADR-021) |
+| `icmp.spacing` / `icmp.timeout` ranges | 20 ms–5 s / 100 ms–5 s, so a cycle always fits the 30 s minimum polling interval (E.18) |
+| Per-cycle deadline | (probes − 1) × spacing + timeout + 200 ms, 2.0 s by default; a probe is sent only if its whole timeout fits before it |
+| `icmp.max_in_flight` | 1,024 (16–16,384): 100 unreachable devices need 500 |
+| Pending-reply table | per socket, at most `icmp.max_in_flight`; finished probes remembered for late and duplicate detection: twice that |
+| Open sockets | at most 8; an idle socket is closed to make room |
+| Receive buffer | 1 MiB requested (`SO_RCVBUF`, capped by `net.core.rmem_max`) |
+| Datagrams read per wakeup | 256 |
+| Echo payload | 12 bytes: `vakr` plus an 8-byte random token |
+| Send retries after a stale queued ICMP error | 2 |
+| `vakr icmp probe` bounds | 1–100 probes, spacing 0–60 s, timeout 1 ms–60 s, name resolution 2 s |
+| `ping_group_range` fix | widen the range just enough to include the `vakr` GID, in `/etc/sysctl.d/99-vakr-icmp.conf`, then `sysctl --system`; never applied automatically |
+
+Decisions taken with the M3 ICMP adapter:
+
+- **Matching.** A reply counts only if its sequence number, payload token, and source address match a waiting probe, because ping sockets rewrite the Echo identifier. Late, duplicate, and foreign replies are counted and dropped.
+- **RTT.** Monotonic time from just before `sendto` to the kernel's arrival stamp (`SO_TIMESTAMPNS`), or to the read when no stamp is available. A reply arriving after its timeout is late, so no RTT exceeds the timeout.
+- **Collector evidence.** Some probes are `NOT_SENT` or `ABORTED` with a collector fault. The causes are local: `EACCES`/`EPERM` from `socket()`, a missing route or a firewall refusal at `sendto()`, a full buffer, no in-flight slot before the deadline, or kernel receive drops during the cycle. Such probes are left out of the summary, and any fault adds `COLLECTOR_DEGRADED`, so 0 replies is `UNKNOWN`. A cycle with nothing sent has no ICMP observation. Router unreachables are target-path evidence: the probe is lost (`-1`), with the reason and reporter.
+- **`icmp.impaired_rtt_ms = 0` means off**, because the option catalog has no unset value.
+- **Health severity.** The `icmp` check is WARNING, not CRITICAL, when the range excludes the collector's group: `check health` gates self-update (UPD-006), and a rollback cannot fix a host setting.
+
 ### E.25 Scheduler (SCHED-001 to SCHED-018, 9.2, 9.9, 16.4)
 
 | Setting | Default | Allowed range |
@@ -3901,7 +3926,7 @@ Decisions taken with the M3 scheduler:
 2. **Configuration names.** Section 11.3's enterprise example uses `[poller]` (`name`, `schedule_strategy`, `global_concurrency`); section 27.9 uses `[polling] default_interval` and `reachability_strategy`. The scheduler keeps `[polling]` for the per-device defaults, as 27.9 and the policy engine expect, and uses `[scheduler]` for its own controls. `schedule_strategy` becomes two keys, `phase` and `device_order`, because SCHED-002 makes them independent. Section 11.3 should be updated to match.
 3. **Plan timeline.** Waits, deadlines, lateness, and durations use the monotonic clock. The timeline's UTC origin is fixed when the scheduler starts. When the wall clock drifts from it by more than 1 s (an NTP step or `date -s`), later `scheduled_at` labels move with the wall clock once, while cadence is untouched: no burst, gap, or duplicate poll (SCHED-018). `completed_at` is `started_at` plus the monotonic duration, so it can never precede `started_at`.
 4. **Execution states.** `COMPLETE`: every step the strategy and gate called for answered fully; ICMP with 0 replies is a complete measurement. `PARTIAL`: some step produced evidence and a later one did not finish cleanly. `FAILED`: no step produced evidence. Misses: the previous poll still running is `MISSED_OVERRUN`; no worker within `max_start_delay`, a slot superseded by the device's next one while waiting, or a slot the scheduler itself reached too late is `NOT_ATTEMPTED`; shutdown before the start is `NOT_ATTEMPTED`. Every miss carries `NOT_ATTEMPTED` and no observations. Capacity misses, collector-side step errors, and polls cancelled by shutdown add `COLLECTOR_DEGRADED`. A device that is disabled or removed while a slot waits loses that slot without a record, because it is no longer scheduled (9.2).
-5. **`snmp_fallback`.** After 0–1 replies, or a collector-side ICMP failure, one Stage 1 request is made without retries and Stage 2 does not follow (`SnmpPlan.STAGE1_FALLBACK`, ICMP-013). Under `icmp_gated` a collector-side ICMP failure skips SNMP and the poll reads as unknown.
+5. **`snmp_fallback`.** After 0–1 replies, or a collector-side ICMP failure, one Stage 1 request is made without retries and Stage 2 does not follow (`SnmpPlan.STAGE1_FALLBACK`, ICMP-013). Under `icmp_gated` a collector-side ICMP failure (for example `ping_group_range` excluding the collector, so nothing was sent) gives no reply count, so SNMP runs normally: the gate spares unreachable devices, and must not stop all collection on a host where vakr cannot ping. The ICMP result stays unknown and the poll carries `COLLECTOR_DEGRADED`. Decided at the M3-icmp merge; reversible.
 6. **Backpressure.** A worker stays busy until the output queue accepts its record, so a full queue slows admission and turns later slots into recorded capacity misses instead of growing memory (6.4). Records are never dropped.
 7. **Collector state from the scheduler.** `OVERLOADED` when the period had capacity misses or producers are blocked on a full queue; `DEGRADED` when event-loop lag exceeded 1 s, a step failed on the collector side, or the scheduler is draining; otherwise `HEALTHY`.
 8. **Shutdown (16.4).** Stop admitting; give in-flight polls the grace period; cancel the rest and record them with the evidence their finished steps produced; then record waiting slots and slots that came due during the drain as `NOT_ATTEMPTED`.

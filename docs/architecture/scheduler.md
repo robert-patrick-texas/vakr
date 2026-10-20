@@ -67,6 +67,8 @@ The poll walks a state machine whose arrows depend on the device's reachability 
 |---|---|---|
 | `icmp_gated` (default) | 2 to 5 | SNMP Stage 1, then Stage 2 if Stage 1 found interfaces up/up |
 | `icmp_gated` | 0 or 1 | SNMP is skipped; the ICMP result is the whole poll |
+| `icmp_gated` | unknown: vakr could not ping (collector trouble) | SNMP runs as for 2 to 5; the poll is flagged `COLLECTOR_DEGRADED` and ICMP reads as unknown |
+| `snmp_fallback` | unknown: vakr could not ping | as for 0 or 1 |
 | `snmp_fallback` | 2 to 5 | as `icmp_gated` |
 | `snmp_fallback` | 0 or 1 | one low-cost Stage 1 request without retries; no Stage 2 |
 | `icmp_only` | any | ICMP only |

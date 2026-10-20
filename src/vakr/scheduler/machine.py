@@ -6,7 +6,8 @@ and every arrow is a row of ``TRANSITIONS``, so the whole behaviour can be
 read, and tested, as a table:
 
 * ``icmp_gated`` (default): 2+ replies continue to Stage 1 (ICMP-006);
-  0-1 replies end the poll with SNMP skipped (ICMP-007).
+  0-1 replies end the poll with SNMP skipped (ICMP-007). An ICMP step that
+  failed on the collector side gives no reply count, so SNMP runs normally.
 * ``snmp_fallback``: 2+ replies continue normally; 0-1 replies, or an ICMP
   step that failed on the collector side, make one low-cost Stage 1 attempt
   and stop there (ICMP-013). SNMP success proves management reachability
@@ -82,7 +83,9 @@ TRANSITIONS: Mapping[tuple[ReachabilityStrategy, Phase, Event], Phase] = {
     (_G, Phase.START, Event.BEGIN): Phase.ICMP,
     (_G, Phase.ICMP, Event.GATE_COLLECT): Phase.STAGE1,
     (_G, Phase.ICMP, Event.GATE_SKIP): Phase.DONE,
-    (_G, Phase.ICMP, Event.ICMP_FAILED): Phase.DONE,
+    # No evidence either way: the gate exists to spare unreachable devices, not to
+    # stop collection when vakr itself cannot ping (E.25 #5).
+    (_G, Phase.ICMP, Event.ICMP_FAILED): Phase.STAGE1,
     **{(_G, *key): to for key, to in _STAGES.items()},
     (_F, Phase.START, Event.BEGIN): Phase.ICMP,
     (_F, Phase.ICMP, Event.GATE_COLLECT): Phase.STAGE1,
@@ -102,7 +105,6 @@ TRANSITIONS: Mapping[tuple[ReachabilityStrategy, Phase, Event], Phase] = {
 
 SKIPPED_BY: Mapping[tuple[ReachabilityStrategy, Phase, Event], Phase] = {
     (_G, Phase.ICMP, Event.GATE_SKIP): Phase.STAGE1,  # 9.2 "SNMP SKIPPED" (ICMP-007)
-    (_G, Phase.ICMP, Event.ICMP_FAILED): Phase.STAGE1,
     **{
         (strategy, Phase.STAGE1, event): Phase.STAGE2
         for strategy in (_G, _F, _S)

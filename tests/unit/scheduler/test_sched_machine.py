@@ -72,7 +72,7 @@ def test_snmp_only_never_probes_and_every_strategy_reaches_done() -> None:
     for (strategy, phase, _), target in TRANSITIONS.items():
         assert target is not Phase.START, strategy
         assert phase is not Phase.DONE, strategy
-    assert transition(G, Phase.ICMP, icmp_event(G, None)) is Phase.DONE
+    assert transition(G, Phase.ICMP, icmp_event(G, None)) is Phase.STAGE1  # E.25 #5
     assert transition(F, Phase.ICMP, icmp_event(F, None)) is Phase.FALLBACK
     with pytest.raises(ValueError, match="no transition"):
         transition(IO, Phase.STAGE1, Event.UP_UP)
@@ -153,7 +153,8 @@ def _shape(progress: PollProgress) -> list[tuple[str, str]]:
         (F, Behaviour(replies=0), [("icmp", "ok"), ("snmp_fallback_stage1", "ok")]),
         (IO, Behaviour(), [("icmp", "ok")]),
         (SO, Behaviour(), [("snmp_stage1", "ok"), ("snmp_stage2", "ok")]),
-        (G, Behaviour(raise_in="icmp"), [("icmp", "error"), ("snmp_stage1", "skipped")]),
+        (G, Behaviour(raise_in="icmp"),
+         [("icmp", "error"), ("snmp_stage1", "ok"), ("snmp_stage2", "ok")]),
         (F, Behaviour(raise_in="icmp"), [("icmp", "error"), ("snmp_fallback_stage1", "ok")]),
         (G, Behaviour(raise_in="stage1"),
          [("icmp", "ok"), ("snmp_stage1", "error"), ("snmp_stage2", "skipped")]),

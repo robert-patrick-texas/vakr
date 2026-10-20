@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (see the end) |
+| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (amendment 1). Amended by the M2 adapter: key, rollup rows and precision, retention, details (amendments 2-5; amendment 3 needs an owner decision) |
 | Date | 2026-10-20 |
 | Decides | Physical layout of Compact-profile telemetry in SQLite: tables, keys, partitions, PRAGMAs, batching, idempotency, rollups, retention |
 | Requirements | Blueprint 5.1, 5.3, 10.1-10.6, 27.2-27.5, Appendix E.8 and E.10; STORE-009, STORE-010, STORE-011, RET-001..RET-009, DASH-003, DASH-004, STATE-001..STATE-004, MVP-ACC-05 |
@@ -160,7 +160,7 @@ Use the natural primary key `(series_key, collector_key, ts_us)` with `INSERT OR
 ### Rollups
 
 * Every 15 minutes, once a bucket's end is more than 10 minutes in the past (E.10), one statement computes all 3,200 interface rows from day plus staging rows and writes them with `INSERT OR REPLACE`. Re-running a bucket is therefore safe (RET-009).
-* The p95 is nearest-rank, computed in Python with `vakr.logic.stats.p95` (see the amendment below). The benchmark measured Hyndman-Fan type 7 (linear interpolation) through SQLite's `percentile_cont`, a window-function query and Python; all three took 110-336 ms per bucket, so the choice of rule does not change the decision.
+* The p95 is nearest-rank, computed in Python with `vakr.logic.stats.p95` (see amendment 1 below). The benchmark measured Hyndman-Fan type 7 (linear interpolation) through SQLite's `percentile_cont`, a window-function query and Python; all three took 110-336 ms per bucket, so the choice of rule does not change the decision.
 * Count columns use `COUNT(…)`, never `SUM(condition)`, so a bucket whose polls all failed stores 0 available and 0 valid samples rather than `NULL`. The first full-day run hit this.
 * `quality_any` is the bitwise OR of the bucket's flags, written as one `MAX(flags & bit)` per defined `Quality` bit, because SQLite has no `bit_or` aggregate.
 * ICMP rollups (200 series) are computed in Python from every individual reply, so the RTT median and p95 come from up to 75 values, never from per-poll averages.
@@ -174,7 +174,7 @@ Use the natural primary key `(series_key, collector_key, ts_us)` with `INSERT OR
 ### SQLite features relied on
 
 * `STRICT` tables (3.37) and `WITHOUT ROWID`.
-* Window functions and the percentile extension are not required (see the amendment below).
+* Window functions and the percentile extension are not required (see amendment 1 below).
 
 JSON functions are not used and play no part in the decision. The bundled 3.53.1 has every feature listed.
 
@@ -272,7 +272,7 @@ Revisit when any of these holds:
 
 Rolling back to plain C means disabling the staging path: the day tables, keys and queries are unchanged.
 
-## Amendment: the rollup p95 rule (2026-10-20, at merge)
+## Amendment 1: the rollup p95 rule (2026-10-20, at merge)
 
 The benchmark computed p95 with linear interpolation (`percentile_cont`), but Appendix E.17 #13 already fixes p95 as nearest-rank: `vakr.logic.stats.p95`, which top-utilization rankings (DASH-003) use, and which rollups (RET-004) must share. This amendment records the contradiction and resolves it in favour of E.17:
 
@@ -282,3 +282,58 @@ The benchmark computed p95 with linear interpolation (`percentile_cont`), but Ap
 * The SQL aggregates (counts, max, average, the `quality_any` OR) stay in SQL.
 
 The benchmark harness keeps its type-7 comparison as evidence; ROLL-T01 for the adapter tests nearest-rank.
+
+## Amendment 2: the native key includes the observation UUID (2026-10-20, M2 adapter)
+
+The telemetry contract that every backend passes (`tests/contract/contract_telemetry_*.py`, and the `ObservationWriter` docstring) stores two observations that share a series, a collector, and an instant but have different UUIDs as two observations: raw reads return both, and series and current state choose the larger UUID (DB-004, DB-005, STATE-004). The natural key above would keep only the first one written, so three contract tests failed against it. This amendment records the contradiction and resolves it in favour of the contract:
+
+* Native tables are keyed `(series_key, collector_key, ts_us, observation_uuid)`, staging tables `(ts_us, series_key, collector_key, observation_uuid)`, both still `WITHOUT ROWID` with `INSERT OR IGNORE`.
+* A replay carries the same UUID and the same key, so it still meets its first copy and inserts nothing (STORE-009); the staging invariant is unchanged.
+* The UUID was already stored in every row. In a `WITHOUT ROWID` table it moves into the key, so leaf records do not grow; only interior cells do. The adapter measured 156.6 bytes per interface row, against 154.5 in the benchmark.
+* **Limitation, flagged for the owner.** The port also says a *different* observation reusing an existing UUID is a duplicate. Inside one batch the adapter enforces that. Across batches it would need the UUID index this ADR rejected (+39 B/row), so a reused UUID at another instant or series is stored. Only a collector bug can produce one; the envelope checksum and the spool make replays byte-identical.
+
+## Amendment 3: packed rollup rows at float32 precision (2026-10-20, M2 adapter); flagged for the owner
+
+The rollup sketch above kept six aggregates per interface bucket. The `RollupRepository` port stores a `RollupBucket` per **metric**: expected, sample, and valid counts, minimum, mean, nearest-rank p95, maximum, and quality. MVP-ACC-02 requires traffic, packet, *and* error graphs at 400 days, so all six interface metrics (in/out bit, packet, and error rates) and all three ICMP metrics are kept through day 400. RET-005 would allow dropping packets and errors after native retention; that is not used, because it would break MVP-ACC-02.
+
+Measured with a prototype loading one day (307,200 interface buckets, six metrics each, one bucket for all series per transaction, as the M4 job will write):
+
+| Representation | Bytes per interface bucket (6 metrics) | Rollups, 431 days | Node worst case |
+|---|---|---|---|
+| One `REAL` column per field, lossless | 248.8 | 32.9 GB | about 58 GB |
+| Packed row, lossless | 198.6 | 26.3 GB | about 52 GB |
+| **Packed row, float32 where needed** | **114.5** | **15.2 GB** | **about 40 GB** |
+
+Lossless storage cannot meet the 40 GB envelope of blueprint 27.3: bit and packet rates alone are 16 noisy doubles per bucket, 128 bytes before any key, count, or page overhead. This amendment chooses:
+
+* **One row per subject, collector, and bucket** in each month table: `(series_key, collector_key, bucket_offset_s, width_adj_s, payload)`, where the offset is seconds from the month start and `width_adj_s = bucket_seconds - 900`, so the reference width costs no bytes. The payload packs every metric of the row: a presence bitmap, counts that are shared with the previous metric when equal, and per value the shortest exact encoding (zero, varint, float32, or float64). The format is documented in `adapters/sqlite/telemetry/rollup_codec.py`.
+* **Interface values that need more than four bytes exactly are stored as float32**, a relative error of at most 2^-24 (6 × 10^-8): under 600 bit/s at 10 Gbit/s and under 0.06 bit/s at 1 Mbit/s. Rounding is monotonic, so minimum ≤ mean, p95 ≤ maximum survives. Integral values and zeros stay exact. ICMP values are always exact. Rankings (DASH-003/004) use native data and are unaffected.
+* **Writing a bucket replaces that metric only** (RET-009); the row's other metrics stay.
+
+Measured with the real adapter over two full days at the MVP workload ([report, appendix B](../performance/adr021-compact-sqlite-benchmark.md#appendix-b-the-real-adapter-m2-exit)): 110.9 bytes per interface row holding six metrics (18.5 per metric bucket, page fill 0.84 under one-bucket-per-transaction writes) and 61.9 bytes per ICMP row holding three, 35.2 MB of rollups a day. With 24.8 GB of native data at the worst point, a node peaks at **40.1 GB**, the 27.3 envelope.
+
+Consequences:
+
+* SQL can no longer aggregate rollups directly; long-range graphs decode one metric per row in Python (3-7 µs a row). The 400-day graph takes 208 ms warm and 231 ms cold (p50), inside MVP-ACC-05's 2 s, against 36 ms for the SQL-aggregated sketch.
+* **Owner decision.** Keep float32 (40.1 GB per node), or set `tuning.QUANTIZED_ROLLUPS` to empty for full precision: no format or migration change is needed, because every value records its own encoding, but a node then needs about 52 GB and a volume of at least 120 GB.
+
+## Amendment 4: exact retention by horizon, disk freed by whole partitions (2026-10-20, M2 adapter)
+
+The `RetentionManager` contract expires native data at `now - native`, aligned to a bucket and never past rollup coverage, and rollups whose bucket ends by `now - rollup`, exactly (`test_db006_native_rollup_boundary`, `test_retention_follows_policy`). Dropping whole days and months cannot do that by itself. The adapter therefore keeps two horizons in `telemetry_state`:
+
+* `native_horizon_us` and `rollup_horizon_us` move forward only. Every read starts at the native horizon and ignores rollup buckets ending by the rollup horizon, so expired data disappears from queries at once, exactly as the port says.
+* In the same transaction, day partitions wholly before the native horizon and month partitions whose last bucket ends by the rollup horizon are dropped, with their catalog rows. No `DELETE` or `VACUUM` touches telemetry.
+* The report's counts are read with one primary-key seek per series, driven from the dictionaries.
+* E.10's "up to about 430 days are kept" now describes disk, not queries: queries see exactly 400 days of rollups (and 30 of native data), the disk holds up to 431 and 31.
+
+## Amendment 5: other decisions taken with the adapter (2026-10-20, M2 adapter)
+
+* **Families.** `DevicePoll` and `CollectorHealthObservation` get their own day-partitioned families, `obs_poll` and `obs_health`, with staging, so current state, freshness, and retention treat every type alike. A poll's start and completion are stored as offsets from its scheduled time.
+* **ICMP probes.** `IcmpObservation` carries 1 to 5 probes (`icmp.probes` is 2-5, and probes never sent are left out). `rtt_1_us` .. `rtt_5_us` are nullable: `-1` is a probe sent without a reply (ICMP-004), `NULL` a probe never sent, and `sent_count` holds the exact length. A probe is never padded with `-1`, because `-1` means loss. Probes beyond five are packed in `rtt_more`. `rtt_1_us` is `NOT NULL`, because a cycle has at least one probe.
+* **Addresses** are stored as canonical text, which keeps IPv6 scope IDs; it costs about 5 bytes per ICMP row.
+* **Dictionaries.** `dict_interface.device_key` is nullable: an interface first seen in a rollup gets its device from its first sample. Triggers refuse dictionary deletes, so keys are never reused.
+* **Schema evolution of partitions.** Migration `0001` records each family's `CREATE TABLE` in `partition_template` with a version, and the catalog records the version that built each partition. A future column change updates the template in a migration; new partitions get the column and queries select `NULL` for it from older ones, which age out. No migration rewrites partition data. A change that must reach existing partitions (an index, say) would need a Python migration step, which the framework does not have yet.
+* **Current state** reads the newest row *not flagged* `NOT_ATTEMPTED` (the port's "latest valid evidence"), staging first, then day tables newest first. An interface's freshness uses its poll, searched from 24 hours before to 5 minutes after the sample (E.21).
+* **Downsampling** on the width ladder is `SqliteObservationQuery.downsampled_series`, an adapter extension. The port's `interface_series` and `icmp_series` must return one point per observation and truncate at the cap (contract test `test_api006_point_cap_and_metric_family`), so they cannot downsample. **Port gap:** M4 should add a downsampling read to `ObservationQuery`, with a reference version.
+* **Rollup computation (M4).** Computing a bucket needs every native value of the bucket for every series. No port returns that, and building 48,000 domain objects per bucket only to read six numbers from each would cost about a second per bucket. The computation therefore belongs inside the adapter, as an adapter-level operation beside `maintain`, using SQL for counts and `vakr.logic.stats.p95` on the fetched floats (amendment 1).
+* **Health** checks the fixed tables every run and leaves partitions to `vakr db status --full`, because a full `quick_check` of 40 GB takes minutes.

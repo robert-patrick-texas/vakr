@@ -78,3 +78,9 @@ At most one unit of work holds uncommitted writes at a time, so single-writer SQ
 3. Build series with `assemble_series` and current state with `vakr.domain.projections`, from whatever your queries fetch.
 4. Create `tests/contract/<backend>/` containing an `__init__.py`, a `conftest.py` that defines `metadata_uow_factory` and/or `telemetry_factory` for a fresh store in `tmp_path`, and a `test_<backend>_contracts.py` that subclasses each suite with an empty body, as `tests/contract/memory/test_memory_contracts.py` does.
 5. Run `uv run pytest tests/contract/<backend>` and fix the adapter until it passes **unchanged** suites. If a suite assumption is wrong for every backend, change the suite and the reference adapter together, never per backend.
+
+## Adapters
+
+- **In-memory** (`vakr.adapters.memory`): the reference implementation the contract suites were written against.
+- **SQLite metadata** (`vakr.adapters.sqlite.metadata`, `metadata.db`): see [the database guide](../operations/database.md) and Appendix E.20.
+- **SQLite telemetry** (`vakr.adapters.sqlite.telemetry`, `telemetry.db`): the Compact layout decided in [ADR-021](../adr/ADR-021-compact-sqlite-telemetry.md), with its measurements in [the benchmark report](../performance/adr021-compact-sqlite-benchmark.md) and defaults in Appendix E.21.

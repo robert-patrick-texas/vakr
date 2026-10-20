@@ -6,6 +6,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ### Added
 
+- Compact SQLite telemetry storage (`telemetry.db`, ADR-021 layout C+H): day-partitioned native tables with a staging table, monthly rollup tables, exact 30/400-day retention by horizon with whole-partition drops, and a `telemetry_db` health check. `vakr db status|migrate|backup` now cover both databases (`vakr db status telemetry` for one).
 - The scheduler (`vakr.scheduler`): SHA-256 phase placement, a due-time plan, bounded workers, the poll state machine with ICMP gating, and an asyncio driver with graceful shutdown. A missed or overrun poll is recorded as not attempted or missed, never as a device outage (SCHED-001..013, SCHED-016..018). It is not yet wired to collection.
 - New options: `polling.default_interval`, `polling.reachability_strategy`, and the `scheduler.*` group (collector name, phase and order modes, workers, queue capacity, lateness, start delay, poll deadline, shutdown grace). `vakr config validate` checks that `scheduler.late_after` does not exceed `scheduler.max_start_delay`.
 - Compact SQLite telemetry layout decided by benchmark (ADR-021, Appendix E.21); measured sizing in blueprint 27.3.

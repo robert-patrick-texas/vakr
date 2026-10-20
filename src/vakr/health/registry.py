@@ -25,6 +25,7 @@ from collections.abc import Callable
 
 from vakr.adapters.icmp.health import check_icmp
 from vakr.adapters.sqlite.metadata.health import check_metadata_db
+from vakr.adapters.sqlite.telemetry.health import check_telemetry_db
 from vakr.config.health import check_config
 from vakr.credentials.health import check_credentials
 from vakr.health.lifecycle_checks import check_tls_policy, check_trusted_cas, check_update
@@ -80,6 +81,7 @@ CHECKS: tuple[Check, ...] = (
     check_metadata_db,
     check_icmp,
     check_spool,
+    check_telemetry_db,
 )
 
 

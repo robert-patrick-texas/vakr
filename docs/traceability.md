@@ -166,6 +166,30 @@ The decision and its evidence are in [ADR-021](adr/ADR-021-compact-sqlite-teleme
 | STATE-001/002/003 | In progress | `sqlc_current.latest_by_seek` | `test_current_state_seek_matches_projection` | ADR-021 | No projection table: it halved ingest. |
 | MVP-ACC-05 | In progress | — | `bench_rollup_store` | report §9, blueprint 27.3 | 400-day graph 36 ms warm, 84 ms cold; 33.9-37.5 GB per node. Final acceptance needs the adapter and UI. |
 
+## SQLite telemetry adapter (M2 exit)
+
+Code is in `src/vakr/adapters/sqlite/telemetry/` (own file `telemetry.db`, application_id `0x766B746C`, migration `sql/0001_initial.sql`). The contract binding is `tests/contract/sqlite_telemetry/`, and the adapter tests are in `tests/unit/adapters/sqlite/telemetry/`. Measurements are in `tests/performance/sqlite_telemetry/` and appendix B of [the benchmark report](performance/adr021-compact-sqlite-benchmark.md). Amendments 2-5 of [ADR-021](adr/ADR-021-compact-sqlite-telemetry.md) record the adapter's decisions.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| STORE-009 | Implemented | `writer.py`, `sql/0001_initial.sql` | contract `test_store009_*`; `test_store009_replay_across_a_move_inserts_nothing` | `database.md` | Amendment 2: the key includes the observation UUID. A different observation reusing a UUID is not caught (no UUID index). |
+| STORE-010 | Implemented | `store.py` (`synchronous=FULL`), `writer.py` | contract `test_store010_*`; `test_store010_crash_between_flush_and_move_loses_nothing` | E.21 | |
+| STORE-011 | Implemented (adapter) | `tuning.MAX_BATCH_ROWS` | contract `test_store010_rejected_batch_writes_nothing` | E.19 | The 10 s flush cadence is the ingester's (E.24). |
+| STORE-012/013, DB-004 | Implemented | `series.py`, `downsample.py`, `codec*.py`, `raw_reads.py` | contract suites; `test_telemetry_fidelity.py`, `test_10_6_downsampling_keeps_envelopes_gaps_and_quality` | | Downsampling is an adapter method (`downsampled_series`); the port has no such call yet. |
+| DB-005, STATE-001..004 | Implemented | `state.py`, `latest.py`, `maintenance.py` | contract TelemetryState; `test_state001_concurrent_readers_never_see_a_row_twice_or_miss_one`, `test_state003_stale_subjects_keep_their_true_age` | `database.md` | |
+| DB-006, STATE-005 | Implemented | `series.py`, `samples.py`, `rollup_reads.py` | contract `test_db006_*`; `test_downsampling_rebuckets_rollups_before_the_horizon` | | |
+| DB-007, ARCH-001 | Implemented | `keys.py`; driver only inside the adapter | contract `test_db007_*`; `test_arch001_only_adapters_import_the_driver` | | `lifecycle/update/backup.py` (portable self-update) also uses `sqlite3`. |
+| DB-008 | Implemented | `store.py` | `test_busy_database_is_a_retryable_error_without_sql` | E.20 | |
+| RET-001..003, RET-007 | Implemented | `retention.py` | `test_ret001_*`, `test_ret002_*`; contract `test_retention_follows_policy` | `database.md` | Amendment 4: queries see exactly 30/400 days; disk holds up to 31/431. |
+| RET-004/006/009 (storage) | Implemented | `rollups.py`, `rollup_codec.py` | `test_ret009_*`, `test_e21_*`; contract `test_rollup_repository_*` | E.21 | Amendment 3 (owner): float32 interface rollup values. The rollup job is M4. |
+| ROLL-T04, ROLL-T05 (storage) | Pass | `retention.py`, `rollup_codec.py` | `test_roll_t04_*`, `test_rollups_keep_counts_without_values_and_other_widths` | | |
+| ICMP-003/004/005 (storage) | Implemented | `codec_probe.py` | `test_icmp004_*`, `test_icmp003_probe_trains_of_1_to_5_*` | E.21 | Amendment 5: `-1` no reply, `NULL` not sent, plus `sent_count`. |
+| API-005/006, 10.6 | Implemented (adapter) | `raw_reads.py`, `series.py`, `downsample.py` | `test_api006_point_caps_and_page_sizes_are_bounded` | E.21 ladder | |
+| MIG-001/004 (telemetry) | Implemented | `store.py` | `test_mig001_*`, `test_mig004_*` | `database.md` | |
+| OPS-001 (`telemetry_db`) | Implemented | `telemetry/health.py` | `test_telemetry_health.py` | `database.md` | WAL above 256 MiB and mover lag above 30 min warn. |
+| PKG-003 (both databases) | Implemented | `cli/cmd_db.py`, `cli/db_targets.py` | `test_postinst_migrate_creates_both_databases`, `test_cmd_db.py` | `database.md` | |
+| MVP-ACC-05 | Measured, pass | — | `bench_adapter` (2 MVP days plus a 400-day rollup store) | benchmark report appendix B, 27.3 | 40.1 GB per node; 400-day graph 208 ms warm, 231 ms cold. Ingest 32,894 rows/s. |
+
 ## ICMP collection (M3)
 
 The port is `src/vakr/ports/icmp.py` (raw result types in `ports/icmp_types.py`). The socket transport is `src/vakr/adapters/icmp/`, the observation builder `src/vakr/collectors/icmp/`, and the CLI `vakr icmp probe` (`cli/cmd_icmp.py`). See [ADR-023](adr/ADR-023-unprivileged-icmp.md), [ICMP operations](operations/icmp.md), and Appendix E.22.

@@ -3175,7 +3175,7 @@ The load per position is about 24,000 SNMP varbinds and 500 ICMP probes per minu
 
 Rollups cover days 1–400, not 31–400, because each bucket is rolled up while its native rows still exist (E.10). With two positions, each node also stores its peer's observations.
 
-The [ADR-021 benchmark](docs/performance/adr021-compact-sqlite-benchmark.md) measured 110 bytes per row, including keys and page overhead. At the worst point, just before a scheduled drop, one node holds 32 native day tables and up to 431 days of rollups, because a month's rollup table is dropped only once all of it is past day 400. That comes to 33.9 GB per node with rollup rates rounded to whole bit/s, or about 37.5 GB at full precision, which is the default. Provision at least 100 GB of SSD-class storage for `/var/lib/vakr` on each node. The remaining space holds the metadata database, the spool, logs, and one `VACUUM INTO` or backup copy of the telemetry file.
+The [ADR-021 benchmark](docs/performance/adr021-compact-sqlite-benchmark.md) and the real adapter (its appendix B) measured the per-node worst case, just before a scheduled drop: 32 native day tables (about 24.8 GB at 799 MB a day) and up to 431 days of rollups (about 15.2 GB), because a month's rollup table is dropped only once all of it is past day 400. That is **40.1 GB per node**, with interface rollup values packed at float32 precision (ADR-021 amendment 3, relative error at most 6×10⁻⁸); lossless rollups would need about 52 GB. Provision at least 100 GB of SSD-class storage for `/var/lib/vakr` on each node. The remainder holds the metadata database, the spool (at most 4 GiB by default, E.24), logs, and one `VACUUM INTO` or backup copy of the telemetry file. Self-update does not copy the telemetry file (E.14).
 
 ### 27.4 Scope
 
@@ -3860,11 +3860,17 @@ Decisions taken with the M2 SQLite metadata adapter:
 | Journal mode / synchronous | WAL / `FULL`; the spool is acknowledged only after `COMMIT` returns |
 | Checkpoint | `PRAGMA wal_checkpoint(TRUNCATE)` after every move; `wal_autocheckpoint` 1,000 pages; `journal_size_limit` 64 MiB |
 | Page size / cache / auto-vacuum / temp store | 4,096 B / 64 MiB per connection / `NONE` / `MEMORY` |
-| Idempotency | natural key `(series_key, collector_key, ts_us)` with `INSERT OR IGNORE`; the observation UUID is stored but not indexed |
+| Idempotency | primary key `(series_key, collector_key, ts_us, observation_uuid)` with `INSERT OR IGNORE`; no separate UUID index (ADR-021 amendment 2) |
 | Health: WAL size | warning above 256 MiB |
 | Health: mover lag | warning when the oldest staged row is older than 2 move intervals (30 min) |
+| Health: integrity | `PRAGMA quick_check` of the fixed tables (dictionaries, catalog, templates, state, staging) every run; `vakr db status --full` checks every partition |
 | Rollup p95 | nearest-rank, computed in Python with `vakr.logic.stats.p95` (E.17 #13) |
-| Stored rates | full precision; rounding to whole bit/s is deferred (it would save about 7% native and 28% rollup space) |
+| Stored native rates | full precision; rounding to whole bit/s is deferred (it would save about 7% of native space) |
+| Stored rollup values | one packed row per subject, collector, and bucket holding every metric; interface values that need more than 4 bytes exactly are kept to float32 precision (relative error at most 2^-24); ICMP values exactly (ADR-021 amendment 3) |
+| ICMP probes | `rtt_1_us` .. `rtt_5_us` (`-1` = no reply, `NULL` = not sent) plus `sent_count`; probes beyond five packed in `rtt_more` |
+| Retention pass | hourly; any interval works because each pass is idempotent and expires exactly by policy |
+| Downsampling ladder | 60 s, 2, 5, 10, 15, 30 min, 1, 2, 3, 4, 6, 8, 12 h, 1 d; the narrowest that fits the point cap, at least 15 min over rollups |
+| Interface-state poll lookup | the sample's poll is searched from 24 h before to 5 min after the sample |
 
 Decisions taken with the ADR-021 benchmark:
 
@@ -3872,6 +3878,12 @@ Decisions taken with the ADR-021 benchmark:
 - **Rollup counts use `COUNT(CASE …)`**, never `SUM(condition)`, so a bucket whose polls all failed records 0 available samples, not `NULL`.
 - **Dictionary keys are node-local.** Replication and the API carry UUIDs. Vocabulary codes are pinned in a `vocab_code` table and are append-only, like `Quality` bits.
 - **HC counters at or above 2^63** are stored as signed 64-bit integers (`v - 2**64`) and mapped back on read.
+
+Decisions taken with the M2 telemetry adapter (ADR-021 amendments 2-5):
+
+- **Retention expires exactly; disk frees whole partitions.** Each pass moves a native horizon (`now - native`, bucket-aligned, never past rollup coverage) and a rollup horizon (`now - rollup`); reads ignore everything before them. Day and month partitions wholly behind a horizon are dropped in the same transaction. Disk therefore holds up to 31 days of native data and 431 days of rollups, while queries see exactly 30 and 400.
+- **Polls and collector health are partitioned like ICMP** (`obs_poll_d*`, `obs_health_d*`), so current state, freshness, and retention treat every observation type alike.
+- **Partition DDL is versioned with the schema.** Migrations record each family's `CREATE TABLE` template and version in `partition_template`; the catalog records the version that built each partition. A column change updates the template, applies to new partitions, and older partitions read the column as `NULL` until they age out.
 
 ### E.22 ICMP adapter (ADR-023, ICMP-001..012)
 

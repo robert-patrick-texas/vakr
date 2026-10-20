@@ -408,3 +408,76 @@ These tables are printed by `bench_report` from the result files. "samples" is t
 | top_errors | 25 | 62.7 / 86.7 | 356.9 | 60.1 / 69.6 | 332.5 | 61.5 / 66.1 | 382.1 |
 | current_device_seek | 80 | 0.4 / 0.5 | 7.0 | 0.4 / 0.5 | 7.2 | 0.4 / 0.5 | 6.9 |
 | current_all_seek | 3,200 | 22.3 / 27.7 | 219.4 | 22.7 / 24.9 | 239.2 | 24.8 / 30.7 | 253.9 |
+
+## Appendix B: the real adapter (M2 exit)
+
+This appendix measures the shipped adapter, `vakr.adapters.sqlite.telemetry`, rather than the harness above. Every row went through the public API: `writer.write_batch` in 10-second flushes, `maintain` every 15 simulated minutes, and `rollups.write` once each bucket was 10 minutes old (E.10). The design changes it measures are ADR-021 amendments 2-5: the observation UUID in the key, poll and health partitions, and packed float32 rollup rows holding all six interface metrics.
+
+| Item | Value |
+|---|---|
+| Script | `uv run python -m tests.performance.sqlite_telemetry.bench_adapter --days 2` ([`bench_adapter.py`](../../tests/performance/sqlite_telemetry/__init__.py)); results in [`adr021-adapter-digest.json`](adr021-adapter-digest.json) |
+| Host, Python, SQLite | As in the context table above; the host was shared with four other agents (load average about 2) |
+| Workload | 100 devices, 1,600 interfaces, 2 collectors: 3,200 interface, 200 ICMP, 200 SNMP, and 200 poll series, plus 2 health series, at 60 s. That is 3,802 rows a minute, 5.47 million a day, generated as validated domain objects (`tele_workload`, seed 21) |
+| Load | 2 full UTC days: 10,949,760 native rows, 3,801,600 rollup metric buckets (19,800 every 15 minutes) |
+| Data location | `.claude/bench-data/` on the real disk, capped at 8 GB (peak 1.7 GB), deleted afterwards |
+
+### Ingest
+
+| Measure | Value | ADR-021 harness |
+|---|---|---|
+| Rows/s inside `write_batch` (encoding, keys, routing, commit with `synchronous=FULL`) | **32,894** (548× the 60 rows/s needed) | 26,514-37,698 |
+| Flush of 634 rows, p50 / p95 / max | 13.8 / 51.2 / 239 ms | 5-6 / 17-49 / 596 ms |
+| `maintain` (move + truncating checkpoint), p50 / max | 0.75 / 1.08 s every 15 min | 0.7-0.9 / 3.4 s |
+| `rollups.write` of one bucket for every series (19,800 metric buckets), p50 / max | 0.80 / 1.19 s every 15 min | not measured |
+| Writer busy time | 633 s over 2 days: 0.37% | 0.2% |
+| Bytes the process wrote per day | 19.8 GB | 15.6-15.8 GB |
+
+The flush costs more than the harness's because the adapter builds rows from domain objects and resolves dictionary keys per row; it still leaves the writer idle 99.6% of the time. The extra bytes written come from the poll and health families and from rollup rows, which rewrite one page per series per bucket; at 7.2 TB a year this is still well within SSD endurance.
+
+### Size
+
+Measured with `dbstat` after two days; bytes per row include keys, page headers, and free space.
+
+| Family | Rows | Bytes/row | Page fill | ADR-021 harness |
+|---|---|---|---|---|
+| `obs_iface_d*` | 9,216,000 | 156.6 | 0.90 | 154.5 |
+| `obs_icmp_d*` | 576,000 | 116.6 | 0.90 | 111.9 |
+| `obs_snmp_d*` | 576,000 | 80.1 | 0.88 | 77.5 |
+| `obs_poll_d*` | 576,000 | 72.2 | 0.88 | not stored |
+| `obs_health_d*` | 5,760 | 69.7 | 0.89 | not stored |
+| `roll_iface_m*` (6 metrics a row) | 614,400 | 110.9 (18.5 per metric bucket) | 0.84 | 66.9 (6 aggregates, bit rates only) |
+| `roll_icmp_m*` (3 metrics a row) | 38,400 | 61.9 (20.6 per metric bucket) | 0.88 | 56.2 |
+
+Projected per node at the worst point, just before a scheduled drop (31.04 days of native data, 431 days of rollups, blueprint 27.3):
+
+| Component | Per day | Worst case |
+|---|---|---|
+| Native, all five families | 799 MB | 24.8 GB |
+| Rollups, interface and ICMP | 35.2 MB | 15.2 GB |
+| WAL after a truncating checkpoint, staging, dictionaries, catalog | | under 0.1 GB |
+| **Total** | | **40.1 GB** |
+
+That is the 27.3 envelope of about 40 GB, so a `VACUUM INTO` or backup copy still fits a 100 GB volume, with about 20 GB left for the metadata database, the spool, and logs. Without the float32 rule (amendment 3) the rollups would need about 26 GB and the node about 52 GB.
+
+### Queries
+
+Warm is p50 of 20 runs on an open store; cold is p50 of 3 runs, each on a fresh store after `posix_fadvise(DONTNEED)` on the database and WAL. Latency includes building the domain read models.
+
+| Query | Warm p50 / p95 (ms) | Cold p50 (ms) |
+|---|---|---|
+| One interface, 1 h raw (`interface_series`, 60 points) | 0.33 / 0.38 | 2.0 |
+| One interface, 24 h raw, capped at 1,200 points (`interface_series`) | 6.4 / 7.1 | 11.0 |
+| One interface, 24 h downsampled to 2-minute buckets (`downsampled_series`, 720 points) | 4.2 / 4.8 | 8.7 |
+| One interface, 30-day window at 1-hour buckets (2 days of data present) | 3.6 / 4.0 | 12.3 |
+| One device ICMP, 24 h raw, capped at 1,200 | 6.8 / 7.4 | 10.3 |
+| `read_raw`, one page of 500 interface samples | 14.4 / 15.8 | 21.8 |
+| `device_state`, one device | 0.17 / 0.26 | 2.6 |
+| `interface_states`, one switch (40 interfaces) | 8.3 / 9.5 | 26.9 |
+| `device_states`, all 100 devices | 17.0 / 23.9 | 77.0 |
+| `rollups.read`, one interface, one day (96 buckets) | 1.5 / 1.6 | 3.3 |
+| **400-day graph** from rollups (`downsampled_series`, 38,400 buckets to 1,200 points of 8 h) | **208 / 224** | **231** (max 324) |
+| 400-day window through the port (`interface_series`, first 1,200 rollup buckets) | 22.5 / 27.6 | 22.1 |
+
+* **30-day graphs.** Only two days were loaded, so the 30-day query read 2,880 samples. The harness showed cost grows with samples read (0.84 µs warm, 4 µs cold per sample); 30 full days of samples (43,200) project to about 40 ms warm and 180 ms cold, inside the 1 s page budget.
+* **The 400-day graph** was measured on a separate store holding 400 days of all six metrics for one interface: a graph reads only one series' rows, which are contiguous in each month table, so the other series' volume does not change its cost. It decodes one metric from each packed row in Python (3-7 µs a row), which is slower than the harness's SQL aggregation (36 ms) and well inside MVP-ACC-05's 2 s.
+* **Listings** pay for a seek per subject and partition, plus a full state per subject. 77 ms cold for every device is acceptable for a page; a dashboard refreshing every few seconds stays warm.

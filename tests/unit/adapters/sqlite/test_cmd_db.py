@@ -108,7 +108,7 @@ def test_fresh_install_status_migrate_and_backup(
     assert "0001 initial applied" in out
     assert main(["db", "migrate"]) == 0
     assert "nothing to migrate" in capsys.readouterr().out
-    assert main(["db", "backup"]) == 0
+    assert main(["db", "backup", "metadata"]) == 0
     copy = Path(capsys.readouterr().out.strip())
     assert copy.parent == state / "backups"
     assert main(["db", "status", "--database", str(copy)]) == 0  # backups can be checked
@@ -158,10 +158,11 @@ def test_newer_schema_exits_2(state: Path, capsys: pytest.CaptureFixture[str]) -
         None
     """
     manager(state / "metadata.db", family_with(DROP_INDEX)).migrate()
-    assert main(["db", "status"]) == 2
+    assert main(["db", "status", "metadata"]) == 2
     assert "newer vakr release" in capsys.readouterr().out
-    assert main(["db", "migrate"]) == 2
+    assert main(["db", "migrate"]) == 2  # telemetry migrates; the newer metadata wins the status
     assert "newer vakr release" in capsys.readouterr().err
+    assert main(["db", "status"]) == 2
 
 
 def test_refusal_inside_migrate_exits_2(state: Path, monkeypatch: pytest.MonkeyPatch) -> None:

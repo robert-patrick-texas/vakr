@@ -175,9 +175,12 @@ def test_doctor_prints_one_line_per_check(capsys: pytest.CaptureFixture[str]) ->
     Raises:
         None
     """
-    assert main(["doctor"]) == 0
+    # Host-dependent checks (icmp reads ping_group_range) may warn on a CI runner,
+    # so the exit status must match the worst result rather than always be 0.
+    results = run_checks()
+    assert main(["doctor"]) == worst(results).exit_code
     lines = capsys.readouterr().out.strip().splitlines()
-    assert len(lines) == len(run_checks())
+    assert len(lines) == len(results)
     assert lines[0].startswith("[OK      ] version:")
 
 

@@ -66,6 +66,8 @@ class Quality(IntFlag):
     MAINTENANCE = 1 << 20  # collected while the device is in maintenance
     REQUEST_SIZE_REDUCED = 1 << 21  # tooBig led to smaller PDUs (SNMP-017)
     RETRIED = 1 << 22  # more than one attempt was needed (SNMP-018)
+    # Counter baselines, continued: bits are append-only, so it cannot join its group.
+    BASELINE_ELAPSED_INVALID = 1 << 23  # non-positive elapsed time between samples
 
 
 BASELINE_INVALIDATING = (
@@ -77,6 +79,7 @@ BASELINE_INVALIDATING = (
     | Quality.BASELINE_WIDTH_CHANGE
     | Quality.BASELINE_DECREASE
     | Quality.BASELINE_IDENTITY_UNRESOLVED
+    | Quality.BASELINE_ELAPSED_INVALID
 )
 """Flags that mean derived rates are unavailable for the sample (RATE-004)."""
 

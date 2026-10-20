@@ -34,6 +34,7 @@ vakr = "vakr.cli.main:main"
 [dependency-groups]
 dev = [
     "coverage>=7.16.2",
+    "hypothesis>=6.170.5",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.1",

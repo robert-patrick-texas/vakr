@@ -81,3 +81,16 @@ Packaged entries:
 | `"ISP"` | `"isp"` | `"primary"` | `true` | `false` |
 | `"WAN"` | `"wan"` | `"primary"` | `true` | `false` |
 | `"UPLINK"` | `"uplink"` | `"primary"` | `false` | `false` |
+
+### `[snmp]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `snmp.port` | int, >= 1, <= 65535 | `161` | live | v0.1.1 | UDP port of SNMP agents (SNMP-016). |
+| `snmp.timeout` | duration, >= 1s, <= 30s | `"2s"` | live | v0.1.1 | How long to wait for each SNMP answer before the attempt counts as unanswered (SNMP-011, Appendix E.9). |
+| `snmp.retries` | int, >= 0, <= 5 | `1` | live | v0.1.1 | Complete new attempts after an unanswered SNMP request. Each retry is counted and flagged in the poll's quality (SNMP-018). |
+| `snmp.max_varbinds` | int, >= 5, <= 100 | `30` | live | v0.1.1 | Varbinds per SNMP request at the start of each session. After a tooBig answer vakr halves it, down to 5, for the rest of the session (SNMP-017, Appendix E.4). |
+| `snmp.max_repetitions` | int, >= 1, <= 100 | `25` | live | v0.1.1 | GETBULK max-repetitions for discovery walks (Appendix E.9). It never exceeds snmp.max_varbinds. |
+| `snmp.max_walk_rows` | int, >= 100, <= 100000 | `10000` | live | v0.1.1 | Most rows one discovery walk of a table column may return. A walk that reaches it stops, keeps the rows it has, and marks the table partial (Appendix E.23). |
+| `snmp.rediscovery_interval` | duration, >= 30s, <= 2.592e+06s | `"24h"` | live | v0.1.1 | How often each device is rediscovered (DISC-002). Policy rules and devices can override it within 30s to 30d (Appendix E.18). |
+| `snmp.capability_reprobe_interval` | duration, >= 3600s, <= 7.776e+06s | `"7d"` | live | v0.1.1 | How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9). |

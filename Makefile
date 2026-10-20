@@ -5,7 +5,7 @@ TY_PATHS := --extra-search-path tools/md2html
 
 .PHONY: check fmt lint types test loc version docs docs-check
 
-check: lint types test loc version docs-check
+check: lint types test loc version docstrings docs-check
 
 fmt:
 	uv run ruff format .
@@ -26,6 +26,11 @@ loc:
 
 version:
 	uv run python tools/check-version/check_version.py --allow CHANGELOG.md --allow uv.lock
+
+# Docstring sections and Args entries (QG-003); rules in [tool.check-docstrings].
+.PHONY: docstrings
+docstrings:
+	uv run python tools/check-docstrings/check_docstrings.py src tests tools
 
 docs:
 	uv run tools/md2html/md2html.py . $(SITE) --title vakr \

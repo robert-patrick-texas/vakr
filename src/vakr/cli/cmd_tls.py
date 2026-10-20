@@ -33,12 +33,12 @@ from urllib.parse import urlsplit
 
 from vakr.cli.common import SubParsers
 from vakr.config.loader import EffectiveConfig, load_effective_config
-from vakr.health.model import CheckResult, PerfDatum, Status
+from vakr.health.lifecycle_checks import check_trusted_cas  # noqa: F401 - re-export for callers
+from vakr.health.model import CheckResult, Status
 from vakr.lifecycle.egress import castore, certinfo, truststore
 from vakr.lifecycle.egress.client import EgressSettings
 from vakr.lifecycle.egress.diagnose import diagnose
 from vakr.lifecycle.egress.errors import EgressError
-from vakr.lifecycle.egress.expiry import expiry_report
 from vakr.lifecycle.egress.proxy import resolve_policy
 from vakr.lifecycle.update.console import confirmer
 from vakr.lifecycle.update.journal import EventSink
@@ -236,25 +236,6 @@ def network_checks(urls: Sequence[str] = ()) -> tuple[CheckResult, ...]:
             status = Status.OK if step.ok else Status.CRITICAL
             results.append(CheckResult(f"egress {host} {step.name}", status, step.detail + hint))
     return tuple(results)
-
-
-def check_trusted_cas() -> CheckResult:
-    """Health check: trusted CA expiry (EGRESS-006); no network I/O.
-
-    Args:
-        None
-
-    Returns:
-        CheckResult: CRITICAL if a CA has expired, WARNING if one expires
-        within 30 days or is unreadable, otherwise OK.
-
-    Raises:
-        None
-    """
-    report = expiry_report(InstallPaths.from_environment().ca_dir, datetime.now(UTC))
-    days = report.min_days_left
-    perf = () if days is None else (PerfDatum("ca_min_days_left", days),)
-    return CheckResult("trusted_cas", SEVERITY[report.severity], report.summary, perf)
 
 
 def _status(argv: Sequence[str]) -> int:

@@ -23,8 +23,7 @@ Example:
 import platform
 from collections.abc import Callable
 
-from vakr.cli.cmd_selfupdate import check_update
-from vakr.cli.cmd_tls import check_trusted_cas
+from vakr.health.lifecycle_checks import check_trusted_cas, check_update
 from vakr.health.model import CheckResult, Status
 from vakr.version import UNKNOWN_VERSION, get_version
 

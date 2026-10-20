@@ -32,7 +32,7 @@ from pathlib import Path
 from vakr.cli.cmd_tls import DIAGNOSIS_TIMEOUT, TRUST_HINT, build_egress_settings
 from vakr.cli.common import SubParsers
 from vakr.config.loader import EffectiveConfig, load_effective_config
-from vakr.health.model import CheckResult, Status
+from vakr.health.lifecycle_checks import check_update  # noqa: F401 - re-export for callers
 from vakr.lifecycle.egress.client import HttpsClient
 from vakr.lifecycle.egress.diagnose import diagnose, render
 from vakr.lifecycle.egress.errors import EgressError
@@ -45,7 +45,6 @@ from vakr.lifecycle.update.policy import Request
 from vakr.lifecycle.update.process import apt_installer, run_command
 from vakr.lifecycle.update.releases import CHANNELS, ReleaseError
 from vakr.lifecycle.update.sources import Project
-from vakr.lifecycle.update.state import StateError, load_state
 from vakr.lifecycle.update.updater import SelfUpdater
 from vakr.lifecycle.update.verify import Artifacts, ReleaseTrust
 from vakr.lifecycle.update.versions import Version
@@ -250,32 +249,6 @@ def _print_diagnosis(paths: InstallPaths, config: EffectiveConfig) -> bool:
     for line in render(result):
         print(line)
     return result.ok
-
-
-def check_update() -> CheckResult:
-    """Health check: outcome of the last update attempt (UPD-006); no network I/O.
-
-    Args:
-        None
-
-    Returns:
-        CheckResult: WARNING after a failed or refused update or an
-        unreadable record; otherwise OK.
-
-    Raises:
-        None
-    """
-    state_file = InstallPaths.from_environment().state_dir / "update-state.json"
-    try:
-        state = load_state(state_file)
-    except StateError:
-        return CheckResult("update", Status.WARNING, f"cannot read {state_file}")
-    if state.result == "never":
-        return CheckResult("update", Status.OK, "never updated")
-    summary = f"last update {state.result} {state.from_version} -> {state.to_version} at {state.at}"
-    if state.result in {"failed", "refused"}:
-        return CheckResult("update", Status.WARNING, f"{summary}: {state.message[:160]}")
-    return CheckResult("update", Status.OK, summary)
 
 
 def _fail(message: str, code: int = 1) -> int:

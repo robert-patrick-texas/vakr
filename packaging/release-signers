@@ -3,11 +3,10 @@
 # /opt/vakr/share/release-signers, and `vakr self-update` checks
 # SHA256SUMS.sig against it before installing anything (UPD-001, ADR-026).
 #
-# PLACEHOLDER: no key is listed yet, so every signature check fails closed.
-# The project owner adds the release public key, one line per key:
-#
-#   vakr-release namespaces="vakr-release" ssh-ed25519 AAAA...key... vakr release
-#
 # Both the principal and the namespace are "vakr-release". To rotate, add the
 # new key here and publish that release signed with the old key; remove the
 # old key in a later release.
+#
+# Release key added 2026-10-20.
+# Fingerprint: SHA256:RNCDpt4jEx+n6vgGCTaKQv8ku7TKS//0u2XOij0G5cQ (ED25519)
+vakr-release namespaces="vakr-release" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFpgj0O65LNIkMGtXvg/NUa5/YnbTCWv6lp0iOl/Cwk0 vakr-release

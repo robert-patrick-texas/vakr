@@ -4,6 +4,10 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+## 0.1.0 - 2026-10-20
+
+First pre-release. It delivers the pipeline only: the package, signed self-update, configuration upgrade, and the field data kit. Production hosts can install it, update themselves, and send field data back, but vakr does not monitor any devices yet. Monitoring arrives in milestones M2–M4.
+
 ### Added
 
 - Blueprint revision 1.1: MVP definition, delivery and lifecycle tooling, portable tools, and default values.

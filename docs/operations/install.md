@@ -42,7 +42,9 @@ Releases are trusted through an SSH signature over `SHA256SUMS` (ADR-026). The t
 
 ```sh
 curl -fLO "https://raw.githubusercontent.com/robert-patrick-texas/vakr/v$version/packaging/release-signers"
-ssh-keygen -lf release-signers      # compare with the published fingerprint
+# allowed-signers lines are "principal options keytype key"; print each key's fingerprint
+grep -v '^#' release-signers | awk 'NF {print $3, $4}' | ssh-keygen -lf -
+# compare with the fingerprint published in the README (SHA256:RNCDpt4j...0G5cQ)
 ssh-keygen -Y verify -f release-signers -I vakr-release -n vakr-release \
     -s SHA256SUMS.sig < SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS

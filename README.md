@@ -28,6 +28,16 @@ Rendered documentation: <https://robert-patrick-texas.github.io/vakr/>
 | Positions | One required; two (east/west) for collection that survives a partition |
 | Platform | Ubuntu 26.04 LTS `.deb`, self-updating from GitHub releases |
 
+## Verifying releases
+
+Release packages are verified before they are installed. Each GitHub release includes `SHA256SUMS`, signed with the project's release key (`SHA256SUMS.sig`), and `vakr self-update` checks that signature against the key in [`packaging/release-signers`](packaging/release-signers) before installing anything. Before the first manual install, compare the key's fingerprint with this value:
+
+```
+SHA256:RNCDpt4jEx+n6vgGCTaKQv8ku7TKS//0u2XOij0G5cQ  vakr-release (ED25519)
+```
+
+See the [installation guide](docs/operations/install.md) for the verification commands.
+
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

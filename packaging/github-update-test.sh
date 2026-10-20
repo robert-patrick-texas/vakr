@@ -24,7 +24,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 TO=${TO:-$(cat VERSION)}
 REPO=${REPO:-$(sed -n 's/^repo = "\(.*\)"$/\1/p' tools/release/release.toml)}
 if [ -z "${FROM:-}" ]; then
-    # vakr's own version order, so 0.2.0-rc.1 sorts before 0.2.0 (VER-002).
+    # vakr's own version order, so 1.4.0-rc.1 sorts before 1.4.0 (VER-002).
     FROM=$(git ls-remote --tags --refs "https://github.com/$REPO.git" 'v*' |
         sed 's|.*refs/tags/v||' |
         uv run --quiet python -c '

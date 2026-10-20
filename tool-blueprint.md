@@ -3340,7 +3340,7 @@ development host                                   production site
 code -> tools/release -> GitHub Release  --HTTPS-->  vakr self-update -> apt install .deb
                          (.deb, SHA256SUMS, .sig)     (optional daily timer)
 
-inbox/ <- tools/field-inbox <-- HTTPS URL or scp <--  vakr field collect -> bundle.tar.gz.p7m
+inbox/ <- field_inbox.py <---- HTTPS URL or scp <--  vakr field collect -> bundle.tar.gz.p7m
 ```
 
 ### 28.2 Single version source
@@ -3427,8 +3427,8 @@ Whenever development needs information from production, a collection tool is bui
 | FIELD-004 | SNMP communities and other credentials shall be read from a protected local file or an interactive prompt, never from command-line arguments, and shall never be written into the bundle. A redaction test corpus proves this. |
 | FIELD-005 | `--pseudonymize` shall replace IP addresses, MAC addresses, hostnames, `sysContact`, `sysLocation`, and free-text descriptions with consistent pseudonyms. It uses a keyed HMAC whose key stays on the production host, and it preserves structure so captures remain valid simulator fixtures. |
 | FIELD-006 | Bundles are encrypted by default to the development host's recipient certificate, which ships with the tool. The output is a standard CMS AuthEnvelopedData file (RFC 5083) named `*.tar.gz.p7m`, using AES-256-GCM content encryption (RFC 5084) and an RSA-3072 recipient key with RSA-OAEP/SHA-256 key transport. Encryption runs `openssl cms`, called with an argument list; OpenSSL 3.0 or newer is required and preflight checks for it. Only the development host can decrypt the bundle, so the transfer location doesn't need to be trusted, and GCM authentication means a modified bundle fails to decrypt. `--no-encrypt` exists only for bundles that stay on the production host. |
-| FIELD-007 | For transfer, the operator either places the encrypted bundle at any HTTPS URL this host can reach (`tools/field-inbox fetch <url>`) or copies it with `scp` into `~/vakr-inbox/` on this host. |
-| FIELD-008 | `tools/field-inbox` shall decrypt with the recipient private key stored outside the repository (`~/.config/vakr-field/recipient-key.pem`, mode `0600`), verify the manifest checksums, extract into the git-ignored `inbox/<bundle-id>/`, and print a summary. It rejects archive members with absolute paths, `..` components, or links. |
+| FIELD-007 | For transfer, the operator either places the encrypted bundle at any HTTPS URL this host can reach (`tools/fieldkit/field_inbox.py fetch <url>`) or copies it with `scp` into `~/vakr-inbox/` on this host. |
+| FIELD-008 | `tools/fieldkit/field_inbox.py` shall decrypt with the recipient private key stored outside the repository (`~/.config/vakr-field/recipient-key.pem`, mode `0600`), verify the manifest checksums, extract into the git-ignored `inbox/<bundle-id>/`, and print a summary. It rejects archive members with absolute paths, `..` components, or links. |
 | FIELD-010 | The field kit's GitHub reachability test (FIELD-002 `host` profile) shall accept the same proxy and CA options as vakr (`--proxy`, `--ca-file`). It shall report the issuer of the certificate presented for `github.com`, so the development side learns whether an enterprise TLS-inspection proxy is in the path before vakr is installed. |
 | FIELD-009 | The field kit shall change nothing on the production host, finish within bounded time, and end by printing one line that names the output file and the next step. |
 
@@ -3468,6 +3468,14 @@ CI may build artifacts for testing but cannot sign releases.
 | TOOLS-002 | Each release runs `tools/check-updates`, and each available update is either applied or deferred with a reason in the changelog. Automated update PRs (Dependabot or Renovate) may supplement this but do not replace it. |
 | TOOLS-003 | Moving to a new Python minor version is a normal release change. `.python-version`, `requires-python`, the bundled interpreter, and the CI matrix change together, and the release notes say so. |
 
+| Test ID | Layer | Scenario | Required pass condition | Primary requirements |
+|---|---|---|---|---|
+| TOOLS-T01 | Unit | Version parsing and pre-release ordering | Stable, pre-release, and mixed forms compare correctly | TOOLS-001 |
+| TOOLS-T02 | Unit | Each source parser on recorded API responses | Current, latest, and status are correct with no network access | TOOLS-001 |
+| TOOLS-T03 | Unit | Workflow `uses:` lines, including SHA pins with `# vX.Y.Z` comments | Pins are compared with the latest releases correctly | TOOLS-001 |
+| TOOLS-T04 | Integration | End-to-end table and JSON output, exit codes, network outage | An outage yields `unknown` rows and never a crash; `--fail-on-outdated` exits 1 | TOOLS-001, TOOLS-002 |
+| TOOLS-T05 | Unit | Configuration errors and failure containment | Bad config exits 2; `uv.lock` is never modified | TOOLS-001 |
+
 ### 28.9 Documentation publishing
 
 | ID | Requirement |
@@ -3500,9 +3508,11 @@ An import-boundary test in CI enforces rule 1 for code under `src/vakr/lifecycle
 | md2html | Markdown → HTML site with link checking | Development host, CI | `tools/md2html/` | Entry script, render module, and template |
 | check-updates | Reports newer toolchain and dependency versions | Development host | `tools/check-updates/` | Entry script plus sibling modules, config-driven |
 | check-version | Enforces the single version source (VER-003) | CI | `tools/check-version/` | Single file |
-| release | Builds, checksums, signs, tags, and publishes | Development host | `tools/release/` | Single file, config-driven |
-| fieldkit | Collects production data into one encrypted bundle | Production | `tools/fieldkit/`, also `vakr field collect` | Single file, standard library only |
-| field-inbox | Fetches, decrypts, verifies, and extracts bundles | Development host | `tools/fieldkit/` | Single file |
+| check-docstrings | Enforces docstring sections and `Args` consistency (QG-003) | CI | `tools/check-docstrings/` | Entry script plus rules module |
+| check-loc | Enforces the 300-line file limit (QG-004) | CI | `tools/check-loc/` | Single file |
+| release | Builds, checksums, signs, tags, and publishes | Development host | `tools/release/` | Entry script plus sibling modules, config-driven |
+| fieldkit | Collects production data into one encrypted bundle | Production | `tools/fieldkit/`, also `vakr field collect` | Entry script plus sibling modules, standard library only, shipped as the single-file zipapp `vakr-fieldkit.pyz` |
+| field-inbox | Fetches, decrypts, verifies, and extracts bundles | Development host | `tools/fieldkit/field_inbox.py` | Entry script plus sibling modules |
 | self-update | Verified GitHub-release updater with pre- and post-install hooks | Production | `src/vakr/lifecycle/update/` | Library plus CLI, parameterized by repository, package, signers, and hooks |
 | config-upgrade | Overrides-only layering, versioned TOML migrations, new-option reporting | Production | `src/vakr/lifecycle/configmerge/` | Library; migrations are data |
 
@@ -3735,3 +3745,16 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | `UPLINK` | `uplink` | primary | no |
 
 Operators add keywords in `[[interface_classification.keywords]]`. Setting `interface_classification.use_default_keywords = false` replaces the defaults instead of extending them. Keywords match whole tokens case-insensitively; `re:`-prefixed keywords follow POLICY-005.
+
+### E.16 Field kit (FIELD-002, FIELD-009)
+
+| Setting | Default |
+|---|---|
+| Total time budget for one collection | 1800 s |
+| Per-walk timeout / net-snmp timeout and retries | 60 s / `-t 2 -r 1` |
+| Pause between devices | 1 s |
+| Gap between the two `sysUpTime` samples | 5 s |
+| Maximum devices per run / devices pinged by the `paths` profile | 500 / 5 |
+| Maximum bundle size / maximum member size | 256 MiB / 32 MiB |
+| Journal lines collected by the `vakr` profile | 5000 |
+| Egress test timeout | 15 s |

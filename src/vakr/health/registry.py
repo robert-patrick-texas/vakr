@@ -23,6 +23,7 @@ Example:
 import platform
 from collections.abc import Callable
 
+from vakr.adapters.sqlite.metadata.health import check_metadata_db
 from vakr.config.health import check_config
 from vakr.credentials.health import check_credentials
 from vakr.health.lifecycle_checks import check_tls_policy, check_trusted_cas, check_update
@@ -74,6 +75,7 @@ CHECKS: tuple[Check, ...] = (
     check_update,
     check_trusted_cas,
     check_tls_policy,
+    check_metadata_db,
 )
 
 

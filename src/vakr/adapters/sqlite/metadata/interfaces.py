@@ -1,10 +1,11 @@
 """SQLite interface repository with identity history (META-002, META-008, IFID-005, LIFE-002).
 
-Interfaces have three write paths, each allowed to change its own fields
+Interfaces have four write paths, each allowed to change its own fields
 only: operator edits (``update``: owned fields, ownership-checked),
-discovery (``update_observed``: observed fields, no owner), and
-``set_lifecycle``. Identity history is append-only, and the schema's
-triggers refuse any update or delete of it. Retiring an interface keeps the
+discovery (``update_observed``: observed fields, no owner),
+``set_lifecycle``, and the audited ownership transfer (``transfer_owner``).
+Identity history is append-only, and the schema's triggers refuse any
+update or delete of it. Retiring an interface keeps the
 row, its history, and its telemetry.
 
 Dependencies:
@@ -43,6 +44,11 @@ from vakr.domain.paging import Page, PageRequest
 from vakr.ports.metadata.filters import InterfaceFilter
 
 _LIFECYCLE_FIXED = tuple(f for f in INTERFACE_FIXED_FIELDS if f != "lifecycle")
+_OWNER_FIXED = (
+    *(f for f in INTERFACE_FIXED_FIELDS if f != "managed_by"),
+    *INTERFACE_OBSERVED_FIELDS,
+    *INTERFACE_OWNED_FIELDS,
+)
 _HISTORY_COLUMNS = (
     "id", "interface_id", "device_id", "decided_at", "outcome", "source", "previous_if_index",
     "observed_if_index", "score", "runner_up_score", "evidence", "actor",
@@ -174,6 +180,34 @@ class SqliteInterfaceRepository(SqliteTable[Interface, InterfaceId, InterfaceFil
         stored = self._stored(interface_id)
         changed = replace(stored, lifecycle=lifecycle, updated_at=at, version=expected_version)
         return self._replace(stored, changed, None, _LIFECYCLE_FIXED)
+
+    def transfer_owner(
+        self,
+        interface_id: InterfaceId,
+        owner: ManagedBy,
+        *,
+        expected_version: int,
+        at: datetime,
+    ) -> Interface:
+        """Hand the operator fields to another source (META-008, E.19).
+
+        Args:
+            interface_id: The interface.
+            owner: The new owning source.
+            expected_version: Version the caller read.
+            at: Change time (UTC), stored as ``updated_at``.
+
+        Returns:
+            Interface: The stored interface.
+
+        Raises:
+            NotFoundError: If the interface does not exist.
+            ConflictError: If ``expected_version`` is stale.
+        """
+        self._tx.begin_write()
+        stored = self._stored(interface_id)
+        changed = replace(stored, managed_by=owner, updated_at=at, version=expected_version)
+        return self._replace(stored, changed, None, _OWNER_FIXED)
 
     def append_identity_history(self, entry: IdentityHistoryEntry) -> None:
         """Record an identity decision (IFID-005).

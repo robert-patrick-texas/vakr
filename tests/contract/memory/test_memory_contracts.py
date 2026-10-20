@@ -8,6 +8,7 @@ Example:
 """
 
 from tests.contract.contract_metadata_crud import MetadataCrudContract
+from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 from tests.contract.contract_telemetry_series import TelemetrySeriesContract
 from tests.contract.contract_telemetry_state import TelemetryStateContract
@@ -32,3 +33,7 @@ class TestMemoryTelemetrySeries(TelemetrySeriesContract):
 
 class TestMemoryTelemetryState(TelemetryStateContract):
     """DB-005, OBS-001, DB-007 on the in-memory telemetry store."""
+
+
+class TestMemoryMetadataIdentity(MetadataIdentityContract):
+    """IFID-007, META-008 transfer, and the change counter on the memory adapter."""

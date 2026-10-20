@@ -1,8 +1,9 @@
 """Helpers for the SQLite adapter tests: synthetic migrations, stores, raw reads.
 
 Synthetic migrations stand in for future releases, so upgrade paths
-(MIG-002) and interrupted migrations (MIG-003) are tested before any real
-second migration exists. The module name is unique on purpose: test
+(MIG-002) and interrupted migrations (MIG-003) are tested independently of
+how many real migrations ship; ``CURRENT`` and ``NEXT`` name this release's
+schema and the next one. The module name is unique on purpose: test
 helpers are never imported from a ``conftest``.
 
 Dependencies:
@@ -41,6 +42,12 @@ NOW = datetime(2026, 10, 20, 3, 15, tzinfo=UTC)
 
 FAST = SqliteSettings(busy_timeout_ms=200, lock_wait_ms=300)
 """Short bounds so contention tests finish quickly."""
+
+CURRENT = len(metadata_family().migrations)
+"""The metadata schema version this release ships (2 since M3 added identity reviews)."""
+
+NEXT = CURRENT + 1
+"""The version a synthetic later-release migration takes."""
 
 
 def synthetic(

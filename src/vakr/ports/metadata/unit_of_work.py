@@ -23,9 +23,12 @@ Safety:
     Adapters must map driver errors to domain errors before they cross this
     boundary, and must never hold a transaction open outside the block.
 
+``reviews`` and ``change_counter`` were added with the M3 inventory loader
+(port extension, E.26).
+
 Example:
     >>> sorted(n for n in dir(MetadataUnitOfWork) if not n.startswith("_"))[:3]
-    ['audit', 'collectors', 'commit']
+    ['audit', 'change_counter', 'collectors']
 """
 
 from collections.abc import Callable
@@ -42,6 +45,7 @@ from vakr.ports.metadata.repository import (
     SiteRepository,
     TagRepository,
 )
+from vakr.ports.metadata.reviews import IdentityReviewRepository
 
 
 class MetadataUnitOfWork(Protocol):
@@ -164,6 +168,42 @@ class MetadataUnitOfWork(Protocol):
 
         Raises:
             None
+        """
+        ...
+
+    @property
+    def reviews(self) -> IdentityReviewRepository:
+        """Identity reviews in this unit of work (IFID-007).
+
+        Args:
+            None
+
+        Returns:
+            IdentityReviewRepository: The repository.
+
+        Raises:
+            None
+        """
+        ...
+
+    def change_counter(self) -> int:
+        """Return a number that grows whenever collection-relevant metadata changes.
+
+        It covers devices, interfaces, sites, tags, groups, policies, and
+        identity reviews: each record contributes one for existing plus its
+        ``version``. Records are never deleted and versions only grow, so
+        the value is monotonic and identical for every process reading the
+        same committed data; a collector compares it between cycles instead
+        of reloading inventory (6.2, "metadata change counter").
+
+        Args:
+            None
+
+        Returns:
+            int: The counter as this unit of work sees the data.
+
+        Raises:
+            StorageError: If the database cannot be read.
         """
         ...
 

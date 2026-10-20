@@ -12,6 +12,8 @@ from pathlib import Path
 import pytest
 
 from tests.unit.adapters.sqlite.sqlite_testkit import (
+    CURRENT,
+    NEXT,
     family_with,
     manager,
     raw_rows,
@@ -24,7 +26,7 @@ from vakr.adapters.sqlite.migrations import Migration, SqliteMigrationManager
 from vakr.health.model import Status
 from vakr.health.registry import CHECKS
 
-ADD_PROBE = synthetic(2, "add_probe", "CREATE TABLE probe (x INTEGER);")
+ADD_PROBE = synthetic(NEXT, "add_probe", "CREATE TABLE probe (x INTEGER);")
 
 
 @pytest.fixture
@@ -133,7 +135,7 @@ def test_fresh_install_warns_then_current_is_ok(state: Path) -> None:
     manager(state / "metadata.db").migrate()
     current = check_metadata_db()
     assert current.status is Status.OK
-    assert [(p.label, p.value) for p in current.perfdata] == [("metadata_schema", 1.0)]
+    assert [(p.label, p.value) for p in current.perfdata] == [("metadata_schema", float(CURRENT))]
 
 
 def test_pending_warns_and_newer_is_critical(state: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -184,9 +186,9 @@ def test_interrupted_migrations(
     db = state / "metadata.db"
     manager(db).migrate()
     probe = synthetic(
-        2, "add_probe", "CREATE TABLE probe (x INTEGER);", transactional=transactional
+        NEXT, "add_probe", "CREATE TABLE probe (x INTEGER);", transactional=transactional
     )
-    marker = (2, probe.name, probe.checksum, "in_progress", 0, None, "vakr test")
+    marker = (NEXT, probe.name, probe.checksum, "in_progress", 0, None, "vakr test")
     raw_write(db, "INSERT INTO schema_migrations VALUES (?, ?, ?, ?, ?, ?, ?)", marker)
     _release_with(monkeypatch, probe)
     assert check_metadata_db().status is expected

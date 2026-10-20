@@ -40,6 +40,11 @@ from vakr.domain.timestamps import to_epoch_us
 from vakr.ports.metadata.filters import AuditFilter, InterfaceFilter
 
 _LIFECYCLE_FIXED = tuple(f for f in INTERFACE_FIXED_FIELDS if f != "lifecycle")
+_OWNER_FIXED = (
+    *(f for f in INTERFACE_FIXED_FIELDS if f != "managed_by"),
+    *INTERFACE_OBSERVED_FIELDS,
+    *INTERFACE_OWNED_FIELDS,
+)
 
 
 class MemoryInterfaceRepository(MemoryTable[Interface, InterfaceId, InterfaceFilter]):
@@ -102,6 +107,32 @@ class MemoryInterfaceRepository(MemoryTable[Interface, InterfaceId, InterfaceFil
         stored = self._stored(interface_id)
         changed = replace(stored, lifecycle=lifecycle, updated_at=at, version=expected_version)
         return self._replace(stored, changed, None, _LIFECYCLE_FIXED)
+
+    def transfer_owner(
+        self,
+        interface_id: InterfaceId,
+        owner: ManagedBy,
+        *,
+        expected_version: int,
+        at: datetime,
+    ) -> Interface:
+        """Hand the operator fields to another source; see ``InterfaceRepository``.
+
+        Args:
+            interface_id: The interface.
+            owner: The new owning source.
+            expected_version: Version the caller read.
+            at: Change time (UTC).
+
+        Returns:
+            Interface: The stored interface.
+
+        Raises:
+            NotFoundError, ConflictError: As the port documents.
+        """
+        stored = self._stored(interface_id)
+        changed = replace(stored, managed_by=owner, updated_at=at, version=expected_version)
+        return self._replace(stored, changed, None, _OWNER_FIXED)
 
     def append_identity_history(self, entry: IdentityHistoryEntry) -> None:
         """Stage an identity decision.

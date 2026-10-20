@@ -6,7 +6,7 @@ discards the transaction, so a failed operation commits nothing.
 
 Dependencies:
     vakr.adapters.memory.metadata_store, metadata_repos, metadata_interfaces,
-    metadata_specs: Storage, repositories, and table rules.
+    metadata_reviews, metadata_specs: Storage, repositories, and table rules.
 
 Safety:
     Uncommitted changes are visible only to their own unit of work.
@@ -25,6 +25,7 @@ from vakr.adapters.memory.metadata_interfaces import (
     MemoryInterfaceRepository,
 )
 from vakr.adapters.memory.metadata_repos import MemoryDeviceRepository, MemoryTable
+from vakr.adapters.memory.metadata_reviews import MemoryReviewRepository, change_counter
 from vakr.adapters.memory.metadata_store import MemoryMetadataStore, Transaction
 from vakr.domain.catalog import Collector, Group, Tag
 from vakr.domain.control import CollectionPolicy
@@ -45,6 +46,7 @@ class MemoryUnitOfWork:
         policies: Collection-policy repository.
         collectors: Collector repository.
         audit: Audit repository.
+        reviews: Identity-review repository.
     """
 
     def __init__(self, store: MemoryMetadataStore) -> None:
@@ -72,6 +74,21 @@ class MemoryUnitOfWork:
             self._tx, specs.COLLECTOR
         )
         self.audit = MemoryAuditRepository(self._tx)
+        self.reviews = MemoryReviewRepository(self._tx)
+
+    def change_counter(self) -> int:
+        """Return the metadata change counter; see ``MetadataUnitOfWork``.
+
+        Args:
+            None
+
+        Returns:
+            int: One plus ``version`` summed over every counted record.
+
+        Raises:
+            None
+        """
+        return change_counter(self._tx)
 
     def commit(self) -> None:
         """Apply every staged change atomically.

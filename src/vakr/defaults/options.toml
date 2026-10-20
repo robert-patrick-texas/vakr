@@ -598,3 +598,31 @@ default = "10s"
 since = "0.1.1"
 reload = "restart"
 description = "How often vakr tui reads current state again (13.1, Appendix E.29). vakr tui --refresh overrides it. At the 60s default poll interval, 10s shows a new poll within a few seconds and keeps database reads trivial."
+
+# Inventory file and network target guardrails (milestone M3: blueprint 11.1-11.4, 15.5,
+# Appendix E.26). The inventory itself lives in inventory.toml, not here.
+
+[[options]]
+key = "inventory.file"
+type = "str"
+pattern = '^(/[^\x00]*)?$'
+default = ""
+since = "0.1.1"
+reload = "live"
+description = "File holding file-managed devices, sites, and interface annotations (META-008, META-010). Empty means inventory.toml in the configuration directory, normally /etc/vakr/inventory.toml. Apply changes with vakr inventory plan and vakr inventory apply."
+
+[[options]]
+key = "security.allowed_target_cidrs"
+type = "list[str]"
+default = []
+since = "0.1.1"
+reload = "live"
+description = "Networks, in CIDR form, that every poll target must fall in (15.5, SEC-015). Empty allows any unicast address. Multicast, unspecified, and broadcast addresses are always refused."
+
+[[options]]
+key = "security.denied_target_addresses"
+type = "list[str]"
+default = ["169.254.169.254/32", "fd00:ec2::254/128", "100.100.100.200/32"]
+since = "0.1.1"
+reload = "live"
+description = "Addresses or CIDR networks that are never polled (15.5, SEC-015). The defaults are the cloud metadata services, which answer anyone on the host. Setting this list replaces the defaults."

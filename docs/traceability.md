@@ -274,6 +274,29 @@ Code is in `src/vakr/scheduler/`, with tests in `tests/unit/scheduler/`. See [th
 | STORE-004 (6.4 outbox) | Implemented | `outbox.py` | QUEUE-T01 `test_full_outbox_applies_reported_backpressure_without_loss` | | |
 | TEST-004 | Simulated | — | `test_hundred_devices_for_a_simulated_day` | `scheduler.md` | 24 simulated hours: p95 2.12 s, p99 2.54 s, every slot recorded. |
 
+## Inventory and interface identity (M3)
+
+The inventory file is handled by `src/vakr/inventory/` (`InventoryService` for the collector), and reconciliation by `src/vakr/discovery/reconcile/`. The CLIs are `vakr inventory validate|plan|apply|list` and `vakr interface claim|review`. The ports gained `MetadataUnitOfWork.reviews`, `change_counter()`, and `InterfaceRepository.transfer_owner`, with SQLite metadata migration `0002_identity_review.sql`. See [inventory operations](operations/inventory.md) and Appendix E.26.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| META-008 | Implemented | `inventory/model.py`, `ownership.py`, `claim.py`, `transfer_owner` | `test_inventory_apply.py::test_cfg011_*`, `test_e19_*`, contract `test_meta008_transfer_owner` | `inventory.md`, E.26 | The E.19 audited claim is delivered. |
+| META-009 | Implemented | `inventory/plan.py`, `apply.py` | `test_cfg007_removed_devices_are_disabled_and_return` | `inventory.md` | Removed devices are disabled, never deleted. |
+| META-010 | Implemented (TOML) | `inventory/parse*.py`, `plan*.py`, `apply.py` | `test_cfg010_*`, `test_cfg011_*`, `test_meta001_uuid_*` | `inventory.md` | CSV import is not built. |
+| META-012 | Implemented (tags stored) | `reconcile/persist.py` | `test_disc_t01_*`, `test_disc008_*` | | Interest class is computed when read. |
+| CONF-008 | Implemented | `inventory/ownership.py`, `validate.py` | `test_cfg006_api_managed_collisions_fail` | `inventory.md`, E.26 | |
+| CONF-009 (inventory) | Implemented | `inventory/settings.inventory_problems`, `config/cross_checks.RULES` | `test_invalid_file_exits_1_with_located_messages` | E.26 #5 | `vakr config validate --config-dir` checks the installed `inventory.toml`; use `vakr inventory validate --config-dir` for another directory. |
+| SEC-015 (15.5) | Implemented (IP literals) | `inventory/guardrails.py` | `test_netsec001_*` | `inventory.md` | `security.allowed_target_cidrs` (empty means any unicast) and `security.denied_target_addresses`. The collector checks DNS names. |
+| SEC-018 | Implemented | `apply.py`, `claim.py`, `reconcile/admin.py`, `service.py` | `test_cfg011_*`, `test_e19_*`, `test_ifid_t07_*` | E.26 | Inventory applies, claims, reviews, and discovery are audited. |
+| DISC-001/007/008 | Implemented | `inventory/service.py`, `reconcile/persist.py`, `records.py` | `test_disc_t01_initial_discovery_round_trip`, `test_disc008_failed_tables_keep_known_values`, `test_end_to_end_two_processes` | `inventory.md` | Suppressed interfaces stay in the inventory (DISC-T05). |
+| IFID-001..003 | Implemented | `reconcile/match.py`, `candidates.py` | corpus `test_ifid_t10_corpus_outcomes` | E.26 | |
+| IFID-004/006 | Implemented (conservative) | `reconcile/match.py`, `inventory/planning.py` | `test_ifid004_*`, `test_ifid_t06_*`, `test_ifid_t09_input_order_never_changes_the_outcome` | E.26 | MVP rule mvp-1: EXACT, unambiguous renumber, otherwise review. ADR-015 weights stay open until field data. |
+| IFID-005 | Implemented (bounded) | `reconcile/records.py`, `persist*.py` | `test_ifid_t02_*`, `test_ifid_t08_*` | E.26 #3 | Unchanged EXACT matches are not re-recorded; no scores. |
+| IFID-007 | Implemented (CLI) | `reconcile/admin.py`, `cli/cmd_interface.py` | `test_ifid_t07_*` | `inventory.md` | The web review page is M4. |
+| IFID-008/009 | Implemented | `reconcile/evidence.py`, `tests/fixtures/reconcile/corpus-v1.toml` | corpus `shared-svi-mac`, `invalid-macs`; `test_ifid_t10_*` | E.26 | 19 IOS XE cases. |
+| LIFE-005 | Implemented | `reconcile/match.py` | `test_ifid_t08_missing_then_returning` | | |
+| MIG-002 (metadata 0002) | Implemented | `adapters/sqlite/metadata/sql/0002_identity_review.sql` | upgrade-with-data test | `database.md` | Self-update backs up `metadata.db`, so rollback restores schema 1. |
+
 ## Current state: query services, `vakr status`, `vakr tui` (M3)
 
 Read services are in `src/vakr/query/` (`StatusQueries`). The Textual app is `src/vakr/tui/`, and the CLIs are `cli/cmd_status.py` and `cli/cmd_tui.py`. See [status and TUI](operations/status-and-tui.md) and Appendix E.29. Until the M4 API exists, both read through the ports in-process (TUI-007).

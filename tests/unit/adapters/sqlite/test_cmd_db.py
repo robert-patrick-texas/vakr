@@ -14,13 +14,19 @@ from pathlib import Path
 
 import pytest
 
-from tests.unit.adapters.sqlite.sqlite_testkit import family_with, manager, raw_write, synthetic
+from tests.unit.adapters.sqlite.sqlite_testkit import (
+    NEXT,
+    family_with,
+    manager,
+    raw_write,
+    synthetic,
+)
 from vakr.adapters.sqlite.migrations import Migration, SqliteMigrationManager
 from vakr.cli import cmd_db
 from vakr.cli.main import main
 from vakr.ports.migrations import IntegrityReport, SchemaTooNewError
 
-DROP_INDEX = synthetic(2, "drop_site_index", "DROP INDEX device_by_site;", destructive=True)
+DROP_INDEX = synthetic(NEXT, "drop_site_index", "DROP INDEX device_by_site;", destructive=True)
 
 
 @pytest.fixture
@@ -140,7 +146,7 @@ def test_migrate_backs_up_first_and_gates_destructive_steps(
     assert "--allow-destructive" in captured.err
     assert main(["db", "migrate", "--allow-destructive"]) == 1
     assert main(["db", "migrate", "--allow-destructive", "--backup-confirmed"]) == 0
-    assert "applied 0002 drop_site_index" in capsys.readouterr().out
+    assert f"applied {NEXT:04d} drop_site_index" in capsys.readouterr().out
     assert len(list((state / "backups").glob("metadata-*.db"))) == 3
 
 
@@ -193,7 +199,7 @@ def test_refusal_inside_migrate_exits_2(state: Path, monkeypatch: pytest.MonkeyP
             SchemaTooNewError: Always.
         """
         raise SchemaTooNewError(
-            "schema 2 was written by a newer vakr release", status=self.status()
+            f"schema {NEXT} was written by a newer vakr release", status=self.status()
         )
 
     monkeypatch.setattr(SqliteMigrationManager, "migrate", refuse)
@@ -233,7 +239,7 @@ def test_problems_exit_1(state: Path, monkeypatch: pytest.MonkeyPatch,
     )
     assert main(["db", "status"]) == 1
     assert "integrity: FAILED (PRAGMA quick_check): bad" in capsys.readouterr().out
-    _use(monkeypatch, synthetic(2, "broken", "CREATE TABLE device (x INTEGER);"))
+    _use(monkeypatch, synthetic(NEXT, "broken", "CREATE TABLE device (x INTEGER);"))
     assert main(["db", "migrate"]) == 1
     assert "rolled back" in capsys.readouterr().err
 

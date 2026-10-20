@@ -4010,6 +4010,52 @@ Decisions taken with the M3 scheduler:
 8. **Shutdown (16.4).** Stop admitting; give in-flight polls the grace period; cancel the rest and record them with the evidence their finished steps produced; then record waiting slots and slots that came due during the drain as `NOT_ATTEMPTED`.
 9. **Deferred.** Worker affinity and rebalancing (SCHED-014) wait for multiple worker processes; estimated-cost ordering (SCHED-015) and adaptive interval changes (ADAPT-002 to ADAPT-007) are post-MVP (27.4). Poll-health diagnostics are on.
 
+### E.26 Inventory and reconciliation
+
+Added with the M3 inventory loader and discovery persistence (META-008, META-010, CONF-008, IFID-001 to IFID-008, DISC-001, DISC-007, 11.1–11.4, 15.5). Operator guide: `docs/operations/inventory.md`.
+
+| Setting or bound | Value |
+|---|---|
+| `inventory.file` | `""`: `inventory.toml` in the configuration directory (11.1) |
+| `security.allowed_target_cidrs` | `[]`: any unicast address |
+| `security.denied_target_addresses` | `169.254.169.254/32`, `fd00:ec2::254/128`, `100.100.100.200/32` (cloud metadata services) |
+| `inventory.toml` size | 4 MiB (the E.18 file bound) |
+| Sites / devices / interface annotations per file | 1,000 / 5,000 / 20,000 |
+| Name / comment length | 255 / 4,096 characters |
+| Tags and groups per entry | 256 (the E.18 list bound); names follow the E.15 tag rule |
+| Devices or sites read per list / stored interfaces read per device | 10,000 / 200,000 |
+| Evidence items kept per identity-history entry or review | 16 |
+| Attempts for a discovery write that collides with another | 3 |
+
+**Ownership.** Records created from the file are `managed_by = file:inventory.toml`; the owner names the file, not its directory, so `VAKR_ROOT` never changes it. An entry with `uuid` manages that record (a rename keeps the identity); otherwise its name does. An entry that lands on an API-managed record by name or UUID, or a device address an API-managed device already polls, fails validation (CONF-008). A file device removed from the file is disabled, never deleted. `vakr inventory apply` refuses to run when the file is missing, so a mistyped path cannot disable every device; an empty file disables them on purpose. Tags and groups named in the file are created file-managed when missing and only referenced when they exist.
+
+**Claims (E.19).** Discovered interfaces start API-managed, including interfaces the file annotates before they are discovered. `vakr inventory plan` lists each annotation that waits, with the reason: not discovered yet, two interfaces with that name (a review is open), or API-managed and needing `vakr interface claim DEVICE IFNAME`. The claim transfers ownership (the new port operation `InterfaceRepository.transfer_owner`), writes the annotation, and audits both in one unit of work. An interface whose annotation leaves the file is released: its annotation returns to the defaults and it becomes API-managed again.
+
+**MVP reconciliation rule (`mvp-1`).** ADR-015's weights and margins remain open until IOS XE field captures exist, so the MVP never weighs evidence. For one device, against stored state as it was before this discovery, so the result never depends on visiting order:
+
+1. **EXACT**: a stored interface has the row's `ifIndex` and the same name. The name is `ifName`, or `ifDescr` when the row has no `ifName`; names are trimmed of whitespace and NUL padding and compared case-insensitively (9.8 step 2).
+2. **CONFIDENT_RENUMBER**: the row's name belongs to exactly one stored interface and to no other row, no stored interface holds the row's `ifIndex`, and no strong MAC contradicts it. The same rule reconnects an interface that returns after going missing (LIFE-005). The old `ifIndex` is recorded in identity history.
+3. Otherwise the row's *candidates* are the unmatched stored interfaces sharing its name, its `ifIndex`, its strong MAC, or one of its unique addresses. None: **NEW**. One candidate that no other row names: **PROBABLE**. Anything else, including swapped ports and names reported twice: **AMBIGUOUS**. Neither merges (IFID-004). A review is opened; the row is planned with no interface UUID and its candidates leave the poll plan, so neither identity receives observations until an administrator decides. The collector flags such samples `BASELINE_IDENTITY_UNRESOLVED`.
+4. **MISSING**: stored interfaces neither matched nor held as candidates, only when `ifTable` was read completely (DISC-008). They release their `ifIndex` and become `INACTIVE` (`NOT_DISCOVERED`, E.6); nothing is deleted.
+
+A MAC is strong only when it is a six-octet unicast address, not all zeros or ones, seen once among the rows and at most once among stored interfaces (IFID-008); IOS XE shares base MACs across SVIs, subinterfaces, and port-channels. Addresses count only when IP-MIB answered completely. A shift such as 1, 2, 3 becoming 2, 3, 4 is therefore mostly AMBIGUOUS: conservative on purpose, and the first thing ADR-015 should revisit with field data. `vakr interface review list|map|new` resolves cases (IFID-007); each decision writes `ADMIN` history with the administrator's name and an audit event.
+
+**History and audit.** History is written for every change of identity state: creation, renumber or return, missing, a case opened for review (on each candidate), an exact match whose description or MAC changed, and every administrator decision. An unchanged exact match is not re-recorded on every rediscovery, which keeps history bounded (about 1,600 rows a day would otherwise accrue for the MVP fleet). Scores are left empty because `mvp-1` does not score. One `discovery.reconcile` audit event (actor `system`) summarises each discovery that changed an identity; quiet rediscoveries write none. Each inventory change and claim has its own audit event naming the operator (`cli:<login>`).
+
+**Lifecycle.** The M2 schema stores only an interface's lifecycle state, so the record `vakr.logic.lifecycle` needs is rebuilt: an interface without an `ifIndex` went missing, and an inactive interface's stale clock starts at its last change (`updated_at`). An edit to an inactive interface therefore restarts its ten-day clock. A new identity is `ACTIVE` only when discovery saw it up/up.
+
+**Poll plans.** `collect` is the policy decision on stored facts; Stage 2 still requires live up/up (SNMP-006). Admin and oper status are not stored, so policy rules that match on them never match while planning. `STALE` interfaces drop status checks (LIFE-004); `RETIRED` ones leave the plan. Counter capabilities come from the latest discovery the process saw and otherwise default to trying 64-bit counters. `InventoryService.change_counter()` is `MetadataUnitOfWork.change_counter()`, the sum of `1 + version` over devices, interfaces, sites, tags, groups, policies, and reviews, plus a per-process policy epoch; records are never deleted and versions only grow, so it is monotonic and seen by every process.
+
+**Port extension.** `MetadataUnitOfWork.reviews` (`IdentityReviewRepository`), `MetadataUnitOfWork.change_counter()`, and `InterfaceRepository.transfer_owner` were added, with the domain record `IdentityReview` and SQLite migration `0002_identity_review`; both adapters pass `tests/contract/contract_metadata_identity.py`.
+
+**Decisions on text that disagrees.**
+
+1. Section 11.3 shows `[[sites]]`, `[[devices]]`, and `[[interface_annotations]]` inside `config.toml`, while 11.1 lists `/etc/vakr/inventory.toml`. Inventory lives only in `inventory.toml`; `config.toml` rejects these tables as unknown keys. Section 11.3 should move them.
+2. Section 11.3's enterprise example allows only RFC 1918 targets. The packaged default allows any unicast address, because management addresses differ by site; operators narrow it with `security.allowed_target_cidrs`.
+3. IFID-005 asks for every decision in history and 9.8 for a scored pipeline; until ADR-015, history omits steady-state exact matches and scores (above), and IFID-006's margin is met by requiring that no runner-up exists.
+4. A stored annotation cannot say "explicitly secondary" (the domain's `InterfaceAnnotation` has no unset state), so a file's `interest = "secondary"` or `sticky = false` cannot override a description keyword. Revisit with the M4 query layer.
+5. `vakr config validate` checks the inventory file of the installed configuration directory (or `inventory.file`), not one named by `--config-dir`, because cross-option rules receive only the effective configuration; `vakr inventory validate --config-dir` covers other directories. It checks the file, credential names, and guardrails, but not storage conflicts, which `vakr inventory validate` adds.
+
 ### E.29 Status CLI and TUI (TUI-001 to TUI-008, 7.7, 13, STATE-003, TIME-005)
 
 | Setting or bound | Default | Allowed range |

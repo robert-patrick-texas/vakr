@@ -4,7 +4,7 @@ All persistence goes through typed `Protocol`s in `vakr.ports` (blueprint [5.2](
 
 | Port module | Protocols |
 |---|---|
-| `vakr.ports.metadata` | `MetadataUnitOfWork`; `DeviceRepository`, `InterfaceRepository`, `SiteRepository`, `TagRepository`, `GroupRepository`, `PolicyRepository`, `CollectorRepository`, `AuditRepository`; generic `EntityRepository` and `NamedRepository`; filters |
+| `vakr.ports.metadata` | `MetadataUnitOfWork` (with `change_counter()`); `DeviceRepository`, `InterfaceRepository` (with `transfer_owner`), `SiteRepository`, `TagRepository`, `GroupRepository`, `PolicyRepository`, `CollectorRepository`, `AuditRepository`, `IdentityReviewRepository`; generic `EntityRepository` and `NamedRepository`; filters. The review repository, change counter, and ownership transfer arrived with the M3 inventory loader ([E.26](../../tool-blueprint.md#e26-inventory-and-reconciliation)). |
 | `vakr.ports.telemetry` | `TelemetryBackend`; `ObservationWriter`, `ObservationQuery`, `CurrentStateQuery`, `RollupRepository`, `CollectorHealthRepository`, `RetentionManager`; `TelemetryCapabilities`, `WriteResult`, `RetentionPolicy`, `RetentionReport` |
 | `vakr.ports.clock` | `Clock`, `SystemClock`, `ManualClock` |
 

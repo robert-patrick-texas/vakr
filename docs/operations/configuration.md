@@ -149,3 +149,16 @@ Packaged entries:
 | Option | Type | Default | Reload | Added in | Description |
 |---|---|---|---|---|---|
 | `tui.refresh_interval` | duration, >= 2s, <= 600s | `"10s"` | restart | v0.1.1 | How often vakr tui reads current state again (13.1, Appendix E.29). vakr tui --refresh overrides it. At the 60s default poll interval, 10s shows a new poll within a few seconds and keeps database reads trivial. |
+
+### `[inventory]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `inventory.file` | str | `""` | live | v0.1.1 | File holding file-managed devices, sites, and interface annotations (META-008, META-010). Empty means inventory.toml in the configuration directory, normally /etc/vakr/inventory.toml. Apply changes with vakr inventory plan and vakr inventory apply. |
+
+### `[security]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `security.allowed_target_cidrs` | list[str] | `[]` | live | v0.1.1 | Networks, in CIDR form, that every poll target must fall in (15.5, SEC-015). Empty allows any unicast address. Multicast, unspecified, and broadcast addresses are always refused. |
+| `security.denied_target_addresses` | list[str] | `["169.254.169.254/32", "fd00:ec2::254/128", "100.100.100.200/32"]` | live | v0.1.1 | Addresses or CIDR networks that are never polled (15.5, SEC-015). The defaults are the cloud metadata services, which answer anyone on the host. Setting this list replaces the defaults. |

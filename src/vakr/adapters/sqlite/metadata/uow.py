@@ -22,6 +22,7 @@ from types import TracebackType
 from vakr.adapters.sqlite.metadata import specs
 from vakr.adapters.sqlite.metadata.audit import SqliteAuditRepository
 from vakr.adapters.sqlite.metadata.interfaces import SqliteInterfaceRepository
+from vakr.adapters.sqlite.metadata.reviews import SqliteReviewRepository, change_counter
 from vakr.adapters.sqlite.metadata.specs_interface import INTERFACE
 from vakr.adapters.sqlite.metadata.specs_inventory import DEVICE
 from vakr.adapters.sqlite.metadata.table import SqliteDeviceRepository, SqliteTable
@@ -47,6 +48,7 @@ class SqliteUnitOfWork:
         policies: Collection-policy repository.
         collectors: Collector repository.
         audit: Audit repository.
+        reviews: Identity-review repository.
     """
 
     def __init__(self, pool: ConnectionPool, gate: WriterGate) -> None:
@@ -75,6 +77,21 @@ class SqliteUnitOfWork:
             self._tx, specs.COLLECTOR
         )
         self.audit = SqliteAuditRepository(self._tx)
+        self.reviews = SqliteReviewRepository(self._tx)
+
+    def change_counter(self) -> int:
+        """Return the metadata change counter; see ``MetadataUnitOfWork``.
+
+        Args:
+            None
+
+        Returns:
+            int: ``1 + version`` summed over every counted record.
+
+        Raises:
+            StorageError: If the database cannot be read.
+        """
+        return change_counter(self._tx)
 
     def commit(self) -> None:
         """Make every change in this unit of work durable and visible.

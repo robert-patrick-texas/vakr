@@ -200,8 +200,8 @@ def build_egress_settings(
     Raises:
         EgressError: When the trust store or proxy settings are invalid.
     """
-    https_proxy = config.get("network.https_proxy", "")  # TODO(merge): default lives in catalog
-    no_proxy = config.get("network.no_proxy", [])  # TODO(merge): default lives in catalog
+    https_proxy = config.get("network.https_proxy")
+    no_proxy = config.get("network.no_proxy")
     env = os.environ if environ is None else environ
     policy = resolve_policy(str(https_proxy or ""), no_proxy, env)
     context = truststore.build_context(paths.ca_dir, OS_BUNDLES)
@@ -223,7 +223,7 @@ def network_checks(urls: Sequence[str] = ()) -> tuple[CheckResult, ...]:
     """
     paths = InstallPaths.from_environment()
     try:
-        config = load_effective_config(paths.config_dir)
+        config = load_effective_config(paths.config_dir, strict=False)
         settings = build_egress_settings(paths, config, timeout=DIAGNOSIS_TIMEOUT)
     except (EgressError, OSError, ValueError) as exc:
         return (CheckResult("egress config", Status.CRITICAL, str(exc)),)

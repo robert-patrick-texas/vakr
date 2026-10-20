@@ -9,6 +9,8 @@ Example:
 
 from pathlib import Path
 
+import pytest
+
 from vakr.config.loader import EffectiveConfig, load_effective_config
 from vakr.paths import InstallPaths
 
@@ -57,7 +59,10 @@ def test_conf_d_overrides_base_and_merges_tables(tmp_path: Path) -> None:
 
 
 def test_missing_directory_is_empty_and_copies_are_independent(tmp_path: Path) -> None:
-    """A fresh install has no files yet and still loads; ``as_dict`` is a copy.
+    """A fresh install has no files yet and loads packaged defaults; ``as_dict`` is a copy.
+
+    Before CFGM-001 an empty directory loaded as ``{}``; it now yields every
+    catalog default, so the expectation checks the ``[update]`` defaults.
 
     Args:
         tmp_path: Empty directory.
@@ -68,8 +73,35 @@ def test_missing_directory_is_empty_and_copies_are_independent(tmp_path: Path) -
     Raises:
         None
     """
-    assert load_effective_config(tmp_path / "absent").as_dict() == {}
+    assert load_effective_config(tmp_path / "absent").as_dict()["update"] == {
+        "repository": "robert-patrick-texas/vakr",
+        "channel": "prerelease",
+        "hold_version": "",
+    }
     cfg = EffectiveConfig({"a": {"b": 1}})
     copy = cfg.as_dict()
     copy["a"]["b"] = 2
     assert cfg.get("a.b") == 1
+
+
+def test_non_strict_load_tolerates_unknown_keys_for_recovery(tmp_path: Path) -> None:
+    """Recovery commands still read valid settings when a file has problems.
+
+    An operator who adds an option only a newer release understands must
+    still be able to self-update to that release.
+
+    Args:
+        tmp_path: Temporary configuration directory.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    (tmp_path / "config.toml").write_text('[update]\nchannel = "stable"\n[future]\nknob = 1\n')
+    lenient = load_effective_config(tmp_path, strict=False)
+    assert lenient.get("update.channel") == "stable"
+    assert lenient.issues
+    with pytest.raises(ValueError, match="future"):
+        load_effective_config(tmp_path)

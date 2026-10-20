@@ -275,9 +275,13 @@ def test_doctor_network_names_untrusted_issuer(
     assert "[CRITICAL] egress 127.0.0.1 tls:" in out
     assert "issued by 'CN=Example Inspection CA'" in out
     assert "vakr tls trust-ca FILE" in out
+    # A broken config is reported by the config check, but the network
+    # diagnosis still runs: it may be what the operator needs to fix it.
     (paths.config_dir / "config.toml").write_text("not = [valid")
     assert main(["doctor", "--network"]) == 2
-    assert "egress config" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "[CRITICAL] config:" in out
+    assert "egress 127.0.0.1 tls:" in out
 
 
 def test_fake_installer_records_failures() -> None:

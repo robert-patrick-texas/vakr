@@ -25,7 +25,7 @@ loc:
 	uv run python tools/check-loc/check_loc.py src tools --exceptions docs/architecture/loc-exceptions.md
 
 version:
-	uv run python tools/check-version/check_version.py --allow CHANGELOG.md --allow uv.lock
+	uv run python tools/check-version/check_version.py --allow CHANGELOG.md --allow uv.lock --allow src/vakr/defaults/options.toml
 
 # Docstring sections and Args entries (QG-003); rules in [tool.check-docstrings].
 .PHONY: docstrings

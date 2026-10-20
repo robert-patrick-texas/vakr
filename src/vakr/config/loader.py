@@ -1,18 +1,19 @@
-"""Load the effective configuration from operator TOML files.
+"""Load the effective configuration: packaged defaults merged with operator files.
 
 This is the stable interface every component uses to read settings. The
-first implementation reads ``config.toml`` and lexically ordered
-``conf.d/*.toml`` files only; the full layering (packaged option catalog,
-environment and CLI overrides, per-key source tracking, validation) replaces
-the internals without changing ``load_effective_config`` or
-``EffectiveConfig.get``.
+packaged option catalog supplies a documented default for every option
+(CFGM-001); ``/etc/vakr/config.toml`` and lexically ordered
+``conf.d/*.toml`` files override it key by key (CONF-006). The merged result
+is validated, so a component never runs on a typo, and each value remembers
+the file and line that set it.
 
 Dependencies:
-    tomllib: Standard-library TOML parser.
+    vakr.config.project: vakr's catalog, migrations, and file layout.
 
 Safety:
     Reading configuration never executes code or follows includes outside
-    the configuration directory.
+    the configuration directory. Error messages name files, lines, and keys,
+    never values.
 
 Example:
     >>> cfg = EffectiveConfig({"update": {"channel": "prerelease"}})
@@ -20,27 +21,64 @@ Example:
     ('prerelease', None)
 """
 
-import tomllib
-from collections.abc import Mapping
+import copy
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from vakr.config import project
+from vakr.lifecycle.configmerge import Issue, Origin
+
 _MISSING = object()
+
+
+class ConfigError(ValueError):
+    """The operator configuration is invalid; nothing should start on it.
+
+    Subclasses ``ValueError`` so callers that already caught TOML syntax
+    errors (``tomllib.TOMLDecodeError`` is a ``ValueError``) keep working.
+
+    Attributes:
+        issues: Every problem, formatted ``file:line: key: message``.
+    """
+
+    def __init__(self, issues: Sequence[Issue]) -> None:
+        """Record the validation problems.
+
+        Args:
+            issues: Problems found while loading.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self.issues = tuple(issues)
+        lines = "\n".join(str(issue) for issue in self.issues)
+        super().__init__(f"invalid configuration ({len(self.issues)} problem(s)):\n{lines}")
 
 
 class EffectiveConfig:
     """Read-only view of merged configuration with dotted-key lookup.
 
-    Instances are immutable after construction; callers receive values, not
-    references to internal tables. Not thread-safe for mutation (there is
-    none), safe to share for reads.
+    Instances are immutable after construction; callers receive copies of
+    tables and lists, never references to internal state. Safe to share
+    between threads for reads.
     """
 
-    def __init__(self, data: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        data: Mapping[str, Any],
+        sources: Mapping[str, tuple[Origin, ...]] | None = None,
+        issues: Sequence[Issue] = (),
+    ) -> None:
         """Wrap already-merged configuration data.
 
         Args:
             data: Nested tables as produced by merging TOML files.
+            sources: Origins of each dotted option key, when known.
+            issues: Validation problems tolerated by a non-strict load.
 
         Returns:
             None
@@ -49,6 +87,8 @@ class EffectiveConfig:
             None
         """
         self._data: Mapping[str, Any] = data
+        self._sources = dict(sources or {})
+        self.issues: tuple[Issue, ...] = tuple(issues)
 
     def get(self, dotted_key: str, default: Any = None) -> Any:
         """Return the value at ``dotted_key`` such as ``"update.channel"``.
@@ -58,7 +98,8 @@ class EffectiveConfig:
             default: Value returned when any part of the path is absent.
 
         Returns:
-            Any: The configured value, or ``default``.
+            Any: The configured value (a copy for tables and lists), or
+            ``default``.
 
         Raises:
             None
@@ -70,7 +111,23 @@ class EffectiveConfig:
             node = node.get(part, _MISSING)
             if node is _MISSING:
                 return default
-        return node
+        return copy.deepcopy(node) if isinstance(node, Mapping | list) else node
+
+    def source(self, dotted_key: str) -> str:
+        """Describe where an option's effective value came from.
+
+        Args:
+            dotted_key: Option key such as ``"update.channel"``.
+
+        Returns:
+            str: ``"default"``, ``"/etc/vakr/config.toml:12"``, or several
+            comma-separated origins for options that merge layers; ``""``
+            when unknown.
+
+        Raises:
+            None
+        """
+        return ", ".join(str(origin) for origin in self._sources.get(dotted_key, ()))
 
     def as_dict(self) -> dict[str, Any]:
         """Return a deep copy of the merged configuration as plain dicts.
@@ -84,64 +141,35 @@ class EffectiveConfig:
         Raises:
             None
         """
-        return _deep_copy(self._data)
+        return copy.deepcopy(dict(self._data))
 
 
-def load_effective_config(config_dir: Path) -> EffectiveConfig:
-    """Merge ``config.toml`` and ``conf.d/*.toml`` from ``config_dir``.
+def load_effective_config(config_dir: Path, *, strict: bool = True) -> EffectiveConfig:
+    """Merge packaged defaults, ``config.toml``, and ``conf.d/*.toml`` from ``config_dir``.
 
     Later files override earlier ones key by key; tables merge recursively.
-    Missing files are treated as empty so a fresh install starts on defaults.
+    Missing files are treated as empty, so a fresh install runs on defaults.
+    Files with an older ``config_version`` are migrated in memory until
+    ``vakr config upgrade`` rewrites them.
+
+    Recovery commands (``self-update``, ``tls``) load with ``strict=False``:
+    an operator file that only a newer release understands must not block
+    installing that release, or trusting the CA needed to download it.
 
     Args:
         config_dir: Operator configuration directory, normally ``/etc/vakr``.
+        strict: Raise on any problem (services); when ``False``, return the
+            valid part and list the problems in ``EffectiveConfig.issues``.
 
     Returns:
-        EffectiveConfig: The merged view.
+        EffectiveConfig: The merged view; validated when ``strict``.
 
     Raises:
-        tomllib.TOMLDecodeError: If any file is not valid TOML.
+        ConfigError: If any file is not valid TOML, or the merged
+            configuration has unknown keys or invalid values.
         OSError: If a present file cannot be read.
     """
-    files = [config_dir / "config.toml", *sorted((config_dir / "conf.d").glob("*.toml"))]
-    merged: dict[str, Any] = {}
-    for path in files:
-        if path.is_file():
-            with path.open("rb") as handle:
-                _merge_into(merged, tomllib.load(handle))
-    return EffectiveConfig(merged)
-
-
-def _merge_into(target: dict[str, Any], overlay: Mapping[str, Any]) -> None:
-    """Recursively merge ``overlay`` into ``target`` in place.
-
-    Args:
-        target: Accumulated configuration, modified in place.
-        overlay: Values from the next file in precedence order.
-
-    Returns:
-        None
-
-    Raises:
-        None
-    """
-    for key, value in overlay.items():
-        if isinstance(value, Mapping) and isinstance(target.get(key), dict):
-            _merge_into(target[key], value)
-        else:
-            target[key] = _deep_copy(value) if isinstance(value, Mapping) else value
-
-
-def _deep_copy(data: Mapping[str, Any]) -> dict[str, Any]:
-    """Copy nested mappings into fresh dicts.
-
-    Args:
-        data: Mapping that may contain nested mappings.
-
-    Returns:
-        dict[str, Any]: Independent copy.
-
-    Raises:
-        None
-    """
-    return {k: _deep_copy(v) if isinstance(v, Mapping) else v for k, v in data.items()}
+    result = project.inspect(config_dir)
+    if result.issues and strict:
+        raise ConfigError(result.issues)
+    return EffectiveConfig(result.nested(), result.sources, result.issues)

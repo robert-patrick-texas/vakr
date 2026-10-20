@@ -702,7 +702,7 @@ Within a bucket, sort by severity, then most recent state change, then natural d
 | META-009 | Deleting an inventory record shall be a soft lifecycle operation by default; historical telemetry and identity history shall remain available. |
 | META-010 | Bulk import/export shall support validated CSV and TOML for device inventory and interface annotations, using stable UUIDs where supplied and deterministic dry-run output. |
 | META-011 | Every interface shall have an interest class: `primary` (interfaces of interest such as uplinks and primary-path transit, viewed often) or `secondary` (default; viewed occasionally for one-off questions). `primary` is the same flag as the high-priority annotation, not a second concept; `high_priority = true` is accepted as an alias. Both classes are collected and retained identically. |
-| META-012 | Interface descriptions (`ifAlias`) are the first source of classification, because NetOps already put labels such as ISP, WAN, and Uplink in them. vakr shall extract keyword tags from descriptions using a configurable keyword list (defaults in Appendix E.15). Matching is case-insensitive and on whole tokens: a description is split on every non-alphanumeric character, so `WAN-ISP_Carrier` matches `WAN` and `ISP` but `SWANSEA` matches nothing. A `re:` keyword uses the bounded regex rules of POLICY-005. Each keyword maps to a tag and may also set interest `primary`, `is_wan_circuit`, or `sticky`. Description-derived tags are labeled as such and follow the description when it changes. Precedence is: explicit vakr annotation, then description keyword, then policy rule, then the default (`secondary`). The explain output (POLICY-004) shows which source applied. |
+| META-012 | Interface descriptions (`ifAlias`) are the first source of classification, because NetOps already put labels such as ISP, WAN, and Uplink in them. vakr shall extract keyword tags from descriptions using a configurable keyword list (defaults in Appendix E.15). Matching is case-insensitive and on whole tokens: a description is split on every non-alphanumeric character, so `WAN-ISP_Carrier` matches `WAN` and `ISP` but `SWANSEA` matches nothing. A `re:` keyword uses the bounded regex rules of POLICY-005. Each keyword maps to a tag and may also set interest `primary`, `wan_circuit`, or `sticky`. (In configuration and annotation files the key is `wan_circuit`, as in section 11.3; `is_wan_circuit` is the name of the domain field in section 7.1.) Description-derived tags are labeled as such and follow the description when it changes. Precedence is: explicit vakr annotation, then description keyword, then policy rule, then the default (`secondary`). The explain output (POLICY-004) shows which source applied. |
 | META-013 | Interfaces whose descriptions carry no keyword shall be classifiable in vakr itself: bulk select-and-tag in the web UI, CSV/TOML import, and `vakr interface tag`. Tags added in vakr are stored apart from description-derived tags, and a later description change never removes them. Device pages and the interface list offer a "not yet classified" filter (no annotation and no keyword match), so NetOps can work through the remainder or decide to update device descriptions instead. |
 
 ### 8.3 Discovery requirements
@@ -3324,7 +3324,7 @@ channel = "prerelease"      # stable | prerelease; MVP iterations are pre-releas
 # hold_version = "0.4.2"    # pin; the update timer will not go past it
 ```
 
-Every omitted option takes its packaged default (CFGM-001).
+Every omitted option takes its packaged default (CFGM-001). Options appear in the packaged catalog when the milestone that implements them lands. Until then, validation rejects them as unknown (for example `[polling]` before M3), so this example is valid only once M3 is complete.
 
 ---
 
@@ -3496,7 +3496,7 @@ An import-boundary test in CI enforces rule 1 for code under `src/vakr/lifecycle
 | Tool | Purpose | Runs on | Location | Form |
 |---|---|---|---|---|
 | md2html | Markdown → HTML site with link checking | Development host, CI | `tools/md2html/` | Entry script, render module, and template |
-| check-updates | Reports newer toolchain and dependency versions | Development host | `tools/check-updates/` | Single file, config-driven |
+| check-updates | Reports newer toolchain and dependency versions | Development host | `tools/check-updates/` | Entry script plus sibling modules, config-driven |
 | check-version | Enforces the single version source (VER-003) | CI | `tools/check-version/` | Single file |
 | release | Builds, checksums, signs, tags, and publishes | Development host | `tools/release/` | Single file, config-driven |
 | fieldkit | Collects production data into one encrypted bundle | Production | `tools/fieldkit/`, also `vakr field collect` | Single file, standard library only |

@@ -1,0 +1,32 @@
+# vakr configuration migrations (CFGM-002, ADR-027).
+#
+# Ordered, declarative changes between operator-file schema versions. Each
+# release that renames, moves, retypes, splits, or removes an option appends a
+# migration here and bumps [catalog] config_version in options.toml to its
+# `to` value. `vakr config upgrade` applies every pending migration in order,
+# so a host may skip any number of releases (CFGM-T05).
+#
+# Format:
+#
+#   [[migrations]]
+#   from = 1
+#   to = 2
+#   description = "Rename update.track to update.channel"
+#   operations = [
+#       { op = "rename", from = "update.track", to = "update.channel" },
+#       { op = "map_values", key = "update.channel", map = { beta = "prerelease" } },
+#   ]
+#
+# Operations (paths are dotted keys; "devices[].x" addresses every element of
+# an array of tables):
+#   rename      from, to       move one key, keeping its value and comment
+#   move_table  from, to       move a whole table, merging into an existing one
+#   remove      key            delete a key or table
+#   set         key, value     set a value
+#   map_values  key, map       replace renamed enum values
+#   scale       key, factor    multiply for a unit change
+#   convert     key, to        change type: str, int, float, duration (unit),
+#                              or list (separator)
+#   split       from, into     split by separator, or copy into several keys
+#
+# Schema version 1 is the first; there are no migrations yet.

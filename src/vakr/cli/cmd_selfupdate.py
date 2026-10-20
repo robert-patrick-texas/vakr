@@ -102,7 +102,13 @@ def run(args: argparse.Namespace) -> int:
     """
     paths = InstallPaths.from_environment()
     try:
-        config = load_effective_config(paths.config_dir)
+        config = load_effective_config(paths.config_dir, strict=False)
+        if config.issues:
+            print(
+                f"vakr: warning: {len(config.issues)} configuration problem(s); "
+                "continuing so an update can fix them (see `vakr config validate`)",
+                file=sys.stderr,
+            )
         request = _request(args, config)
         current = Version.parse(get_version())
     except (OSError, ValueError) as exc:
@@ -169,8 +175,8 @@ def _request(args: argparse.Namespace, config: EffectiveConfig) -> Request:
     """
     if args.file and not (args.sums and args.sig):
         raise ValueError("--file needs --sums and --sig")
-    channel = args.channel or config.get("update.channel", "prerelease")  # TODO(merge): catalog
-    hold = str(config.get("update.hold_version", "") or "")  # TODO(merge): catalog default
+    channel = args.channel or config.get("update.channel")
+    hold = str(config.get("update.hold_version") or "")
     return Request(
         channel=str(channel),
         hold=Version.parse(hold) if hold else None,
@@ -197,7 +203,7 @@ def _updater(
     Raises:
         EgressError: When the trust store is unusable and ``offline`` is false.
     """
-    repository = config.get("update.repository", "robert-patrick-texas/vakr")  # TODO(merge)
+    repository = config.get("update.repository")
     trust = ReleaseTrust(paths.release_signers, SIGNER, SIGNER)
     project = Project(str(repository), PACKAGE, ARCH, trust, api_base=API_BASE)
     new_vakr = str(paths.opt_dir / "venv/bin/vakr")

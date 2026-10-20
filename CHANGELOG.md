@@ -17,6 +17,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - `vakr snmp discover` and `vakr snmp poll TARGET --credential NAME`, which check one device and report in plain language. A community is never accepted on the command line.
 - New `[snmp]` options: `port`, `timeout`, `retries`, `max_varbinds`, `max_repetitions`, `max_walk_rows`, `rediscovery_interval`, and `capability_reprobe_interval` (Appendix E.23). Their defaults apply without any edit.
 - A synthetic 100-device IOS XE simulator served by snmpsim, and `tools/snmpsim/walk2rec.py`, which turns field-kit walks into snmpsim data.
+- File-managed inventory and interface identity: `vakr inventory validate|plan|apply|list` for `/etc/vakr/inventory.toml` (sites, devices, interface annotations; removed devices are disabled, never deleted), the audited `vakr interface claim`, conservative identity reconciliation on rediscovery with `vakr interface review list|map|new` for uncertain cases, and the collector-facing `InventoryService`. New options `inventory.file`, `security.allowed_target_cidrs`, and `security.denied_target_addresses` (cloud metadata services denied by default). Metadata schema 2 adds identity reviews: run `vakr db migrate` (it takes a backup first). See [the inventory guide](docs/operations/inventory.md).
 
 ## 0.1.1 - 2026-10-20
 

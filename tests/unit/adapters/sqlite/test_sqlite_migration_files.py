@@ -28,7 +28,7 @@ BODY = "\nCREATE TABLE probe (x INTEGER);\n"
 
 
 def test_packaged_initial_migration_carries_every_5_6_note() -> None:
-    """5.6: the shipped 0001 has description, recovery, volume, and test impact.
+    """5.6: the shipped migrations carry description, recovery, volume, and test impact.
 
     Args:
         None
@@ -39,8 +39,13 @@ def test_packaged_initial_migration_carries_every_5_6_note() -> None:
     Raises:
         None
     """
-    (initial,) = metadata_family().migrations
+    initial, reviews = metadata_family().migrations
     assert (initial.version, initial.name) == (1, "initial")
+    assert (reviews.version, reviews.name) == (2, "identity_review")
+    assert (reviews.destructive, reviews.transactional) == (False, True)
+    assert "MIG-002" in reviews.test_impact
+    assert reviews.recovery
+    assert reviews.data_volume
     assert (initial.destructive, initial.transactional) == (False, True)
     assert "collection policies" in initial.description  # a continuation line joined in
     assert "metadata.db" in initial.recovery

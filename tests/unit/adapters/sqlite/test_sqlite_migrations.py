@@ -17,6 +17,8 @@ import pytest
 
 from tests.contract import contract_samples as s
 from tests.unit.adapters.sqlite.sqlite_testkit import (
+    CURRENT,
+    NEXT,
     family_with,
     manager,
     migrated_store,
@@ -40,10 +42,13 @@ from vakr.ports.migrations import (
 )
 
 ADD_NOTES = synthetic(
-    2, "add_device_notes", "ALTER TABLE device ADD COLUMN notes TEXT NOT NULL DEFAULT '';"
+    NEXT, "add_device_notes", "ALTER TABLE device ADD COLUMN notes TEXT NOT NULL DEFAULT '';"
 )
-ADD_TABLE = synthetic(3, "add_note_table", "CREATE TABLE device_note (id BLOB PRIMARY KEY) STRICT;")
-DROP_INDEX = synthetic(2, "drop_site_index", "DROP INDEX device_by_site;", destructive=True)
+ADD_TABLE = synthetic(
+    NEXT + 1, "add_note_table", "CREATE TABLE device_note (id BLOB PRIMARY KEY) STRICT;"
+)
+DROP_INDEX = synthetic(NEXT, "drop_site_index", "DROP INDEX device_by_site;", destructive=True)
+SHIPPED = list(range(1, CURRENT + 1))  # versions this release's own migrations produce
 
 
 def test_mig001_fresh_install_reaches_current_schema(tmp_path: Path) -> None:
@@ -62,15 +67,17 @@ def test_mig001_fresh_install_reaches_current_schema(tmp_path: Path) -> None:
     mgr = manager(path)
     before = mgr.status()
     assert (before.state, before.version, before.can_migrate) == (SchemaState.MISSING, 0, True)
-    assert [m.version for m in before.pending] == [1]
+    assert [m.version for m in before.pending] == SHIPPED
     assert "fresh install" in before.detail
     assert not path.exists()  # status never creates the file
-    (applied,) = mgr.migrate()
-    assert (applied.version, applied.name, applied.applied_by) == (1, "initial", "vakr test")
+    applied = mgr.migrate()
+    assert (applied[0].version, applied[0].name, applied[0].applied_by) == (
+        1, "initial", "vakr test")  # fmt: skip
+    assert [a.version for a in applied] == SHIPPED
     after = mgr.require_current()
-    assert (after.state, after.version, after.pending) == (SchemaState.CURRENT, 1, ())
+    assert (after.state, after.version, after.pending) == (SchemaState.CURRENT, CURRENT, ())
     assert after.supported == metadata_family().supported
-    assert [a.version for a in after.applied] == [1]
+    assert [a.version for a in after.applied] == SHIPPED
     assert raw_rows(path, "PRAGMA application_id") == [(METADATA_APPLICATION_ID,)]
     assert raw_rows(path, "PRAGMA journal_mode") == [("wal",)]
     assert mgr.migrate() == ()  # already current: nothing to do
@@ -94,7 +101,7 @@ def test_mig001_empty_file_is_pending_and_migrates(tmp_path: Path) -> None:
     status = manager(path).status()
     assert (status.state, status.version) == (SchemaState.PENDING, 0)
     assert "empty" in status.detail
-    assert [m.version for m in manager(path).migrate()] == [1]
+    assert [m.version for m in manager(path).migrate()] == SHIPPED
 
 
 def test_db007_schema_has_no_row_ids(tmp_path: Path) -> None:
@@ -114,12 +121,12 @@ def test_db007_schema_has_no_row_ids(tmp_path: Path) -> None:
         tmp_path / "metadata.db",
         "SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name <> 'schema_migrations'",
     )
-    assert len(tables) == 13  # 9 record tables and 4 membership tables
+    assert len(tables) == 14  # 10 record tables (identity_review since 0002), 4 membership
     assert all("WITHOUT ROWID" in str(sql) for _, sql in tables)
 
 
 def test_mig002_upgrade_preserves_ids_and_data(tmp_path: Path) -> None:
-    """MIG-002: schema 1 data survives an upgrade to 3 with IDs intact and durations recorded.
+    """MIG-002: current-schema data survives two later upgrades with IDs intact and durations.
 
     Args:
         tmp_path: Directory for the database.
@@ -145,12 +152,12 @@ def test_mig002_upgrade_preserves_ids_and_data(tmp_path: Path) -> None:
     later = family_with(ADD_NOTES, ADD_TABLE)
     applied = manager(path, later).migrate()
     assert [(a.version, a.name) for a in applied] == [
-        (2, "add_device_notes"),
-        (3, "add_note_table"),
+        (NEXT, "add_device_notes"),
+        (NEXT + 1, "add_note_table"),
     ]
     assert all(a.duration.total_seconds() >= 0 for a in applied)
     status = manager(path, later).require_current()
-    assert [a.version for a in status.applied] == [1, 2, 3]
+    assert [a.version for a in status.applied] == [*SHIPPED, NEXT, NEXT + 1]
     upgraded = SqliteMetadataStore(path, family=later)
     with sqlite_uow_factory(upgraded)() as uow:
         assert uow.devices.get(dev.id) == dev
@@ -162,7 +169,7 @@ def test_mig002_upgrade_preserves_ids_and_data(tmp_path: Path) -> None:
 
 
 def test_mig004_older_release_refuses_newer_schema(tmp_path: Path) -> None:
-    """MIG-004: after an upgrade to schema 2, this release refuses with an actionable message.
+    """MIG-004: after an upgrade past this release's schema, it refuses with an actionable message.
 
     Args:
         tmp_path: Directory for the database.
@@ -176,10 +183,10 @@ def test_mig004_older_release_refuses_newer_schema(tmp_path: Path) -> None:
     path = tmp_path / "metadata.db"
     manager(path, family_with(ADD_NOTES)).migrate()
     status = manager(path).status()
-    assert (status.state, status.version, status.pending) == (SchemaState.TOO_NEW, 2, ())
+    assert (status.state, status.version, status.pending) == (SchemaState.TOO_NEW, NEXT, ())
     assert not status.can_migrate
     assert "newer vakr release" in status.detail
-    assert "supports up to 1" in status.detail
+    assert f"supports up to {CURRENT}" in status.detail
     with pytest.raises(SchemaTooNewError) as caught:
         SqliteMetadataStore(path)
     assert "restore the backup" in str(caught.value)
@@ -201,10 +208,10 @@ def test_mig004_newer_release_crash_still_counts_as_newer(tmp_path: Path) -> Non
     """
     path = tmp_path / "metadata.db"
     manager(path).migrate()
-    marker = (2, "future", "sha256:0", "in_progress", 0, None, "vakr 9.9.9")
+    marker = (NEXT, "future", "sha256:0", "in_progress", 0, None, "vakr 9.9.9")
     raw_write(path, "INSERT INTO schema_migrations VALUES (?, ?, ?, ?, ?, ?, ?)", marker)
     status = manager(path).status()
-    assert (status.state, status.version) == (SchemaState.TOO_NEW, 1)
+    assert (status.state, status.version) == (SchemaState.TOO_NEW, CURRENT)
 
 
 def test_mig005_destructive_step_needs_flag_and_verified_backup(tmp_path: Path) -> None:
@@ -231,10 +238,10 @@ def test_mig005_destructive_step_needs_flag_and_verified_backup(tmp_path: Path) 
         assert "--allow-destructive" in str(caught.value)
     copy = later.backup(tmp_path / "backups")
     assert copy.name == "metadata-20261020T031500Z.db"
-    assert verify_backup(copy, later.family, 1)
+    assert verify_backup(copy, later.family, CURRENT)
     with pytest.raises(DestructiveMigrationError):
         later.migrate(allow_destructive=False, verified_backup=copy)
-    assert later.status().version == 1  # every refusal left the schema alone
+    assert later.status().version == CURRENT  # every refusal left the schema alone
     assert [a.name for a in later.migrate(allow_destructive=True, verified_backup=copy)] == [
         "drop_site_index"
     ]
@@ -254,7 +261,7 @@ def test_mig005_fresh_install_has_nothing_to_destroy(tmp_path: Path) -> None:
         None
     """
     applied = manager(tmp_path / "metadata.db", family_with(DROP_INDEX)).migrate()
-    assert [a.version for a in applied] == [1, 2]
+    assert [a.version for a in applied] == [*SHIPPED, NEXT]
 
 
 def test_mismatch_states_refuse_to_run(tmp_path: Path) -> None:

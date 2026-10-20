@@ -30,7 +30,7 @@ from vakr.domain.errors import ConflictError, DuplicateError
 
 TABLES = (
     "device", "interface", "site", "tag", "group", "policy", "collector",
-    "identity_history", "audit",
+    "identity_history", "audit", "review",
 )  # fmt: skip
 NAMED = frozenset({"device", "site", "tag", "group", "policy", "collector"})
 

@@ -29,6 +29,9 @@ Safety:
     Repositories return domain records only; driver rows and row IDs never
     escape (rule 2, API-002).
 
+``InterfaceRepository.transfer_owner`` was added with the M3 inventory
+loader (port extension, E.26).
+
 Example:
     >>> "get_by_name" in dir(DeviceRepository), "set_lifecycle" in dir(InterfaceRepository)
     (True, True)
@@ -140,6 +143,36 @@ class InterfaceRepository(EntityRepository[Interface, InterfaceId, InterfaceFilt
         Args:
             interface_id: The interface.
             lifecycle: New lifecycle state.
+            expected_version: Version the caller read.
+            at: Change time (UTC), stored as ``updated_at``.
+
+        Returns:
+            Interface: The stored interface, with ``version`` incremented.
+
+        Raises:
+            NotFoundError: If the interface does not exist.
+            ConflictError: If ``expected_version`` is stale.
+        """
+        ...
+
+    def transfer_owner(
+        self,
+        interface_id: InterfaceId,
+        owner: ManagedBy,
+        *,
+        expected_version: int,
+        at: datetime,
+    ) -> Interface:
+        """Hand an interface's operator fields to another source (META-008, E.19).
+
+        Discovered interfaces start API-managed. This is the explicit
+        ownership transfer that lets a file annotation govern one (``vakr
+        interface claim``), or hands it back; the caller audits it (SEC-018).
+        Only ``managed_by`` and ``updated_at`` change.
+
+        Args:
+            interface_id: The interface.
+            owner: The new owning source.
             expected_version: Version the caller read.
             at: Change time (UTC), stored as ``updated_at``.
 

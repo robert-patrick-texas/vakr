@@ -48,6 +48,7 @@ ObservationId = NewType("ObservationId", UUID)
 BatchId = NewType("BatchId", UUID)
 AuditEventId = NewType("AuditEventId", UUID)
 IdentityHistoryId = NewType("IdentityHistoryId", UUID)
+ReviewId = NewType("ReviewId", UUID)  # an identity case awaiting admin review (IFID-007)
 
 _CANONICAL = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 _RESERVED = {UUID(int=0), UUID(int=(1 << 128) - 1)}

@@ -36,6 +36,8 @@ COMMAND_MODULES: tuple[str, ...] = (
     "vakr.cli.cmd_db",
     "vakr.cli.cmd_icmp",
     "vakr.cli.cmd_snmp",
+    "vakr.cli.cmd_inventory",
+    "vakr.cli.cmd_interface",
 )
 """Subcommand modules, in the order they appear in ``vakr --help``."""
 

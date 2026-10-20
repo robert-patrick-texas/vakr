@@ -10,6 +10,7 @@ Example:
 """
 
 from tests.contract.contract_metadata_crud import MetadataCrudContract
+from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 
 
@@ -19,3 +20,7 @@ class TestSqliteMetadataCrud(MetadataCrudContract):
 
 class TestSqliteMetadataRules(MetadataRulesContract):
     """DB-002, DB-003, DB-008 (reader beside writer), META-008/009, IFID-005, SEC-018 on SQLite."""
+
+
+class TestSqliteMetadataIdentity(MetadataIdentityContract):
+    """IFID-007, META-008 transfer, and the change counter on a SQLite metadata file."""

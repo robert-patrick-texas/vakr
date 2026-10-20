@@ -143,3 +143,16 @@ Packaged entries:
 | `snmp.max_walk_rows` | int, >= 100, <= 100000 | `10000` | live | v0.1.1 | Most rows one discovery walk of a table column may return. A walk that reaches it stops, keeps the rows it has, and marks the table partial (Appendix E.23). |
 | `snmp.rediscovery_interval` | duration, >= 30s, <= 2.592e+06s | `"24h"` | live | v0.1.1 | How often each device is rediscovered (DISC-002). Policy rules and devices can override it within 30s to 30d (Appendix E.18). |
 | `snmp.capability_reprobe_interval` | duration, >= 3600s, <= 7.776e+06s | `"7d"` | live | v0.1.1 | How long vakr trusts a learned counter limitation, such as an interface without 64-bit counters, before asking for the missing counters again (DISC-009, Appendix E.9). |
+
+### `[inventory]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `inventory.file` | str | `""` | live | v0.1.1 | File holding file-managed devices, sites, and interface annotations (META-008, META-010). Empty means inventory.toml in the configuration directory, normally /etc/vakr/inventory.toml. Apply changes with vakr inventory plan and vakr inventory apply. |
+
+### `[security]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `security.allowed_target_cidrs` | list[str] | `[]` | live | v0.1.1 | Networks, in CIDR form, that every poll target must fall in (15.5, SEC-015). Empty allows any unicast address. Multicast, unspecified, and broadcast addresses are always refused. |
+| `security.denied_target_addresses` | list[str] | `["169.254.169.254/32", "fd00:ec2::254/128", "100.100.100.200/32"]` | live | v0.1.1 | Addresses or CIDR networks that are never polled (15.5, SEC-015). The defaults are the cloud metadata services, which answer anyone on the host. Setting this list replaces the defaults. |

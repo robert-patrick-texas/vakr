@@ -8,7 +8,8 @@ migrations shipped as package data in ``sql/`` (5.6).
 - ``store``: ``SqliteMetadataStore`` (startup preflight, pool, writer gate),
   ``sqlite_uow_factory``, ``metadata_family``, ``metadata_migrations``.
 - ``uow``, ``transaction``: the unit of work and its transaction.
-- ``reader``, ``table``, ``interfaces``, ``audit``: the repositories.
+- ``reader``, ``table``, ``interfaces``, ``audit``, ``reviews``: the
+  repositories; ``reviews`` also holds the metadata change counter.
 - ``specs``, ``specs_inventory``, ``specs_interface``, ``paging``: row mapping
   and keyset pages.
 - ``health``: the ``metadata_db`` self-health check.

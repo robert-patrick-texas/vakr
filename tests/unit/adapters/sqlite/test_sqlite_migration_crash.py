@@ -19,6 +19,8 @@ from pathlib import Path
 import pytest
 
 from tests.unit.adapters.sqlite.sqlite_testkit import (
+    CURRENT,
+    NEXT,
     family_with,
     manager,
     raw_rows,
@@ -48,11 +50,11 @@ SqliteMigrationManager(path, family).migrate()
 
 
 def _crash_during(path: Path, transactional: bool) -> None:
-    """Migrate to schema 2 in a child process that dies before committing.
+    """Migrate to schema ``NEXT`` in a child process that dies before committing.
 
     Args:
-        path: Database at schema 1.
-        transactional: Whether migration 0002 runs in one transaction.
+        path: Database at schema ``CURRENT``.
+        transactional: Whether migration ``NEXT`` runs in one transaction.
 
     Returns:
         None
@@ -66,7 +68,7 @@ def _crash_during(path: Path, transactional: bool) -> None:
         "-- recovery: Restore the backup.\n-- data-volume: Tiny.\n-- test-impact: MIG-003.\n\n"
         "CREATE TABLE crash_probe (x INTEGER) STRICT;\n"
     )
-    argv = [sys.executable, "-c", _CRASH_SCRIPT, str(path), "0002_crash_probe.sql", text]
+    argv = [sys.executable, "-c", _CRASH_SCRIPT, str(path), f"{NEXT:04d}_crash_probe.sql", text]
     child = subprocess.run(argv, capture_output=True, check=False, timeout=120)  # noqa: S603
     assert child.returncode == CRASH_EXIT, child.stderr.decode()
 
@@ -87,21 +89,20 @@ def test_mig003_transactional_crash_is_detected_and_resumed(tmp_path: Path) -> N
     manager(path).migrate()
     _crash_during(path, transactional=True)
     family = family_with(
-        synthetic(2, "crash_probe", "CREATE TABLE crash_probe (x INTEGER) STRICT;")
+        synthetic(NEXT, "crash_probe", "CREATE TABLE crash_probe (x INTEGER) STRICT;")
     )
     status = manager(path, family).status()
-    assert (status.state, status.version) == (SchemaState.INTERRUPTED, 1)
+    assert (status.state, status.version) == (SchemaState.INTERRUPTED, CURRENT)
     assert status.interrupted is not None
-    assert (status.interrupted.version, status.can_migrate) == (2, True)
+    assert (status.interrupted.version, status.can_migrate) == (NEXT, True)
     assert "safe to retry" in status.detail
     assert raw_rows(path, "SELECT 1 FROM sqlite_schema WHERE name = 'crash_probe'") == []
     with pytest.raises(MigrationError):
         SqliteMetadataStore(path, family=family)  # startup refuses until migrated
-    assert [a.version for a in manager(path, family).migrate()] == [2]
-    assert manager(path, family).require_current().version == 2
+    assert [a.version for a in manager(path, family).migrate()] == [NEXT]
+    assert manager(path, family).require_current().version == NEXT
     assert raw_rows(path, "SELECT version, state FROM schema_migrations") == [
-        (1, "applied"),
-        (2, "applied"),
+        (v, "applied") for v in range(1, NEXT + 1)
     ]
 
 
@@ -121,7 +122,7 @@ def test_mig003_non_transactional_crash_blocks_until_restored(tmp_path: Path) ->
     manager(path).migrate()
     _crash_during(path, transactional=False)
     family = family_with(
-        synthetic(2, "crash_probe", "CREATE TABLE crash_probe (x INTEGER) STRICT;",
+        synthetic(NEXT, "crash_probe", "CREATE TABLE crash_probe (x INTEGER) STRICT;",
                   transactional=False)
     )  # fmt: skip
     status = manager(path, family).status()
@@ -148,7 +149,7 @@ def test_mig003_non_transactional_failure_part_way_blocks(tmp_path: Path) -> Non
     path = tmp_path / "metadata.db"
     manager(path).migrate()
     half = "CREATE TABLE half_done (x INTEGER);\nCREATE TABLE device (x INTEGER);"
-    family = family_with(synthetic(2, "half_done", half, transactional=False))
+    family = family_with(synthetic(NEXT, "half_done", half, transactional=False))
     with pytest.raises(MigrationError) as caught:
         manager(path, family).migrate()
     assert "part-way" in str(caught.value)
@@ -175,13 +176,13 @@ def test_failed_transactional_migration_leaves_database_unchanged(tmp_path: Path
     path = tmp_path / "metadata.db"
     manager(path).migrate()
     broken = "CREATE TABLE ok_part (x INTEGER);\nCREATE TABLE device (x INTEGER);"
-    family = family_with(synthetic(2, "broken", broken))
+    family = family_with(synthetic(NEXT, "broken", broken))
     with pytest.raises(MigrationError) as caught:
         manager(path, family).migrate()
     assert "rolled back" in str(caught.value)
-    assert "unchanged at schema 1" in str(caught.value)
+    assert f"unchanged at schema {CURRENT}" in str(caught.value)
     status = manager(path, family).status()
-    assert (status.state, status.version) == (SchemaState.PENDING, 1)
+    assert (status.state, status.version) == (SchemaState.PENDING, CURRENT)
     assert raw_rows(path, "SELECT 1 FROM sqlite_schema WHERE name = 'ok_part'") == []
 
 
@@ -202,11 +203,11 @@ def test_schema_moved_by_another_process_is_refused(
     """
     path = tmp_path / "metadata.db"
     manager(path).migrate()
-    family = family_with(synthetic(2, "add_probe", "CREATE TABLE probe (x INTEGER);"))
+    family = family_with(synthetic(NEXT, "add_probe", "CREATE TABLE probe (x INTEGER);"))
     slow = manager(path, family)
     stale = slow.status()
     manager(path, family).migrate()  # another process gets there first
     monkeypatch.setattr(slow, "status", lambda: stale)
     with pytest.raises(MigrationError) as caught:
         slow.migrate()
-    assert "moved to 2" in str(caught.value)
+    assert f"moved to {NEXT}" in str(caught.value)

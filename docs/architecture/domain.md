@@ -17,6 +17,7 @@ This page covers the entities, the observation contract, the envelope encoding, 
 | `catalog` | `Tag`, `Group`, `Collector` |
 | `interfaces` | `Interface`, `InterfaceAnnotation`, and the owned/observed field groups |
 | `control` | `CollectionPolicy`, `IdentityHistoryEntry`, `AuditEvent` |
+| `reviews` | `IdentityReview`, `ReviewState`: discovered interfaces whose identity waits for an administrator (IFID-007, E.26) |
 | `observations` | `IcmpObservation`, the `Observation` union; re-exports every observation type |
 | `snmp_observations`, `interface_observations`, `polls` | `SnmpDeviceObservation`, `InterfaceObservation`, `DevicePoll`, `CollectorHealthObservation` |
 | `codec`, `codec_fields`, `codec_values` | Plain-dict encoding of every observation type |

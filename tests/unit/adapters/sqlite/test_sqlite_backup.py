@@ -14,6 +14,7 @@ import pytest
 
 from tests.contract import contract_samples as s
 from tests.unit.adapters.sqlite.sqlite_testkit import (
+    CURRENT,
     NOW,
     family_with,
     manager,
@@ -108,15 +109,15 @@ def test_verify_backup_rejects_unsound_copies(tmp_path: Path) -> None:
     path = tmp_path / "metadata.db"
     manager(path).migrate()
     copy = manager(path).backup(tmp_path / "backups")
-    assert verify_backup(copy, family, 1)
-    assert not verify_backup(copy, family, 2)
-    assert not verify_backup(tmp_path / "absent.db", family, 1)
+    assert verify_backup(copy, family, CURRENT)
+    assert not verify_backup(copy, family, CURRENT + 1)
+    assert not verify_backup(tmp_path / "absent.db", family, CURRENT)
     page_size = int(raw_rows(copy, "PRAGMA page_size")[0][0])
     (root,) = raw_rows(copy, "SELECT rootpage FROM sqlite_schema WHERE name = 'device_by_site'")[0]
     with copy.open("r+b") as handle:
         handle.seek((int(root) - 1) * page_size)
         handle.write(b"\xff" * page_size)
-    assert not verify_backup(copy, family, 1)
+    assert not verify_backup(copy, family, CURRENT)
 
 
 def test_non_transactional_migration_runs_outside_a_transaction(tmp_path: Path) -> None:
@@ -133,7 +134,7 @@ def test_non_transactional_migration_runs_outside_a_transaction(tmp_path: Path) 
     """
     path = tmp_path / "metadata.db"
     manager(path).migrate()
-    family = family_with(synthetic(2, "compact", "VACUUM;", transactional=False))
+    family = family_with(synthetic(CURRENT + 1, "compact", "VACUUM;", transactional=False))
     assert [a.name for a in manager(path, family).migrate()] == ["compact"]
     assert manager(path, family).status().state is SchemaState.CURRENT
 

@@ -1,0 +1,275 @@
+# Interface reconciliation corpus, version 1 (IFID-009, IFID-T10).
+#
+# Each case is one device: `stored` are the interfaces vakr knew before a
+# rediscovery (`key` labels them for the expectations; no `if_index` means the
+# interface had already gone missing), `rows` are what the agent reports now,
+# and `expect` lists the approved outcome for every row. `missing` lists the
+# stored interfaces that must be reported missing, `held` those held as review
+# candidates. Changing an approved outcome needs review: bump `corpus_version`
+# or the rules' `rules_version` (vakr.discovery.reconcile.model.RULES_VERSION)
+# and say why in the commit.
+#
+# Names follow Cisco IOS XE. Addresses are RFC 5737 / RFC 3849 documentation
+# ranges, MACs the RFC 7042 documentation block 00:00:5e:00:53:00/24.
+
+corpus_version = 1
+rules_version = "mvp-1"
+
+[[cases]]
+name = "unchanged-physical-ports"
+why = "IFID-T01: same ifIndex and ifName keep the UUID"
+stored = [
+    { key = "gi0", if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6, mac = "00:00:5e:00:53:01", addresses = ["192.0.2.1/30"] },
+    { key = "gi1", if_index = 2, if_name = "Gi0/0/1", if_descr = "GigabitEthernet0/0/1", if_type = 6, mac = "00:00:5e:00:53:02" },
+]
+rows = [
+    { if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6, mac = "00:00:5e:00:53:01", addresses = ["192.0.2.1/30"] },
+    { if_index = 2, if_name = "Gi0/0/1", if_descr = "GigabitEthernet0/0/1", if_type = 6, mac = "00:00:5e:00:53:02" },
+]
+expect = [
+    { if_index = 1, outcome = "exact", interface = "gi0" },
+    { if_index = 2, outcome = "exact", interface = "gi1" },
+]
+
+[[cases]]
+name = "description-change"
+why = "IFID-T03: an ifAlias edit is cosmetic and never splits identity"
+stored = [
+    { key = "wan", if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_alias = "WAN ISP-A", if_type = 6 },
+]
+rows = [
+    { if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_alias = "WAN ISP-B circuit 42", if_type = 6 },
+]
+expect = [{ if_index = 1, outcome = "exact", interface = "wan", evidence_count = 2 }]
+
+[[cases]]
+name = "case-and-padding"
+why = "9.8 step 2: names compare trimmed and case-insensitively"
+stored = [{ key = "lo", if_index = 9, if_name = "Loopback0", if_descr = "Loopback0", if_type = 24 }]
+rows = [{ if_index = 9, if_name = "loopback0 \u0000", if_descr = "Loopback0", if_type = 24 }]
+expect = [{ if_index = 9, outcome = "exact", interface = "lo" }]
+
+[[cases]]
+name = "renumber-after-reload"
+why = "IFID-T02: unique names moved to free ifIndexes keep their UUIDs"
+stored = [
+    { key = "gi0", if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6 },
+    { key = "gi1", if_index = 2, if_name = "Gi0/0/1", if_descr = "GigabitEthernet0/0/1", if_type = 6 },
+    { key = "po1", if_index = 3, if_name = "Po1", if_descr = "Port-channel1", if_type = 161 },
+]
+rows = [
+    { if_index = 11, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6 },
+    { if_index = 12, if_name = "Gi0/0/1", if_descr = "GigabitEthernet0/0/1", if_type = 6 },
+    { if_index = 13, if_name = "Po1", if_descr = "Port-channel1", if_type = 161 },
+]
+expect = [
+    { if_index = 11, outcome = "confident_renumber", interface = "gi0" },
+    { if_index = 12, outcome = "confident_renumber", interface = "gi1" },
+    { if_index = 13, outcome = "confident_renumber", interface = "po1" },
+]
+
+[[cases]]
+name = "renumber-shift-onto-occupied-indexes"
+why = "IFID-006: a name moving onto an ifIndex another interface held is not unambiguous"
+stored = [
+    { key = "a", if_index = 1, if_name = "Gi1/0/1", if_descr = "GigabitEthernet1/0/1", if_type = 6 },
+    { key = "b", if_index = 2, if_name = "Gi1/0/2", if_descr = "GigabitEthernet1/0/2", if_type = 6 },
+    { key = "c", if_index = 3, if_name = "Gi1/0/3", if_descr = "GigabitEthernet1/0/3", if_type = 6 },
+]
+rows = [
+    { if_index = 2, if_name = "Gi1/0/1", if_descr = "GigabitEthernet1/0/1", if_type = 6 },
+    { if_index = 3, if_name = "Gi1/0/2", if_descr = "GigabitEthernet1/0/2", if_type = 6 },
+    { if_index = 4, if_name = "Gi1/0/3", if_descr = "GigabitEthernet1/0/3", if_type = 6 },
+]
+expect = [
+    { if_index = 2, outcome = "ambiguous", candidates = ["a", "b"] },
+    { if_index = 3, outcome = "ambiguous", candidates = ["b"] },
+    { if_index = 4, outcome = "confident_renumber", interface = "c" },
+]
+held = ["a", "b"]
+
+[[cases]]
+name = "swapped-ports"
+why = "IFID-T05: two ports that traded ifIndexes are never merged automatically"
+stored = [
+    { key = "a", if_index = 1, if_name = "Gi1/0/1", if_descr = "GigabitEthernet1/0/1", if_type = 6 },
+    { key = "b", if_index = 2, if_name = "Gi1/0/2", if_descr = "GigabitEthernet1/0/2", if_type = 6 },
+]
+rows = [
+    { if_index = 1, if_name = "Gi1/0/2", if_descr = "GigabitEthernet1/0/2", if_type = 6 },
+    { if_index = 2, if_name = "Gi1/0/1", if_descr = "GigabitEthernet1/0/1", if_type = 6 },
+]
+expect = [
+    { if_index = 1, outcome = "ambiguous", candidates = ["a", "b"] },
+    { if_index = 2, outcome = "ambiguous", candidates = ["a", "b"] },
+]
+held = ["a", "b"]
+
+[[cases]]
+name = "renamed-at-same-index"
+why = "IFID-T06: a new name at an old ifIndex is probable, never merged"
+stored = [{ key = "gi5", if_index = 5, if_name = "Gi0/0/5", if_descr = "GigabitEthernet0/0/5", if_type = 6, mac = "00:00:5e:00:53:05" }]
+rows = [{ if_index = 5, if_name = "Te0/0/5", if_descr = "TenGigabitEthernet0/0/5", if_type = 6, mac = "00:00:5e:00:53:55" }]
+expect = [{ if_index = 5, outcome = "probable", candidates = ["gi5"] }]
+held = ["gi5"]
+
+[[cases]]
+name = "duplicate-names-reported"
+why = "A name the agent reports twice cannot pick one identity"
+stored = [{ key = "tu", if_index = 1, if_name = "Tu0", if_descr = "Tunnel0", if_type = 131 }]
+rows = [
+    { if_index = 5, if_name = "Tu0", if_descr = "Tunnel0", if_type = 131 },
+    { if_index = 6, if_name = "Tu0", if_descr = "Tunnel0", if_type = 131 },
+]
+expect = [
+    { if_index = 5, outcome = "ambiguous", candidates = ["tu"] },
+    { if_index = 6, outcome = "ambiguous", candidates = ["tu"] },
+]
+held = ["tu"]
+
+[[cases]]
+name = "duplicate-names-stored"
+why = "Two stored identities with one name (one retired) leave a renumbered row ambiguous"
+stored = [
+    { key = "old", if_index = 7, if_name = "Gi0/0/7", if_descr = "GigabitEthernet0/0/7", if_type = 6, lifecycle = "retired" },
+    { key = "new", if_index = 8, if_name = "Gi0/0/7", if_descr = "GigabitEthernet0/0/7", if_type = 6 },
+]
+rows = [{ if_index = 9, if_name = "Gi0/0/7", if_descr = "GigabitEthernet0/0/7", if_type = 6 }]
+expect = [{ if_index = 9, outcome = "ambiguous", candidates = ["old", "new"] }]
+held = ["old", "new"]
+
+[[cases]]
+name = "shared-svi-mac"
+why = "IFID-T04, IFID-008: SVIs share the base MAC, so it is no evidence"
+stored = [
+    { key = "v10", if_index = 30, if_name = "Vl10", if_descr = "Vlan10", if_type = 53, mac = "00:00:5e:00:53:a0", addresses = ["198.51.100.1/24"] },
+    { key = "v20", if_index = 31, if_name = "Vl20", if_descr = "Vlan20", if_type = 53, mac = "00:00:5e:00:53:a0" },
+]
+rows = [
+    { if_index = 30, if_name = "Vl10", if_descr = "Vlan10", if_type = 53, mac = "00:00:5e:00:53:a0", addresses = ["198.51.100.1/24"] },
+    { if_index = 31, if_name = "Vl20", if_descr = "Vlan20", if_type = 53, mac = "00:00:5e:00:53:a0" },
+    { if_index = 32, if_name = "Vl30", if_descr = "Vlan30", if_type = 53, mac = "00:00:5e:00:53:a0" },
+]
+expect = [
+    { if_index = 30, outcome = "exact", interface = "v10" },
+    { if_index = 31, outcome = "exact", interface = "v20" },
+    { if_index = 32, outcome = "new" },
+]
+
+[[cases]]
+name = "invalid-macs"
+why = "IFID-008: zero, broadcast, and multicast MACs are never evidence"
+stored = [
+    { key = "tu0", if_index = 40, if_name = "Tu0", if_descr = "Tunnel0", if_type = 131, mac = "00:00:00:00:00:00" },
+    { key = "nv", if_index = 41, if_name = "Nv0", if_descr = "NVI0", if_type = 1, mac = "ff:ff:ff:ff:ff:ff" },
+    { key = "mc", if_index = 42, if_name = "Vi1", if_descr = "Virtual-Access1", if_type = 23, mac = "01:00:5e:00:00:01" },
+]
+rows = [
+    { if_index = 50, if_name = "Tu5", if_descr = "Tunnel5", if_type = 131, mac = "00:00:00:00:00:00" },
+    { if_index = 51, if_name = "Nv5", if_descr = "NVI5", if_type = 1, mac = "ff:ff:ff:ff:ff:ff" },
+    { if_index = 52, if_name = "Vi5", if_descr = "Virtual-Access5", if_type = 23, mac = "01:00:5e:00:00:01" },
+]
+expect = [
+    { if_index = 50, outcome = "new" },
+    { if_index = 51, outcome = "new" },
+    { if_index = 52, outcome = "new" },
+]
+missing = ["tu0", "nv", "mc"]
+
+[[cases]]
+name = "unique-mac-moved-and-renamed"
+why = "A unique unicast MAC links a renamed, renumbered port for review instead of a new identity"
+stored = [{ key = "gi3", if_index = 3, if_name = "Gi0/0/3", if_descr = "GigabitEthernet0/0/3", if_type = 6, mac = "00:00:5e:00:53:33" }]
+rows = [{ if_index = 9, if_name = "Te0/1/0", if_descr = "TenGigabitEthernet0/1/0", if_type = 6, mac = "00:00:5e:00:53:33" }]
+expect = [{ if_index = 9, outcome = "probable", candidates = ["gi3"] }]
+held = ["gi3"]
+
+[[cases]]
+name = "renumber-contradicted-by-mac"
+why = "9.8 step 8: a strong MAC that disagrees makes a renumber only probable"
+stored = [{ key = "gi4", if_index = 4, if_name = "Gi0/0/4", if_descr = "GigabitEthernet0/0/4", if_type = 6, mac = "00:00:5e:00:53:44" }]
+rows = [{ if_index = 14, if_name = "Gi0/0/4", if_descr = "GigabitEthernet0/0/4", if_type = 6, mac = "00:00:5e:00:53:45" }]
+expect = [{ if_index = 14, outcome = "probable", candidates = ["gi4"] }]
+held = ["gi4"]
+
+[[cases]]
+name = "shared-address"
+why = "A unique address moving to a new tunnel is evidence for review"
+stored = [{ key = "tu10", if_index = 20, if_name = "Tu10", if_descr = "Tunnel10", if_type = 131, addresses = ["203.0.113.1/30", "2001:db8:10::1/64"] }]
+rows = [{ if_index = 21, if_name = "Tu99", if_descr = "Tunnel99", if_type = 131, addresses = ["203.0.113.1/30"] }]
+expect = [{ if_index = 21, outcome = "probable", candidates = ["tu10"] }]
+held = ["tu10"]
+
+[[cases]]
+name = "logical-interfaces"
+why = "Loopbacks, SVIs, subinterfaces, Null0, and port-channel members reconcile like ports"
+stored = [
+    { key = "lo0", if_index = 10, if_name = "Lo0", if_descr = "Loopback0", if_type = 24, addresses = ["192.0.2.255/32", "2001:db8::ff/128"] },
+    { key = "sub", if_index = 11, if_name = "Gi0/0/0.100", if_descr = "GigabitEthernet0/0/0.100", if_type = 135, mac = "00:00:5e:00:53:01" },
+    { key = "null", if_index = 12, if_name = "Nu0", if_descr = "Null0", if_type = 1 },
+    { key = "po", if_index = 13, if_name = "Po10", if_descr = "Port-channel10", if_type = 161, mac = "00:00:5e:00:53:10" },
+    { key = "m1", if_index = 14, if_name = "Te1/0/1", if_descr = "TenGigabitEthernet1/0/1", if_type = 6, mac = "00:00:5e:00:53:10" },
+]
+rows = [
+    { if_index = 10, if_name = "Lo0", if_descr = "Loopback0", if_type = 24, addresses = ["192.0.2.255/32", "2001:db8::ff/128"] },
+    { if_index = 11, if_name = "Gi0/0/0.100", if_descr = "GigabitEthernet0/0/0.100", if_type = 135, mac = "00:00:5e:00:53:01" },
+    { if_index = 12, if_name = "Nu0", if_descr = "Null0", if_type = 1 },
+    { if_index = 13, if_name = "Po10", if_descr = "Port-channel10", if_type = 161, mac = "00:00:5e:00:53:10" },
+    { if_index = 14, if_name = "Te1/0/1", if_descr = "TenGigabitEthernet1/0/1", if_type = 6, mac = "00:00:5e:00:53:10" },
+    { if_index = 15, if_name = "Lo100", if_descr = "Loopback100", if_type = 24, addresses = ["198.51.100.100/32"] },
+]
+expect = [
+    { if_index = 10, outcome = "exact", interface = "lo0" },
+    { if_index = 11, outcome = "exact", interface = "sub" },
+    { if_index = 12, outcome = "exact", interface = "null" },
+    { if_index = 13, outcome = "exact", interface = "po" },
+    { if_index = 14, outcome = "exact", interface = "m1" },
+    { if_index = 15, outcome = "new" },
+]
+
+[[cases]]
+name = "missing-interface"
+why = "LIFE-005/E.6: an interface absent from a complete ifTable is missing, not deleted"
+stored = [
+    { key = "gi0", if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6 },
+    { key = "gi3", if_index = 4, if_name = "Gi0/0/3", if_descr = "GigabitEthernet0/0/3", if_type = 6 },
+]
+rows = [{ if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6 }]
+expect = [{ if_index = 1, outcome = "exact", interface = "gi0" }]
+missing = ["gi3"]
+
+[[cases]]
+name = "missing-after-incomplete-walk"
+why = "DISC-008: a partial ifTable never marks anything missing"
+inventory_complete = false
+stored = [
+    { key = "gi0", if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6 },
+    { key = "gi3", if_index = 4, if_name = "Gi0/0/3", if_descr = "GigabitEthernet0/0/3", if_type = 6 },
+]
+rows = [{ if_index = 1, if_name = "Gi0/0/0", if_descr = "GigabitEthernet0/0/0", if_type = 6 }]
+expect = [{ if_index = 1, outcome = "exact", interface = "gi0" }]
+
+[[cases]]
+name = "returning-interface"
+why = "IFID-T08, LIFE-005: an interface that went missing reconnects to its UUID"
+stored = [
+    { key = "gi3", if_name = "Gi0/0/3", if_descr = "GigabitEthernet0/0/3", if_type = 6, lifecycle = "inactive" },
+]
+rows = [{ if_index = 4, if_name = "Gi0/0/3", if_descr = "GigabitEthernet0/0/3", if_type = 6 }]
+expect = [{ if_index = 4, outcome = "confident_renumber", interface = "gi3" }]
+
+[[cases]]
+name = "no-ifname-uses-ifdescr"
+why = "ifName absent (ifXTable failed): ifDescr is the name"
+stored = [{ key = "se", if_index = 2, if_name = "Se0/1/0", if_descr = "Serial0/1/0", if_type = 22 }]
+rows = [{ if_index = 2, if_descr = "Serial0/1/0", if_type = 22 }]
+expect = [{ if_index = 2, outcome = "exact", interface = "se" }]
+
+[[cases]]
+name = "addresses-ignored-when-ip-mib-incomplete"
+why = "DISC-T04: incomplete IP-MIB answers are not evidence"
+addresses_complete = false
+stored = [{ key = "tu10", if_index = 20, if_name = "Tu10", if_descr = "Tunnel10", if_type = 131, addresses = ["203.0.113.1/30"] }]
+rows = [{ if_index = 21, if_name = "Tu99", if_descr = "Tunnel99", if_type = 131, addresses = ["203.0.113.1/30"] }]
+expect = [{ if_index = 21, outcome = "new" }]
+missing = ["tu10"]

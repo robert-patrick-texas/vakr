@@ -9,8 +9,8 @@ operator finds the problem when validating rather than when a service
 refuses to start.
 
 Dependencies:
-    vakr.config.keyword_check, vakr.scheduler.settings, vakr.ingest.settings:
-        The subsystem rules.
+    vakr.config.keyword_check, vakr.scheduler.settings, vakr.ingest.settings,
+    vakr.inventory.settings: The subsystem rules.
 
 Safety:
     Read-only. Messages name options and values, never secrets.
@@ -25,12 +25,14 @@ from collections.abc import Callable
 from vakr.config.keyword_check import keyword_problems
 from vakr.config.loader import EffectiveConfig
 from vakr.ingest.settings import spool_problems
+from vakr.inventory.settings import inventory_problems
 from vakr.scheduler.settings import scheduler_problems
 
 RULES: tuple[tuple[str, Callable[[EffectiveConfig], list[str]]], ...] = (
     ("unsafe or invalid interface keyword", keyword_problems),
     ("inconsistent scheduler settings", scheduler_problems),
     ("inconsistent spool settings", spool_problems),
+    ("invalid inventory file", inventory_problems),
 )
 """``(what is wrong, rule)`` pairs, run in order; the first failing rule is reported."""
 

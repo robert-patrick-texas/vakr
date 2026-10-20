@@ -1497,7 +1497,7 @@ Operator files under `/etc/vakr/` hold only the settings an operator has changed
 
 ### 11.3 Reference configuration
 
-Enterprise example of `/etc/vakr/config.toml` (a Compact/MVP example appears in section 27.9):
+The option catalog (`src/vakr/defaults/options.toml`, published as the [configuration reference](docs/operations/configuration.md)) is authoritative for names, defaults, and ranges; this section shows how the files fit together. Operator files hold only overrides (CFGM-001). An enterprise-leaning `/etc/vakr/config.toml` (a Compact/MVP example appears in section 27.9):
 
 ```toml
 config_version = 1  # maintained by `vakr config upgrade`; do not edit (CFGM-002)
@@ -1508,62 +1508,57 @@ timezone = "America/New_York"
 [profile]
 name = "enterprise"  # lite | compact | hybrid-small | standard | enterprise
 
-[metadata]
-backend = "postgresql"
-dsn_secret = "metadata-dsn"
-
 [telemetry]
-backend = "clickhouse"
-dsn_secret = "telemetry-dsn"
 native_retention_days = 30
 rollup_retention_days = 400
 rollup_interval = "15m"
 
-[poller]
-name = ""  # empty means Linux short hostname
-schedule_strategy = "hostname-phase"
-global_concurrency = 500
-per_device_pdu_concurrency = 1
-
-[polling]
+[polling]                         # per-device defaults; inventory and policies may override
 default_interval = "60s"
-discovery_interval = "24h"
-icmp_count = 5
-icmp_spacing = "200ms"
 reachability_strategy = "icmp_gated"
-snmp_timeout = "2s"
-snmp_retries = 1
-adaptive_polling = false
 
-[spool]
-path = "/var/lib/vakr/spool"
-max_bytes = 107374182400
-warning_percent = 70
-critical_percent = 85
-exhausted_percent = 95
+[scheduler]                       # the collector's own controls (E.25)
+collector_name = ""               # empty means the short host name
+phase = "hostname"                # hostname | fixed (SCHED-002)
+device_order = "common"           # common | hashed
+workers = 500
 
-[security]
-trusted_proxy_cidrs = ["127.0.0.1/32", "::1/128"]
+[icmp]                            # E.9, E.22
+probes = 5
+spacing = "200ms"
+timeout = "1s"
+
+[snmp]                            # E.9, E.23; one outstanding PDU per device is fixed (SNMP-012)
+timeout = "2s"
+retries = 1
+rediscovery_interval = "24h"
+
+[spool]                           # E.8, E.24
+max_size_mib = 102400
+warning_pct = 70
+critical_pct = 85
+exhausted_pct = 95
+
+[security]                        # 15.5
 allowed_target_cidrs = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
-denied_target_addresses = ["169.254.169.254"]
-public_dashboards_enabled = false
+denied_target_addresses = ["169.254.169.254/32"]
+```
 
+Enterprise profiles add settings the MVP catalog does not have yet; they arrive with their features and are listed here so the shape is known: `[metadata] backend` and `dsn_secret`, `[telemetry] backend` and `dsn_secret`, `[security] trusted_proxy_cidrs` and `public_dashboards_enabled`, and `[polling] adaptive_polling`.
+
+Inventory lives in `/etc/vakr/inventory.toml` ([inventory guide](docs/operations/inventory.md), E.26), not in `config.toml`:
+
+```toml
 [[sites]]
 name = "nyc01"
-display_name = "New York Primary"
 region = "US-East"
 
 [[devices]]
 name = "router01"
 address = "192.0.2.1"
 site = "nyc01"
-credential = "network-snmpv3"
+credential = "network-v2c"        # a name in the credentials file, never the secret
 comment = "Primary WAN router"
-
-[[interface_policy.rules]]
-name = "access-switch-uninteresting"
-groups = ["access-switches"]
-exclude_ifname_patterns = ["Loopback*", "Vlan*", "BVI*", "Tunnel*", "Null*"]
 
 [[interface_annotations]]
 device = "router01"
@@ -1574,7 +1569,15 @@ sticky = true
 provider = "Example ISP"
 circuit_id = "ABC12345"
 contracted_bps = 1000000000
-public_dashboard_eligible = true
+```
+
+Collection rules live in `/etc/vakr/policies.toml` ([policy guide](docs/operations/policies.md)):
+
+```toml
+[[interface_policy.rules]]
+name = "access-switch-uninteresting"
+groups = ["access-switches"]
+exclude_ifname_patterns = ["Loopback*", "Vlan*", "BVI*", "Tunnel*", "Null*"]
 ```
 
 Credentials live in a separate protected file, `/etc/vakr/secrets/credentials.toml` (mode `0640`, owner `root:vakr`), not in `config.toml`. Database DSNs referenced by `dsn_secret` are resolved from the same provider.
@@ -3327,7 +3330,7 @@ channel = "prerelease"      # stable | prerelease; MVP iterations are pre-releas
 # hold_version = "0.4.2"    # pin; the update timer will not go past it
 ```
 
-Every omitted option takes its packaged default (CFGM-001). Options appear in the packaged catalog when the milestone that implements them lands. Until then, validation rejects them as unknown (for example `[polling]` before M3), so this example is valid only once M3 is complete.
+Every omitted option takes its packaged default (CFGM-001). Options appear in the packaged catalog when the milestone that implements them lands. Until then, validation rejects them as unknown; `[polling]`, for example, arrived with M3.
 
 ---
 
@@ -4002,7 +4005,7 @@ Rationale: 32 workers is about six times the ~5 concurrent polls the MVP workloa
 Decisions taken with the M3 scheduler:
 
 1. **Offsets.** `offset_us = (phase_us + hash64(order_input) mod I) mod I` with `I` the interval in microseconds; `phase_us` is `hash64(collector_name) mod I` (`hostname`) or `fixed_phase mod I` (`fixed`). E.11 names only the hashed-order input, so `common` order hashes the device UUID alone: every collector then visits devices in the same relative order. Slot `k` of a device is `k × I + offset_us` microseconds after the Unix epoch, so a device polls at the same offset past every interval boundary, and adding or removing other devices never moves it. Golden vectors for a Go collector are in `tests/unit/scheduler/golden_phase_vectors.json`.
-2. **Configuration names.** Section 11.3's enterprise example uses `[poller]` (`name`, `schedule_strategy`, `global_concurrency`); section 27.9 uses `[polling] default_interval` and `reachability_strategy`. The scheduler keeps `[polling]` for the per-device defaults, as 27.9 and the policy engine expect, and uses `[scheduler]` for its own controls. `schedule_strategy` becomes two keys, `phase` and `device_order`, because SCHED-002 makes them independent. Section 11.3 should be updated to match.
+2. **Configuration names.** Section 11.3's enterprise example uses `[poller]` (`name`, `schedule_strategy`, `global_concurrency`); section 27.9 uses `[polling] default_interval` and `reachability_strategy`. The scheduler keeps `[polling]` for the per-device defaults, as 27.9 and the policy engine expect, and uses `[scheduler]` for its own controls. `schedule_strategy` becomes two keys, `phase` and `device_order`, because SCHED-002 makes them independent. Section 11.3 now uses these names.
 3. **Plan timeline.** Waits, deadlines, lateness, and durations use the monotonic clock. The timeline's UTC origin is fixed when the scheduler starts. When the wall clock drifts from it by more than 1 s (an NTP step or `date -s`), later `scheduled_at` labels move with the wall clock once, while cadence is untouched: no burst, gap, or duplicate poll (SCHED-018). `completed_at` is `started_at` plus the monotonic duration, so it can never precede `started_at`.
 4. **Execution states.** `COMPLETE`: every step the strategy and gate called for answered fully; ICMP with 0 replies is a complete measurement. `PARTIAL`: some step produced evidence and a later one did not finish cleanly. `FAILED`: no step produced evidence. Misses: the previous poll still running is `MISSED_OVERRUN`; no worker within `max_start_delay`, a slot superseded by the device's next one while waiting, or a slot the scheduler itself reached too late is `NOT_ATTEMPTED`; shutdown before the start is `NOT_ATTEMPTED`. Every miss carries `NOT_ATTEMPTED` and no observations. Capacity misses, collector-side step errors, and polls cancelled by shutdown add `COLLECTOR_DEGRADED`. A device that is disabled or removed while a slot waits loses that slot without a record, because it is no longer scheduled (9.2).
 5. **`snmp_fallback`.** After 0–1 replies, or a collector-side ICMP failure, one Stage 1 request is made without retries and Stage 2 does not follow (`SnmpPlan.STAGE1_FALLBACK`, ICMP-013). Under `icmp_gated` a collector-side ICMP failure (for example `ping_group_range` excluding the collector, so nothing was sent) gives no reply count, so SNMP runs normally: the gate spares unreachable devices, and must not stop all collection on a host where vakr cannot ping. The ICMP result stays unknown and the poll carries `COLLECTOR_DEGRADED`. Decided at the M3-icmp merge; reversible.
@@ -4051,7 +4054,7 @@ A MAC is strong only when it is a six-octet unicast address, not all zeros or on
 
 **Decisions on text that disagrees.**
 
-1. Section 11.3 shows `[[sites]]`, `[[devices]]`, and `[[interface_annotations]]` inside `config.toml`, while 11.1 lists `/etc/vakr/inventory.toml`. Inventory lives only in `inventory.toml`; `config.toml` rejects these tables as unknown keys. Section 11.3 should move them.
+1. Section 11.3 shows `[[sites]]`, `[[devices]]`, and `[[interface_annotations]]` inside `config.toml`, while 11.1 lists `/etc/vakr/inventory.toml`. Inventory lives only in `inventory.toml`; `config.toml` rejects these tables as unknown keys. Section 11.3 now shows them in an `inventory.toml` example.
 2. Section 11.3's enterprise example allows only RFC 1918 targets. The packaged default allows any unicast address, because management addresses differ by site; operators narrow it with `security.allowed_target_cidrs`.
 3. IFID-005 asks for every decision in history and 9.8 for a scored pipeline; until ADR-015, history omits steady-state exact matches and scores (above), and IFID-006's margin is met by requiring that no runner-up exists.
 4. A stored annotation cannot say "explicitly secondary" (the domain's `InterfaceAnnotation` has no unset state), so a file's `interest = "secondary"` or `sticky = false` cannot override a description keyword. Revisit with the M4 query layer.

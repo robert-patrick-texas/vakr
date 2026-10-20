@@ -31,3 +31,6 @@ credentials.toml
 .idea/
 .vscode/
 *.swp
+
+# Claude Code agent worktrees and local session state
+.claude/

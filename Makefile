@@ -34,8 +34,8 @@ docstrings:
 
 docs:
 	uv run tools/md2html/md2html.py . $(SITE) --title vakr \
-		--repo-url https://github.com/robert-patrick-texas/vakr --branch main
+		--repo-url https://github.com/robert-patrick-texas/vakr --branch main --exclude .claude
 
 docs-check:
 	uv run tools/md2html/md2html.py . $(SITE) --check --title vakr \
-		--repo-url https://github.com/robert-patrick-texas/vakr --branch main
+		--repo-url https://github.com/robert-patrick-texas/vakr --branch main --exclude .claude

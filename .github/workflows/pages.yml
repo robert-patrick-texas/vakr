@@ -1,0 +1,57 @@
+# Publish every Markdown file in the repository to GitHub Pages as HTML.
+# The build fails, and nothing is deployed, if md2html --check finds a broken
+# internal link or anchor. Requires Settings > Pages > Source: "GitHub Actions".
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; let an in-progress deployment finish rather than
+# cancelling it halfway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # setup-uv no longer publishes floating major tags (there is no "v10"),
+      # so it is pinned to the v10.3.0 commit as its README recommends.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          # The script's inline metadata is the only dependency declaration.
+          cache-dependency-glob: tools/md2html/md2html.py
+
+      - name: Build site and check links
+        run: >-
+          uv run tools/md2html/md2html.py . _site --check
+          --repo-url https://github.com/robert-patrick-texas/vakr
+          --branch main --title vakr
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

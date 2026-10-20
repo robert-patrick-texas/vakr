@@ -2100,7 +2100,7 @@ Required runbooks:
 
 ### 17.2 File size and complexity
 
-- Authored production files under `src/` shall target no more than 300 physical lines, including docstrings and comments.
+- Authored production files under `src/` and `tools/` shall target no more than 300 physical lines, including docstrings and comments.
 - A CI check shall fail files over 300 lines unless the path is listed in `docs/architecture/loc-exceptions.md` with reason, owner, decomposition analysis, and expiry/review milestone.
 - Generated artifacts, vendored assets, and migration snapshots may be excluded but shall be clearly identified.
 - Functions should normally remain under 50 lines and cyclomatic complexity at or below 10.
@@ -3452,7 +3452,7 @@ Tools that support development and operations, rather than network monitoring it
 1. import nothing from vakr's domain, application, or adapter packages;
 2. take project-specific values (names, repository, paths, key files, profiles) from arguments or a small config file, never from constants;
 3. have its own README, its own tests, and an Apache-2.0 header;
-4. be a single file with PEP 723 inline dependencies if it is a development tool, or use only the Python standard library if it runs on production hosts;
+4. be a small self-contained directory that another project can vendor by copying it: one entry-point script, plus sibling modules and templates where the 300-line limit (section 17.2) requires them. Development tools declare dependencies with PEP 723 inline metadata in the entry point. Tools that run on production hosts use only the Python standard library;
 5. move to its own repository once a second project adopts it (ADR-030).
 
 An import-boundary test in CI enforces rule 1 for code under `src/vakr/lifecycle/` and `tools/`.
@@ -3461,7 +3461,7 @@ An import-boundary test in CI enforces rule 1 for code under `src/vakr/lifecycle
 
 | Tool | Purpose | Runs on | Location | Form |
 |---|---|---|---|---|
-| md2html | Markdown → HTML site with link checking | Development host, CI | `tools/md2html/` | Single file plus template |
+| md2html | Markdown → HTML site with link checking | Development host, CI | `tools/md2html/` | Entry script, render module, and template |
 | check-updates | Reports newer toolchain and dependency versions | Development host | `tools/check-updates/` | Single file, config-driven |
 | check-version | Enforces the single version source (VER-003) | CI | `tools/check-version/` | Single file |
 | release | Builds, checksums, signs, tags, and publishes | Development host | `tools/release/` | Single file, config-driven |

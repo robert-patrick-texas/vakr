@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>${title}</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --fg: #1f2328;
+  --muted: #59636e;
+  --border: #d1d9e0;
+  --surface: #f6f8fa;
+  --link: #0969da;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #9198a1;
+    --border: #3d444d;
+    --surface: #151b23;
+    --link: #4493f8;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+a { color: var(--link); }
+.wrap { max-width: 52rem; margin: 0 auto; padding: 0 1rem; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); }
+.topbar .wrap {
+  display: flex; flex-wrap: wrap; align-items: baseline;
+  justify-content: space-between; gap: .25rem 1.25rem; padding-block: .65rem;
+}
+.topbar .site { color: var(--fg); font-weight: 600; text-decoration: none; }
+.topbar nav { display: flex; gap: 1.25rem; }
+main { padding-block: .5rem 2.5rem; overflow-wrap: break-word; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.75em 0 .6em; }
+h1, h2 { padding-bottom: .3em; border-bottom: 1px solid var(--border); }
+main > h1:first-child { margin-top: 1rem; }
+.header-anchor { margin-left: .2em; color: var(--muted); text-decoration: none; opacity: 0; }
+:is(h1, h2, h3, h4, h5, h6):hover .header-anchor, .header-anchor:focus { opacity: 1; }
+@media (hover: none) { .header-anchor { opacity: .4; } }
+code, kbd, pre, samp {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: .875em;
+}
+:not(pre) > code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: .1em .3em; }
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: .75rem 1rem; overflow-x: auto; line-height: 1.45; tab-size: 4;
+}
+pre code { font-size: 1em; }
+.table-wrap { overflow-x: auto; margin: 1rem 0; }
+table { border-collapse: collapse; overflow-wrap: normal; }
+th, td { border: 1px solid var(--border); padding: .4rem .75rem; text-align: left; vertical-align: top; }
+th { font-weight: 600; }
+blockquote { margin: 1rem 0; padding: 0 1rem; color: var(--muted); border-left: .25em solid var(--border); }
+img { max-width: 100%; height: auto; }
+hr { border: 0; border-top: 1px solid var(--border); margin: 2rem 0; }
+.contains-task-list { list-style: none; padding-left: 1.5em; }
+.task-list-item-checkbox { margin: 0 .4em 0 -1.4em; vertical-align: middle; }
+.footnotes { color: var(--muted); font-size: .9em; }
+footer { color: var(--muted); font-size: .875rem; padding-block: 1rem 2rem; border-top: 1px solid var(--border); }
+footer a { color: inherit; }
+</style>
+</head>
+<body>
+<header class="topbar">
+<div class="wrap">
+<a class="site" href="${home}">${site}</a>
+<nav><a href="${home}">Home</a> <a href="${all_docs}">All docs</a></nav>
+</div>
+</header>
+<main class="wrap">
+${body}</main>
+<footer class="wrap">${footer}</footer>
+</body>
+</html>

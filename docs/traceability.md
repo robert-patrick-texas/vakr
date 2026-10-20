@@ -183,6 +183,24 @@ The port is `src/vakr/ports/icmp.py` (raw result types in `ports/icmp_types.py`)
 | OBS-001/002/003 (ICMP) | In progress | `IcmpCounters`, `CollectorFault`, `cycle.collector_state` | `test_icmp_faults.py`, `test_icmp_errqueue.py` | ADR-023 | Collector trouble is never target loss; metrics export comes later. |
 | 16.3 preflight (ICMP) | Implemented | `adapters/icmp/health.check_icmp` in `CHECKS` | `test_icmp_preflight.py` | `icmp.md` | WARNING, not CRITICAL, so self-update is not rolled back on an unfixed host. |
 
+## Spool and ingestion (M3)
+
+Code is in `src/vakr/ingest/` and `src/vakr/health/spool_check.py`, with tests in `tests/unit/ingest/`. See [the spool guide](operations/spool.md) and Appendix E.24. Records keep the M2 JSON envelope; MessagePack (ADR-014) is not used (E.24).
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| STORE-003 | Implemented | `ingest/ingester.py` | `test_ingest_flow::test_ingest_t01_*`, `test_ingest_t02_*` | `spool.md` | Batches by interval or row count. |
+| STORE-004 | Implemented | `ingest/{spool,writer_thread,gate,commit,segment_writer}.py` | `test_spool_append::test_store004_*`, `test_e8_*`, `test_queue_t01_*`; `test_spool_throughput::test_store004_*` | `spool.md`, E.24 | `append` returns only after the covering fsync (E.8). 2× MVP rate: p99 append-to-durable about 0.92 s. |
+| STORE-005 | Implemented | `ingest/settings.py`, `config/cross_checks.py` | `test_spool_settings::test_cross_option_rules_are_enforced`, `test_inconsistent_spool_settings_fail_validation` | `spool.md` | Refuses `/dev/shm` and `/run`; `vakr config validate` runs `spool_problems`. |
+| STORE-006 | Implemented | `segment_writer.py`, `recovery.py`, `cursor.py`, `reader.py` | `test_spool_crash::test_spool_t06_*`, `test_spool_recovery::*` | `spool.md` | Real SIGKILL and `os._exit` crash tests. |
+| STORE-007 | Implemented | `incidents.py`, `incident_log.py`, `losses.py`, `recovery.py` | `test_spool_recovery::test_spool_t08_*`, `test_spool_capacity::*`, `test_ingest_failures::test_store007_*` | `spool.md` | Incidents are local (`incidents.jsonl` and the journal); the API and UI show them later. |
+| STORE-009/010 | Implemented (spool side) | `ingester.py`, `ingest_steps.py` | `test_ingest_flow::test_spool_t04_store009_*`, `test_store010_*`; `test_ingest_failures::test_spool_t05_*`, `test_ingest_t03_*` | E.24 | Verified with the memory adapter; the SQLite run comes with the M3 wiring. |
+| STORE-011 | Implemented | `ingester.py`, `settings.py` | `test_ingest_t01_*`, `test_ingest_t02_*` | `configuration.md`, E.24 | 10 s or the backend's row limit. |
+| STORE-014 | Implemented | `ingester.py` | `test_ingest_failures::test_spool_t03_store014_*`, `test_spool_health::test_store014_*` | `spool.md` | |
+| 6.4 backpressure | Implemented (spool side) | `capacity.py`, `Spool.admits_new_work` | `test_spool_capacity::*`, `test_spool_health::test_spool_t07_*` | `spool.md` | The scheduler must consult `admits_new_work()` (M3 wiring). |
+| OBS-001/003/007, OPS-001 (spool) | In progress | `status.py`, `inspect.py`, `health/spool_check.py` | `test_spool_health::*` | `spool.md` | No Prometheus metrics yet (OBS-005). |
+| SPOOL-T01..T08, QUEUE-T01, INGEST-T01..T03 | Verified | as above | `test_spool_t0N_*`, `test_queue_t01_*`, `test_ingest_t0N_*` | | INGEST-T04 is an Enterprise benchmark, not MVP. |
+
 ## Scheduler and poll planning (M3)
 
 Code is in `src/vakr/scheduler/`, with tests in `tests/unit/scheduler/`. See [the scheduler architecture](architecture/scheduler.md) and Appendix E.25. The ICMP and SNMP steps are protocols in `scheduler/steps.py`; the collection adapters are wired to them in M3.

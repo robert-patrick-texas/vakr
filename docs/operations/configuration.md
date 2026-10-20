@@ -57,6 +57,22 @@ Useful commands: `vakr config show-effective --sources` prints every effective v
 | `telemetry.rollup_retention_days` | int, >= 1 | `400` | live | v0.1.0 | Days to keep rollups, which back long-range graphs. |
 | `telemetry.rollup_interval` | duration, >= 60s | `"15m"` | restart | v0.1.0 | Bucket width of historical rollups. |
 
+### `[spool]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `spool.directory` | str | `""` | restart | v0.1.1 | Directory of the durable observation spool (STORE-004). Empty means spool/ under the state directory, normally /var/lib/vakr/spool. Each collector writes its own subdirectory named by its UUID. Use a disk-backed filesystem: paths under /dev/shm and /run are refused because tmpfs can never be the only durability layer (STORE-005). |
+| `spool.max_size_mib` | int, >= 64, <= 524288 | `4096` | restart | v0.1.1 | Upper bound on the spool's disk use in MiB, quarantined files included (6.4, E.24). The default holds about 40 hours of the MVP workload while the telemetry database is unavailable. Must be at least four segments. |
+| `spool.segment_size_mib` | int, >= 1, <= 1024 | `64` | restart | v0.1.1 | Size in MiB at which the spool starts a new segment file (E.8). A segment is deleted only once every record in it is stored in the telemetry database. |
+| `spool.fsync_interval` | duration, >= 0.1s, <= 10s | `"1s"` | restart | v0.1.1 | Longest time a completed observation waits for the fsync that makes it durable (group commit, E.8). An abrupt power loss can lose at most about this much telemetry, and recovery records the loss (STORE-007). |
+| `spool.fsync_records` | int, >= 1, <= 100000 | `1000` | restart | v0.1.1 | Records written before the spool fsyncs early, even if spool.fsync_interval has not elapsed (E.8). |
+| `spool.queue_capacity` | int, >= 100, <= 500000 | `10000` | restart | v0.1.1 | Observations that may wait in memory for the spool's fsync (6.4). When full, collectors wait instead of growing memory, and the wait is reported as queue saturation (QUEUE-T01). |
+| `spool.warning_pct` | int, >= 1, <= 99 | `70` | restart | v0.1.1 | Spool fill level, in percent of spool.max_size_mib, at which vakr check health reports WARNING (6.4). Must be below spool.critical_pct. |
+| `spool.critical_pct` | int, >= 1, <= 99 | `85` | restart | v0.1.1 | Spool fill level at which vakr check health reports CRITICAL capacity degradation (6.4). Must be below spool.exhausted_pct. |
+| `spool.exhausted_pct` | int, >= 1, <= 99 | `95` | restart | v0.1.1 | Spool fill level at which the collector stops scheduling new normal polling instead of losing observations (6.4). Targets not polled are unknown, never down. The space above it absorbs observations already in flight. |
+| `spool.ingest_interval` | duration, >= 1s, <= 300s | `"10s"` | restart | v0.1.1 | How often ingestion writes spooled observations to the telemetry database in one batch (STORE-011, E.21). While at least spool.ingest_max_rows observations wait, batches are written back to back. |
+| `spool.ingest_max_rows` | int, >= 1, <= 50000 | `50000` | restart | v0.1.1 | Most observations in one telemetry write (STORE-011, E.19). The telemetry backend's own limit applies when it is lower. |
+
 ### `[interface_classification]`
 
 | Option | Type | Default | Reload | Added in | Description |

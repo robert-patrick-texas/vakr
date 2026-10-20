@@ -9,6 +9,9 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - The scheduler (`vakr.scheduler`): SHA-256 phase placement, a due-time plan, bounded workers, the poll state machine with ICMP gating, and an asyncio driver with graceful shutdown. A missed or overrun poll is recorded as not attempted or missed, never as a device outage (SCHED-001..013, SCHED-016..018). It is not yet wired to collection.
 - New options: `polling.default_interval`, `polling.reachability_strategy`, and the `scheduler.*` group (collector name, phase and order modes, workers, queue capacity, lateness, start delay, poll deadline, shutdown grace). `vakr config validate` checks that `scheduler.late_after` does not exceed `scheduler.max_start_delay`.
 - Compact SQLite telemetry layout decided by benchmark (ADR-021, Appendix E.21); measured sizing in blueprint 27.3.
+- Durable observation spool and batched ingestion (`vakr.ingest`, STORE-004 to STORE-011): collectors hand observations to an fsynced, append-only spool under `/var/lib/vakr/spool/<collector UUID>/`, and ingestion writes them to the telemetry database in idempotent batches. Losses are recorded as telemetry-loss incidents (STORE-007). See [the spool guide](docs/operations/spool.md).
+- `[spool]` options (`directory`, `max_size_mib`, `segment_size_mib`, `fsync_interval`, `fsync_records`, `queue_capacity`, `warning_pct`, `critical_pct`, `exhausted_pct`, `ingest_interval`, `ingest_max_rows`). Their defaults apply without any edit.
+- A `spool` check in `vakr check health` and `vakr doctor`: fill level, backlog age, database write failures, recent loss incidents, and quarantined files.
 
 ## 0.1.1 - 2026-10-20
 

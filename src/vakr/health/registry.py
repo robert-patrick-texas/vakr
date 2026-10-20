@@ -29,6 +29,7 @@ from vakr.config.health import check_config
 from vakr.credentials.health import check_credentials
 from vakr.health.lifecycle_checks import check_tls_policy, check_trusted_cas, check_update
 from vakr.health.model import CheckResult, Status
+from vakr.health.spool_check import check_spool
 from vakr.version import UNKNOWN_VERSION, get_version
 
 type Check = Callable[[], CheckResult]
@@ -78,6 +79,7 @@ CHECKS: tuple[Check, ...] = (
     check_tls_policy,
     check_metadata_db,
     check_icmp,
+    check_spool,
 )
 
 

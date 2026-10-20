@@ -165,6 +165,115 @@ reload = "restart"
 description = "Bucket width of historical rollups."
 
 [[options]]
+key = "spool.directory"
+type = "str"
+pattern = '^(/[^\x00]*)?$'
+default = ""
+since = "0.1.1"
+reload = "restart"
+description = "Directory of the durable observation spool (STORE-004). Empty means spool/ under the state directory, normally /var/lib/vakr/spool. Each collector writes its own subdirectory named by its UUID. Use a disk-backed filesystem: paths under /dev/shm and /run are refused because tmpfs can never be the only durability layer (STORE-005)."
+
+[[options]]
+key = "spool.max_size_mib"
+type = "int"
+min = 64
+max = 524288
+default = 4096
+since = "0.1.1"
+reload = "restart"
+description = "Upper bound on the spool's disk use in MiB, quarantined files included (6.4, E.24). The default holds about 40 hours of the MVP workload while the telemetry database is unavailable. Must be at least four segments."
+
+[[options]]
+key = "spool.segment_size_mib"
+type = "int"
+min = 1
+max = 1024
+default = 64
+since = "0.1.1"
+reload = "restart"
+description = "Size in MiB at which the spool starts a new segment file (E.8). A segment is deleted only once every record in it is stored in the telemetry database."
+
+[[options]]
+key = "spool.fsync_interval"
+type = "duration"
+min = 0.1
+max = 10
+default = "1s"
+since = "0.1.1"
+reload = "restart"
+description = "Longest time a completed observation waits for the fsync that makes it durable (group commit, E.8). An abrupt power loss can lose at most about this much telemetry, and recovery records the loss (STORE-007)."
+
+[[options]]
+key = "spool.fsync_records"
+type = "int"
+min = 1
+max = 100000
+default = 1000
+since = "0.1.1"
+reload = "restart"
+description = "Records written before the spool fsyncs early, even if spool.fsync_interval has not elapsed (E.8)."
+
+[[options]]
+key = "spool.queue_capacity"
+type = "int"
+min = 100
+max = 500000
+default = 10000
+since = "0.1.1"
+reload = "restart"
+description = "Observations that may wait in memory for the spool's fsync (6.4). When full, collectors wait instead of growing memory, and the wait is reported as queue saturation (QUEUE-T01)."
+
+[[options]]
+key = "spool.warning_pct"
+type = "int"
+min = 1
+max = 99
+default = 70
+since = "0.1.1"
+reload = "restart"
+description = "Spool fill level, in percent of spool.max_size_mib, at which vakr check health reports WARNING (6.4). Must be below spool.critical_pct."
+
+[[options]]
+key = "spool.critical_pct"
+type = "int"
+min = 1
+max = 99
+default = 85
+since = "0.1.1"
+reload = "restart"
+description = "Spool fill level at which vakr check health reports CRITICAL capacity degradation (6.4). Must be below spool.exhausted_pct."
+
+[[options]]
+key = "spool.exhausted_pct"
+type = "int"
+min = 1
+max = 99
+default = 95
+since = "0.1.1"
+reload = "restart"
+description = "Spool fill level at which the collector stops scheduling new normal polling instead of losing observations (6.4). Targets not polled are unknown, never down. The space above it absorbs observations already in flight."
+
+[[options]]
+key = "spool.ingest_interval"
+type = "duration"
+min = 1
+max = 300
+default = "10s"
+since = "0.1.1"
+reload = "restart"
+description = "How often ingestion writes spooled observations to the telemetry database in one batch (STORE-011, E.21). While at least spool.ingest_max_rows observations wait, batches are written back to back."
+
+[[options]]
+key = "spool.ingest_max_rows"
+type = "int"
+min = 1
+max = 50000
+default = 50000
+since = "0.1.1"
+reload = "restart"
+description = "Most observations in one telemetry write (STORE-011, E.19). The telemetry backend's own limit applies when it is lower."
+
+[[options]]
 key = "interface_classification.use_default_keywords"
 type = "bool"
 default = true

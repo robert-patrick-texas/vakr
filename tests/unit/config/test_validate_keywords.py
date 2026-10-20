@@ -95,3 +95,26 @@ def test_inconsistent_scheduler_settings_fail_validation(
     out = capsys.readouterr().out
     assert "scheduler.late_after (1m) must not exceed scheduler.max_start_delay (30s)" in out
     assert "inconsistent scheduler settings" in out
+
+
+def test_inconsistent_spool_settings_fail_validation(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Out-of-order spool capacity thresholds are caught by validation (E.24, STORE-005).
+
+    Args:
+        tmp_path: Temporary configuration directory.
+        capsys: Pytest output capture.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    (tmp_path / "config.toml").write_text(
+        "config_version = 1\n\n[spool]\nwarning_pct = 90\ncritical_pct = 80\n",
+        encoding="utf-8",
+    )
+    assert main(["config", "validate", "--config-dir", str(tmp_path)]) == 1
+    assert "inconsistent spool settings" in capsys.readouterr().out

@@ -1,0 +1,40 @@
+{
+ "info": {
+  "name": "ruff",
+  "version": "0.17.1",
+  "project_urls": {
+   "Changelog": "https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md",
+   "Documentation": "https://docs.astral.sh/ruff/",
+   "Homepage": "https://docs.astral.sh/ruff",
+   "Repository": "https://github.com/astral-sh/ruff"
+  }
+ },
+ "releases": {
+  "0.16.0": [
+   {
+    "yanked": false
+   }
+  ],
+  "0.17.0": [
+   {
+    "yanked": false
+   }
+  ],
+  "0.17.1": [
+   {
+    "yanked": false
+   }
+  ],
+  "0.18.0rc1": [
+   {
+    "yanked": false
+   }
+  ],
+  "0.17.2": [
+   {
+    "yanked": true
+   }
+  ],
+  "0.17.3": []
+ }
+}

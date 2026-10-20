@@ -1,0 +1,44 @@
+[
+ {
+  "name": "Python 2.7.18",
+  "is_published": true,
+  "is_latest": true,
+  "pre_release": false,
+  "release_notes_url": ""
+ },
+ {
+  "name": "Python 3.14.8",
+  "is_published": true,
+  "is_latest": false,
+  "pre_release": false,
+  "release_notes_url": "https://docs.python.org/release/3.14.8/whatsnew/changelog.html"
+ },
+ {
+  "name": "Python 3.15.0",
+  "is_published": true,
+  "is_latest": true,
+  "pre_release": false,
+  "release_notes_url": "https://docs.python.org/release/3.15.0/whatsnew/changelog.html"
+ },
+ {
+  "name": "Python 3.9.25",
+  "is_published": true,
+  "is_latest": false,
+  "pre_release": false,
+  "release_notes_url": "https://docs.python.org/release/3.9.25/whatsnew/changelog.html"
+ },
+ {
+  "name": "Python install manager 26.4",
+  "is_published": true,
+  "is_latest": true,
+  "pre_release": false,
+  "release_notes_url": "https://github.com/python/pymanager/releases/tag/26.4"
+ },
+ {
+  "name": "Python 3.16.0a1",
+  "is_published": true,
+  "is_latest": false,
+  "pre_release": true,
+  "release_notes_url": "https://docs.python.org/release/3.16.0a1/"
+ }
+]

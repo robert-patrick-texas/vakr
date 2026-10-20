@@ -39,3 +39,29 @@ docs:
 docs-check:
 	uv run tools/md2html/md2html.py . $(SITE) --check --title vakr \
 		--repo-url https://github.com/robert-patrick-texas/vakr --branch main --exclude .claude
+
+# Toolchain and dependency currency (TOOLS-001, TOOLS-002); run before every
+# release. Informational by default; UPDATES_FLAGS=--fail-on-outdated gates.
+UPDATES_FLAGS ?=
+TY_PATHS += --extra-search-path tools/check-updates
+
+# Known-vulnerability scan of every locked runtime and development dependency
+# (QG-008). Justified exceptions go in AUDIT_IGNORE: one ID per line followed
+# by a "# reason" comment. check-updates reports when PIP_AUDIT falls behind.
+PIP_AUDIT := pip-audit==2.10.1
+AUDIT_IGNORE := tools/check-updates/audit-ignore.txt
+
+.PHONY: updates audit
+
+updates:
+	uv run tools/check-updates/check_updates.py $(UPDATES_FLAGS)
+
+audit:
+	@awk '!/^[[:space:]]*(#|$$)/ && !/#[[:space:]]*[^[:space:]]/ \
+		{ print FILENAME ":" FNR ": add a # justification"; bad = 1 } END { exit bad }' \
+		$(AUDIT_IGNORE)
+	@set -e; reqs=$$(mktemp); trap 'rm -f "$$reqs"' EXIT; \
+	uv export --frozen --format requirements-txt --all-groups --no-emit-project \
+		--quiet -o "$$reqs"; \
+	uvx $(PIP_AUDIT) --strict --disable-pip --require-hashes --progress-spinner off \
+		-r "$$reqs" $$(sed -e 's/#.*//' $(AUDIT_IGNORE) | awk 'NF { print "--ignore-vuln", $$1 }')

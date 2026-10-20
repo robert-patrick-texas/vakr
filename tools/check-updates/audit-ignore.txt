@@ -1,0 +1,12 @@
+# Known-vulnerability exceptions for `make audit` (QG-008).
+#
+# One vulnerability ID per line, exactly as pip-audit prints it (PYSEC-...,
+# GHSA-..., or CVE-...), followed by "#" and a justification: why the
+# vulnerability cannot affect vakr, who accepted it, and when to review it.
+# `make audit` rejects an entry without a justification. Remove the entry as
+# soon as a fixed version is locked. See docs/development/updates.md.
+#
+# Example (commented out):
+#   GHSA-aaaa-bbbb-cccc  # only the XML parser is affected; vakr never calls it; RP; review 2027-01-31
+#
+# No exceptions are currently accepted.

@@ -1,0 +1,14 @@
+[
+ {
+  "version": "go1.28rc1",
+  "stable": false
+ },
+ {
+  "version": "go1.27.3",
+  "stable": true
+ },
+ {
+  "version": "go1.26.10",
+  "stable": true
+ }
+]

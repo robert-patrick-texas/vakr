@@ -138,6 +138,7 @@ def test_answers_map_onto_the_local_failures() -> None:
         (http(200, b"{}"), "vakr-api's answer does not fit this release's views ($.rows: missing)"),
         (http(200, b"[1, 2]"), "the answer is not a JSON object"),
         (http(200, b"not json"), "the answer is not a JSON object"),
+        (http(200, b"[" * 200_000 + b"]" * 200_000), "the answer is not a JSON object"),
         (http(404, b'{"code": "not_found", "message": "gone"}'), "HTTP 404 not_found: gone"),
         (http(503, b'{"code": "busy", "message": "too many"}'), "HTTP 503 busy: too many"),
     ],

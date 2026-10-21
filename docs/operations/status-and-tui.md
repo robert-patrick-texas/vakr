@@ -19,10 +19,10 @@ When [`vakr-api`](api.md) is running, both commands ask it over its local socket
 
 ```console
 $ vakr status
-vakr status: this account may not use the vakr-api socket /run/vakr/api.sock: only root and members of vakr-admin or vakr may; add the account to the vakr group (sudo usermod -aG vakr NAME, then log in again), run the command with sudo, or add --local
+vakr status: this account may not use the vakr-api socket /run/vakr/api.sock: only root and members of vakr-admin or vakr may; add the account to the vakr group (sudo usermod -aG vakr NAME, then log in again; that group can also read the SNMP credentials and the password hashes), run the command with sudo, or add --local
 ```
 
-After `sudo usermod -aG vakr alice`, Alice must log out and in again before the new group counts.
+After `sudo usermod -aG vakr alice`, Alice must log out and in again before the new group counts. Membership of `vakr` is more than a status view: the group can also read the SNMP credentials file and `metadata.db`, with its password hashes ([where the secrets live](users.md#where-the-secrets-live)). Give it only to people you would trust with the communities, and give others a web account.
 
 **Reading the databases directly** (`--local`, or no API) needs read access to `/var/lib/vakr`. As root, `sudo vakr status --local` first switches to the `vakr` service user, just as `vakr db` does. Running as the `vakr` user works too. The SQLite stores have no read-only connection mode, so this path opens its connections read-write. It only ever reads, without taking a write lock, and never creates a missing file.
 
@@ -84,7 +84,7 @@ The exit codes follow the Nagios plugin convention, so a monitoring system can r
 
 The exit code covers the devices listed, so `vakr status --bucket attention` exits 1 exactly when something needs attention. A search that matches nothing exits 0.
 
-A monitoring agent that runs the check under its own account, such as NRPE as `nagios`, needs that account in the `vakr` group (`sudo usermod -aG vakr nagios`, then restart the agent). Otherwise the socket refuses it and the check reports UNKNOWN (3) with the reason.
+A monitoring agent that runs the check under its own account, such as NRPE as `nagios`, needs that account in the `vakr` group (`sudo usermod -aG vakr nagios`, then restart the agent). Otherwise the socket refuses it and the check reports UNKNOWN (3) with the reason. That group can also read the SNMP credentials, so where that matters, let the agent run the check through `sudo` with a rule that allows only `vakr status` instead.
 
 ### JSON
 

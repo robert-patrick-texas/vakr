@@ -26,6 +26,15 @@ Copyright: Individual contributors to the cryptography project
 License: Apache-2.0 or BSD-3-Clause
 Comment: Full texts are in the cryptography-*.dist-info/licenses directory.
 
+Files: opt/vakr/venv/lib/python3.*/site-packages/argon2* opt/vakr/venv/lib/python3.*/site-packages/_argon2_cffi_bindings*
+Copyright: Hynek Schlawack and contributors
+License: MIT
+Comment:
+ argon2-cffi and argon2-cffi-bindings. The bindings bundle the Argon2
+ reference implementation, which is dual-licensed CC0-1.0 or Apache-2.0.
+ The full texts are in the argon2_cffi-*.dist-info and
+ argon2_cffi_bindings-*.dist-info licenses directories.
+
 Files: opt/vakr/venv/lib/python3.*/site-packages/cffi* opt/vakr/venv/lib/python3.*/site-packages/_cffi_backend*
 Copyright: Armin Rigo, Maciej Fijalkowski, and contributors
 License: MIT

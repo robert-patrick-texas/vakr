@@ -7,6 +7,8 @@ Example:
     $ uv run pytest tests/contract/memory/test_memory_contracts.py
 """
 
+from tests.contract.contract_auth_sessions import AuthSessionsContract
+from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
@@ -42,3 +44,11 @@ class TestMemoryMetadataIdentity(MetadataIdentityContract):
 
 class TestMemoryRollupSource(RollupSourceContract):
     """RET-004, RET-009, DB-004 rollup reads on the in-memory telemetry store."""
+
+
+class TestMemoryAuthUsers(AuthUsersContract):
+    """SEC-005, SEC-009, AUTH-004: users and login failures on the memory adapter."""
+
+
+class TestMemoryAuthSessions(AuthSessionsContract):
+    """SEC-010, AUTH-002: sessions and kiosk tokens on the memory adapter."""

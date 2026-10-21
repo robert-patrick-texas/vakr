@@ -100,6 +100,8 @@ vakr doctor               # one line per self-check
 vakr check health         # Nagios/CheckMK plugin output and exit code
 ```
 
+Create the first admin account for the web UI with `sudo vakr setup`, which asks for the password twice and lists the remaining steps ([users](users.md)).
+
 To give an operator administrative access to the local vakr API and TUI, add them to `vakr-admin` (members of `vakr` get operator access):
 
 ```sh

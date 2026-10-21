@@ -163,6 +163,18 @@ Packaged entries:
 | `security.allowed_target_cidrs` | list[str] | `[]` | live | v0.2.0 | Networks, in CIDR form, that every poll target must fall in (15.5, SEC-015). Empty allows any unicast address. Multicast, unspecified, and broadcast addresses are always refused. |
 | `security.denied_target_addresses` | list[str] | `["169.254.169.254/32", "fd00:ec2::254/128", "100.100.100.200/32"]` | live | v0.2.0 | Addresses or CIDR networks that are never polled (15.5, SEC-015). The defaults are the cloud metadata services, which answer anyone on the host. Setting this list replaces the defaults. |
 
+### `[auth]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `auth.session_idle_timeout` | duration, >= 300s, <= 86400s | `"30m"` | restart | v0.2.1 | A signed-in session ends after this long without a request (SEC-010, Appendix E.12). Must not exceed auth.session_lifetime. Use is recorded at most once a minute, so a session can end up to a minute earlier, never later. |
+| `auth.session_lifetime` | duration, >= 600s, <= 604800s | `"12h"` | restart | v0.2.1 | A signed-in session ends this long after login however active it is, and the user signs in again (absolute expiry, SEC-010, Appendix E.12). |
+| `auth.kiosk_token_lifetime` | duration, >= 86400s, <= 3.1536e+07s | `"30d"` | restart | v0.2.1 | How long a kiosk token for an unattended display stays valid after an admin creates it (Appendix E.12). Kiosk tokens have the operator role and no idle expiry. |
+| `auth.login_throttle_after` | int, >= 1, <= 100 | `5` | restart | v0.2.1 | From this many consecutive failed logins for one account from one address, each failure is answered after a delay and the next attempt must wait as long: 1 s, doubling with each further failure, up to auth.login_throttle_max_delay (SEC-012, Appendix E.12). A successful login clears the count. |
+| `auth.login_throttle_max_delay` | duration, >= 1s, <= 300s | `"30s"` | restart | v0.2.1 | Longest delay before the next login attempt for one account from one address (SEC-012, Appendix E.12). |
+| `auth.login_failure_reset` | duration, >= 60s, <= 86400s | `"15m"` | restart | v0.2.1 | A run of failed logins with no new failure for this long is forgotten, and the next failure counts from one again (SEC-012, Appendix E.12). |
+| `auth.password_min_length` | int, >= 8, <= 128 | `15` | restart | v0.2.1 | Fewest characters a new password may have (NIST SP 800-63B for a single-factor password, Appendix E.12). Existing passwords keep working; the rule applies when one is set. |
+
 ### `[rates]`
 
 | Option | Type | Default | Reload | Added in | Description |

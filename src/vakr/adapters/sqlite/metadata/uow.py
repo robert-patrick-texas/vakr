@@ -22,11 +22,15 @@ from types import TracebackType
 from vakr.adapters.sqlite.metadata import specs
 from vakr.adapters.sqlite.metadata.audit import SqliteAuditRepository
 from vakr.adapters.sqlite.metadata.interfaces import SqliteInterfaceRepository
+from vakr.adapters.sqlite.metadata.kiosk import SqliteKioskTokenRepository
+from vakr.adapters.sqlite.metadata.login_failures import SqliteLoginFailureRepository
 from vakr.adapters.sqlite.metadata.reviews import SqliteReviewRepository, change_counter
+from vakr.adapters.sqlite.metadata.sessions import SqliteSessionRepository
 from vakr.adapters.sqlite.metadata.specs_interface import INTERFACE
 from vakr.adapters.sqlite.metadata.specs_inventory import DEVICE
 from vakr.adapters.sqlite.metadata.table import SqliteDeviceRepository, SqliteTable
 from vakr.adapters.sqlite.metadata.transaction import SqliteTransaction
+from vakr.adapters.sqlite.metadata.users import SqliteUserRepository
 from vakr.adapters.sqlite.pool import ConnectionPool
 from vakr.adapters.sqlite.writer import WriterGate
 from vakr.domain.catalog import Collector, Group, Tag
@@ -49,6 +53,10 @@ class SqliteUnitOfWork:
         collectors: Collector repository.
         audit: Audit repository.
         reviews: Identity-review repository.
+        users: Local-account repository.
+        login_failures: Login throttle state.
+        sessions: Login sessions.
+        kiosk_tokens: Kiosk display tokens.
     """
 
     def __init__(self, pool: ConnectionPool, gate: WriterGate) -> None:
@@ -78,6 +86,10 @@ class SqliteUnitOfWork:
         )
         self.audit = SqliteAuditRepository(self._tx)
         self.reviews = SqliteReviewRepository(self._tx)
+        self.users = SqliteUserRepository(self._tx)
+        self.login_failures = SqliteLoginFailureRepository(self._tx)
+        self.sessions = SqliteSessionRepository(self._tx)
+        self.kiosk_tokens = SqliteKioskTokenRepository(self._tx)
 
     def change_counter(self) -> int:
         """Return the metadata change counter; see ``MetadataUnitOfWork``.

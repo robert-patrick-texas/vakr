@@ -7,6 +7,11 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 ### Added
 
 - The hourly 15-minute rollup job (RET-004 to RET-009): the collector now rolls up every complete quarter-hour before retention runs, so native data finally expires after 30 days (ROLL-T04). A 0.2.x backlog drains in bounded passes of at most 7 days and 2 minutes each. A new `rollups` check in `vakr check health` and `vakr doctor` warns when rollups fall behind. No database schema changes. See [rollups](docs/operations/rollups.md).
+- Local accounts for the coming web UI and API (SEC-005, SEC-006): `sudo vakr setup` creates the first admin, and `sudo vakr user list|add|passwd|disable|enable|role|revoke-sessions` manages accounts. Passwords are asked for twice at a hidden prompt and never accepted as arguments. Every change is audited with the invoking operator. See [the users guide](docs/operations/users.md).
+- The authentication layer below HTTP (`vakr.auth`): Argon2id hashing with transparent rehash on login (SEC-009); opaque server-side sessions with idle and absolute expiry, rotation, and revocation (SEC-010); kiosk tokens for wall displays; CSRF tokens bound to sessions (SEC-011); per-account-and-address login throttling (SEC-012); and the Unix-socket peer-credential roles from Appendix E.12. The `vakr-api` service will use it.
+- New `[auth]` options: `session_idle_timeout` (30 min), `session_lifetime` (12 h), `kiosk_token_lifetime` (30 d), `login_throttle_after` (5), `login_throttle_max_delay` (30 s), `login_failure_reset` (15 min), and `password_min_length` (15). Their defaults apply without any edit.
+- Metadata schema 3 adds accounts, sessions, kiosk tokens, and failed-login counts. The package runs `vakr db migrate`, which takes a backup first.
+- New runtime dependency `argon2-cffi` (MIT).
 
 ### Changed
 

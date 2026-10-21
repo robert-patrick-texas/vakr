@@ -13,6 +13,7 @@ from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 from tests.contract.contract_rollup_source import RollupSourceContract
+from tests.contract.contract_telemetry_history import TelemetryHistoryContract
 from tests.contract.contract_telemetry_series import TelemetrySeriesContract
 from tests.contract.contract_telemetry_state import TelemetryStateContract
 from tests.contract.contract_telemetry_write import TelemetryWriteContract
@@ -52,3 +53,7 @@ class TestMemoryAuthUsers(AuthUsersContract):
 
 class TestMemoryAuthSessions(AuthSessionsContract):
     """SEC-010, AUTH-002: sessions and kiosk tokens on the memory adapter."""
+
+
+class TestMemoryTelemetryHistory(TelemetryHistoryContract):
+    """10.6 downsampling, E.17 #13 ranking summaries, MPOS-008 on the in-memory telemetry store."""

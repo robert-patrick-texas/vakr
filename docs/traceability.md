@@ -106,7 +106,7 @@ Code lives in `src/vakr/logic/` and tests in `tests/unit/logic/`. Rules and the 
 | MPOS-007 | In progress | `status.py` (`composite_status`) | `test_logic_status.py::test_composite` | `quality-states.md` | E.17 #7. The UI is pending. |
 | OBS-003 | In progress | `icmp.py`, `status_table.py` (row 3) | `test_collector_context`, `test_e2_rows` | `quality-states.md` | |
 | UI-005 | In progress | `status.py` (`device_sort_key`) | `test_device_list_order` | `quality-states.md` | WEB-T01 covers the logic only. |
-| DASH-003/004/005 | In progress | `ranking.py`, `ranking_errors.py`, `stats.py` | `test_logic_ranking.py` (DASH-T01..T03) | `quality-states.md` | E.17 #13. The query and UI are pending. |
+| DASH-003/004/005 | In progress | `ranking.py`, `ranking_errors.py`, `stats.py` | `test_logic_ranking.py` (DASH-T01..T03) | `quality-states.md` | E.17 #13. The M4 query is `vakr.query.rankings` (see the M4 query section); the UI is pending. |
 | RET-004 | In progress | `stats.py` (`p95`) | `test_logic_stats.py::test_nearest_rank` | `quality-states.md` | Rollups must import `p95` from here. |
 | QG-006 | In progress | `vakr.logic` | `--cov-branch` 100% | | Not yet enforced as a CI gate. |
 
@@ -195,7 +195,7 @@ Code is in `src/vakr/adapters/sqlite/telemetry/` (own file `telemetry.db`, appli
 | STORE-009 | Implemented | `writer.py`, `sql/0001_initial.sql` | contract `test_store009_*`; `test_store009_replay_across_a_move_inserts_nothing` | `database.md` | Amendment 2: the key includes the observation UUID. A different observation reusing a UUID is not caught (no UUID index). |
 | STORE-010 | Implemented | `store.py` (`synchronous=FULL`), `writer.py` | contract `test_store010_*`; `test_store010_crash_between_flush_and_move_loses_nothing` | E.21 | |
 | STORE-011 | Implemented (adapter) | `tuning.MAX_BATCH_ROWS` | contract `test_store010_rejected_batch_writes_nothing` | E.19 | The 10 s flush cadence is the ingester's (E.24). |
-| STORE-012/013, DB-004 | Implemented | `series.py`, `downsample.py`, `codec*.py`, `raw_reads.py` | contract suites; `test_telemetry_fidelity.py`, `test_10_6_downsampling_keeps_envelopes_gaps_and_quality` | | Downsampling is an adapter method (`downsampled_series`); the port has no such call yet. |
+| STORE-012/013, DB-004 | Implemented | `series.py`, `downsample.py`, `codec*.py`, `raw_reads.py` | contract suites; `test_telemetry_fidelity.py`, `test_10_6_downsampling_keeps_envelopes_gaps_and_quality` | | M4 promoted downsampling into the port (`HistoryQuery.downsampled_series`; see the M4 query section). |
 | DB-005, STATE-001..004 | Implemented | `state.py`, `latest.py`, `maintenance.py` | contract TelemetryState; `test_state001_concurrent_readers_never_see_a_row_twice_or_miss_one`, `test_state003_stale_subjects_keep_their_true_age` | `database.md` | |
 | DB-006, STATE-005 | Implemented | `series.py`, `samples.py`, `rollup_reads.py` | contract `test_db006_*`; `test_downsampling_rebuckets_rollups_before_the_horizon` | | |
 | DB-007, ARCH-001 | Implemented | `keys.py`; driver only inside the adapter | contract `test_db007_*`; `test_arch001_only_adapters_import_the_driver` | | `lifecycle/update/backup.py` (portable self-update) also uses `sqlite3`. |
@@ -392,6 +392,32 @@ Read services are in `src/vakr/query/` (`StatusQueries`). The Textual app is `sr
 | TIME-002..006 (display) | Implemented | `query/text.py`, `labels.mark_stale` | `test_stale_evidence_is_marked_stale_and_never_current`, `test_display_zone_follows_time_timezone` | `status-and-tui.md` | |
 | STATE-003/004, MPOS-007 (display) | Implemented | `query/evidence.py`, `PositionView` | `test_partition_between_positions_is_amber_not_red` | E.29 #2-4 | |
 | `vakr status` (OPS) | Implemented | `cli/cmd_status.py`, `status_render.py`, `status_json.py`, `status_stores.py` | `test_status_cli.py` | `status-and-tui.md` | Nagios-style exit codes 0/1/3 (2 is a usage error). Opens no database that does not exist. |
+
+## History, rankings, and search queries (M4)
+
+The read services for the API and web UI are in `src/vakr/query/`: `history.py` (`HistoryQueries`), `rankings.py` (`RankingQueries`), `catalog.py` (`CatalogQueries`), and `overview.py` (`OverviewQueries`). The new telemetry port is `ports/telemetry/{history,rankings}.py`; its adapters are `adapters/sqlite/telemetry/{history,rankings}.py` and `adapters/memory/telemetry_history.py`, and the shared bucketing rules are `domain/downsampling.py`. See [query services](architecture/queries.md) and Appendix E.28.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| STORE-012, UI-010 (graphs) | Implemented | `query/history_markers.py`, `history_fetch.py` | `test_store012_e19_native_outage_is_an_explicit_gap`, `test_12_6_quality_markers_and_flags`, contract `test_10_6_downsample_buckets_envelope_and_gaps` | `queries.md` | E.19 gap points; markers for restart, discontinuity, baseline, partial, collector, over capacity, gap. |
+| ROLL-T05 (query side) | Pass | `query/history_fetch.py`, `downsample.py` | `test_roll_t05_rollup_gaps_stay_visible`, contract `test_10_6_forced_sources` | `queries.md` | Missing rollup buckets are `None` points and gap markers. |
+| STATE-005, 10.6 | Implemented | `query/history_requests.py` (`plan`), `HistoryQuery.downsampled_series(source=)` | `test_state005_source_follows_the_10_6_table` (10 cases) | `queries.md`, E.28 | Rollups for windows over 30 days; `native`/`rollup` overrides. |
+| API-006, API-T04, SEC-019 (history) | Implemented | `history_requests.TimeRange`, `GraphRequest`, `ports/telemetry/rankings.check_ranking_bounds` | `test_api006_ranges_and_caps_are_bounded`, contract `test_sec019_ranking_bounds` | E.28 | Ranges 1 min to 400 d; caps 1 to 1,200; rankings at most 1 day. |
+| MPOS-008, MPOS-T04 (query) | Implemented | `history_context.choose_collectors`, `latency.py`, `rankings.py` | `test_mpos008_one_series_per_position_never_merged`, `test_mpos008_latency_is_per_position_with_probe_smoke`, `test_mpos008_rankings_use_one_collector`, contract `test_mpos008_collectors_are_never_merged` | `queries.md` | One series per position; rankings use one collector. |
+| DASH-003/004/005, E.17 #13 (query) | Implemented | `query/rankings.py`, `ranking_rows.py`, `HistoryQuery.window_summaries` | `test_rankings.py` (DASH-T01..T03), contract `test_e17_13_nearest_rank_p95_and_error_sums` | `queries.md`, E.28 #1 | 24-hour first computation exceeds 12.9's 2 s (recorded contradiction, E.28 #1). |
+| E.17 #15 (query) | Implemented | `graph_build.py`, `ranking_rows.py` via `interface_capacity` | `test_e17_15_utilization_needs_a_link_and_lines_show_capacity`, `test_dash_t03_e17_15_exclusions_carry_the_reason`, `test_e17_15_capacity_override_lets_a_tunnel_rank` | `queries.md` | |
+| UI-008, DASH-001, DASH-002, DASH-006 | Implemented (query) | `catalog.py` (`high_priority`, `wan_circuits`), `catalog_scope.InterfaceScope`, `overview.py` | `test_ui017_primary_and_wan_first_then_natural_names`, `test_dash002_wan_circuits_carry_circuit_metadata`, `test_ui008_scope_filters_and_request_bounds` | `queries.md` | Web pages are pending. |
+| UI-009 | Implemented (query) | `overview.DeviceScope`, `OverviewQueries.browse` | `test_ui009_browse_devices_by_group` | `queries.md` | |
+| UI-017 | Implemented (query) | `catalog_order.py` (priority order), `search.py` (hits carry interface UUIDs) | `test_ui017_primary_and_wan_first_then_natural_names`, `test_12_1_search_kinds_and_sec019_plain_text` | `queries.md` | |
+| API-005, API-T02 (lists) | Implemented | `catalog_order.InterfaceListRequest`, `ordered` | `test_api005_paging_is_stable_and_bounded` | `queries.md` | Offset paging with `total` and `next_offset`. |
+| 12.1 search, SEC-019 | Implemented | `query/search.py`, `catalog_index.py` | `test_12_1_search_kinds_and_sec019_plain_text` | `queries.md`, E.28 #10 | Plain substring; 256 characters; 50 hits per kind. |
+| 12.2 overview, UI-014 | Implemented (query) | `overview.py`, `overview_events.py`, `overview_parts.py` | `test_12_2_overview_summary_feeds_and_filters` | `queries.md`, E.28 #11 | The rediscovery feed is "not available": no store records discovery runs. |
+| 12.6 latency smoke | Implemented (query) | `latency.py`, `latency_views.py` | `test_12_6_long_windows_show_a_median_envelope`, `test_mpos008_latency_is_per_position_with_probe_smoke` | `queries.md`, E.28 #9 | Probes up to 1,200 polls; median envelope beyond. |
+| 12.5 state timeline | Implemented (query) | `timeline.py` | `test_12_5_state_timeline_with_gaps` | `queries.md` | Native samples only; last 7 days. |
+| API-012, API-T09 | Implemented (synchronous) | `query/export.py` | `test_api012_csv_and_json_export`, `test_api012_oversized_export_is_refused` | `queries.md` | Asynchronous bulk export is deferred (27.4). |
+| TIME-002/003/004 (history) | Implemented | `query/zone.py`, `jsonable.py` | `test_state005_source_follows_the_10_6_table` (zone), `test_api012_csv_and_json_export` (ISO UTC) | `queries.md`, E.28 #6 | |
+| MVP-ACC-05 | Measured, pass (query) | `HistoryQueries.interface_graph` over `downsampled_series` | `test_mvp_acc_05_400_day_graph_under_two_seconds`, `bench_history` | `queries.md` | 400-day traffic graph (two series): 628 ms cold, 582 ms warm on one MVP day plus 400 days of rollups. |
+| 12.9 (rankings, lists) | Measured | `rankings.py`, `catalog.py` | `test_12_9_top_n_15_minutes_at_mvp_scale`, `bench_history` | `queries.md` | Rankings 133 ms (15 min), 247 ms (1 h), 1.2 s (6 h), 4.2 s (24 h, over budget; E.28 #1); a reused scan answers in 53 ms. Interface list 69 ms; search 9 ms. |
 
 ## Field data
 

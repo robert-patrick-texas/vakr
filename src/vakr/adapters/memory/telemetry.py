@@ -8,7 +8,7 @@ simply expires after the policy duration.
 
 Dependencies:
     vakr.adapters.memory.telemetry_store, telemetry_query, telemetry_state,
-        telemetry_rollup_source.
+        telemetry_rollup_source, telemetry_history.
     vakr.domain.rollups: Bucket alignment.
 
 Safety:
@@ -22,6 +22,7 @@ Example:
 
 from datetime import datetime
 
+from vakr.adapters.memory.telemetry_history import MemoryHistoryQuery
 from vakr.adapters.memory.telemetry_query import MemoryObservationQuery
 from vakr.adapters.memory.telemetry_rollup_source import MemoryRollupSource
 from vakr.adapters.memory.telemetry_state import MemoryCurrentStateQuery
@@ -133,6 +134,7 @@ class MemoryTelemetry:
         rollup_source: Native reads for the rollup job.
         collector_health: Latest collector health.
         retention: Retention.
+        history: Downsampled series and ranking summaries (M4, ``HistoryBackend``).
     """
 
     def __init__(self, store: MemoryTelemetryStore) -> None:
@@ -155,3 +157,4 @@ class MemoryTelemetry:
         self.rollup_source = MemoryRollupSource(store)
         self.collector_health = MemoryCollectorHealthRepository(store)
         self.retention = MemoryRetentionManager(store)
+        self.history = MemoryHistoryQuery(store)

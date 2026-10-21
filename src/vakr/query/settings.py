@@ -10,6 +10,7 @@ every query is bounded).
 Dependencies:
     vakr.config: The effective configuration and option catalog.
     vakr.logic.icmp, vakr.logic.status: ICMP policy and restart window.
+    vakr.scheduler.hashing: The local collector's name, resolved as the collector does.
 
 Safety:
     Reads configuration only; never secrets.
@@ -30,6 +31,7 @@ from vakr.domain.paging import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from vakr.lifecycle.configmerge import parse_duration
 from vakr.logic.icmp import DEFAULT_POLICY, IcmpPolicy
 from vakr.logic.status import RECENT_RESTART_WINDOW_S
+from vakr.scheduler.hashing import resolve_collector_name
 
 DEFAULT_REFRESH_S = 10.0
 """``tui.refresh_interval`` default (E.29)."""
@@ -69,6 +71,9 @@ class QuerySettings:
         restart_window_s: How long a detected restart keeps a device amber.
         timezone: ``time.timezone``; empty means the host timezone.
         limits: Read bounds.
+        local_collector: This node's collector name (``scheduler.collector_name``,
+            else the short host name); empty when unknown. Traffic graphs and
+            rankings default to it (27.5 #6).
     """
 
     default_interval_s: int = 60
@@ -77,6 +82,7 @@ class QuerySettings:
     restart_window_s: float = RECENT_RESTART_WINDOW_S
     timezone: str = ""
     limits: QueryLimits = field(default_factory=QueryLimits)
+    local_collector: str = ""
 
 
 def _get(config: EffectiveConfig, key: str) -> Any:
@@ -98,11 +104,14 @@ def _get(config: EffectiveConfig, key: str) -> Any:
     return config.get(key, option.default)
 
 
-def settings_from_config(config: EffectiveConfig) -> QuerySettings:
+def settings_from_config(config: EffectiveConfig, hostname: str | None = None) -> QuerySettings:
     """Build query settings from the effective configuration.
 
     Args:
         config: Effective configuration, validated by the catalog.
+        hostname: This host's name, to resolve an empty ``scheduler.collector_name``
+            as the collector does (SCHED-001); ``None`` leaves the local
+            collector unknown unless it is configured.
 
     Returns:
         QuerySettings: The settings; ``icmp.impaired_rtt_ms = 0`` means off.
@@ -113,11 +122,17 @@ def settings_from_config(config: EffectiveConfig) -> QuerySettings:
     """
     rtt_ms = float(_get(config, "icmp.impaired_rtt_ms"))
     policy = IcmpPolicy(float(_get(config, "icmp.impaired_loss_percent")), rtt_ms or None)
+    configured = str(_get(config, "scheduler.collector_name")).strip()
+    try:
+        local = resolve_collector_name(configured, hostname) if hostname else configured
+    except ValueError:
+        local = configured
     return QuerySettings(
         default_interval_s=int(parse_duration(_get(config, "polling.default_interval"))),
         strategy=ReachabilityStrategy(_get(config, "polling.reachability_strategy")),
         icmp_policy=policy,
         timezone=str(_get(config, "time.timezone")),
+        local_collector=local,
     )
 
 

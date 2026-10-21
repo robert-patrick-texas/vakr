@@ -23,6 +23,7 @@ from datetime import datetime
 
 from vakr.adapters.sqlite.telemetry.maintenance import MaintenanceReport, maintain
 from vakr.adapters.sqlite.telemetry.retention import SqliteRetentionManager
+from vakr.adapters.sqlite.telemetry.rollup_source import SqliteRollupSource
 from vakr.adapters.sqlite.telemetry.rollups import SqliteRollupRepository
 from vakr.adapters.sqlite.telemetry.series import SqliteObservationQuery
 from vakr.adapters.sqlite.telemetry.state import (
@@ -50,6 +51,7 @@ class SqliteTelemetry:
         query: Series and raw reads (plus ``downsampled_series``).
         current: Current-state reads.
         rollups: Rollup storage.
+        rollup_source: Native reads for the rollup job.
         collector_health: Latest collector health.
         retention: Retention.
     """
@@ -72,6 +74,7 @@ class SqliteTelemetry:
         self.query = SqliteObservationQuery(store)
         self.current = SqliteCurrentStateQuery(store)
         self.rollups = SqliteRollupRepository(store)
+        self.rollup_source = SqliteRollupSource(store)
         self.collector_health = SqliteCollectorHealthRepository(store)
         self.retention = SqliteRetentionManager(store)
 

@@ -44,6 +44,7 @@ from vakr.app.collector.identity import (
     resolve_identity,
 )
 from vakr.app.collector.preflight import PreflightError
+from vakr.app.collector.rollup_job import RollupJob
 from vakr.app.collector.service import CollectorService
 from vakr.app.collector.timings import EX_PREFLIGHT, ServiceTimings
 from vakr.credentials import FileCredentialProvider
@@ -107,6 +108,9 @@ def test_empty_inventory_starts_idles_and_stops_cleanly(tmp_path: Path) -> None:
     service = asyncio.run(scenario())
     assert service.failed is None
     assert service.parts.checkpoint.is_file()
+    # RET-004, ROLL-T04: the hourly pass runs the real rollup job before retention.
+    assert isinstance(service.upkeep._rollups, RollupJob)
+    assert service.upkeep.failures["retention"] == 0
     store = SqliteTelemetryStore(paths.state_dir / TELEMETRY_FILE)
     latest = SqliteTelemetry(store).collector_health.latest(service.parts.collector.id)
     store.close()

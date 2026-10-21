@@ -72,7 +72,8 @@ class RollupBucket:
         sample_count: Observations present in the bucket.
         valid_count: Observations with a value for the metric.
         minimum: Smallest value, if any valid sample.
-        mean: Mean value (loss: from summed counts), if any valid sample.
+        mean: Central value, if any valid sample: the mean; for loss, from summed
+            counts (RET-008); for RTT, the median reply (E.10).
         p95: 95th percentile value, if any valid sample.
         maximum: Largest value, if any valid sample.
         quality: Union of the member observations' quality flags.

@@ -1,20 +1,23 @@
-"""Telemetry upkeep inside the collector: staging moves, rollups hook, retention (E.10, E.21).
+"""Telemetry upkeep inside the collector: staging moves, rollups, retention (E.10, E.21).
 
 The Compact collector is the only telemetry writer (6.2), so it also keeps
 the store in shape:
 
 * every 15 minutes, ``maintain(now)`` moves staged rows older than two
   minutes into their day partitions and truncates the WAL (E.21);
-* every hour, the rollup hook runs and then the retention pass expires
-  native rows and rollups exactly by policy (E.10, E.21). Retention never
-  expires native rows that no rollup covers, so until the M4 rollup job
-  exists the hourly pass keeps all native data.
+* every hour, the rollup job (``RollupHook``) rolls up every complete
+  15-minute bucket, within its per-pass bounds, and then the retention
+  pass expires native rows and rollups exactly by policy (E.10, E.21).
+  Retention never expires native rows that no rollup covers (ROLL-T04),
+  so it runs even when the rollup pass fails.
 
-``ROLLUP_HOOK`` is the clearly named place for the M4 rollup job; today it
-is ``NoRollups``, which computes nothing. Each pass runs in a worker thread,
-one at a time, after the first pass at startup. A failed pass is logged and
-retried at the next interval; it never stops collection, because the spool
-keeps every observation until it is stored (invariant 8).
+``CollectorService`` builds the real job (``rollup_job.collector_job``);
+``NoRollups``, which computes nothing and so keeps every native row, is
+the default only for callers that pass no job. Each pass runs in a worker
+thread, one at a time, after the first pass at startup. A failed pass is
+logged and retried at the next interval; it never stops collection,
+because the spool keeps every observation until it is stored
+(invariant 8).
 
 Dependencies:
     asyncio: The timer loop and worker threads.
@@ -75,7 +78,7 @@ class MaintainedTelemetry(Protocol):
 
 
 class RollupHook(Protocol):
-    """The M4 rollup job: complete 15-minute buckets before retention runs (E.10)."""
+    """The rollup job: complete 15-minute buckets before retention runs (E.10, RET-004)."""
 
     def run(self, now: datetime) -> int:
         """Roll up every complete bucket not yet rolled up.
@@ -93,7 +96,7 @@ class RollupHook(Protocol):
 
 
 class NoRollups:
-    """Placeholder until the M4 rollup job exists: computes nothing."""
+    """A rollup hook that computes nothing, so retention keeps every native row."""
 
     def run(self, now: datetime | None) -> int:  # noqa: ARG002 - hook shape
         """Do nothing.
@@ -108,10 +111,6 @@ class NoRollups:
             None
         """
         return 0
-
-
-ROLLUP_HOOK: RollupHook = NoRollups()
-"""Where the M4 rollup job plugs in (RET-004); it runs hourly before retention."""
 
 
 class TelemetryUpkeep:
@@ -135,7 +134,7 @@ class TelemetryUpkeep:
             telemetry: The telemetry backend.
             clock: Monotonic and UTC time.
             timings: Cadences (E.21, E.27).
-            rollups: The rollup job; ``ROLLUP_HOOK`` by default.
+            rollups: The rollup job; ``NoRollups`` (keep all native data) by default.
 
         Returns:
             None
@@ -144,7 +143,7 @@ class TelemetryUpkeep:
             None
         """
         self._telemetry, self._clock, self._timings = telemetry, clock, timings
-        self._rollups = ROLLUP_HOOK if rollups is None else rollups
+        self._rollups = NoRollups() if rollups is None else rollups
         self._stop = asyncio.Event()
         self.passes = {"move": 0, "retention": 0}
         self.failures = {"move": 0, "retention": 0}
@@ -230,6 +229,10 @@ class TelemetryUpkeep:
         if kind == "move":
             self._telemetry.maintain(now)
             return
-        self._rollups.run(now)
-        report = self._telemetry.retention.apply(now)
+        try:
+            self._rollups.run(now)
+        finally:
+            # Retention only ever expires what rollups already cover, so a failed
+            # rollup pass must not also stop rollups past day 400 from expiring.
+            report = self._telemetry.retention.apply(now)
         _LOG.debug("retention pass: %s", report, extra={"event_id": "telemetry.retention"})

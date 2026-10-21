@@ -62,7 +62,7 @@ One condition only produces a warning, because collection still works:
 - **Derives rates** from consecutive samples of each interface, using the actual time between them. The first sample of an interface has counters but no rates (`BASELINE_FIRST_SAMPLE`), and so does the sample after a counter reset or an agent restart. Missing data stays missing, never 0.
 - **Reports its own health** once at start, and then at least once per poll interval. A collector that stops reporting shows as unavailable in the views, and its devices as unknown, never as down.
 - **Pauses polling when the spool is full.** At EXHAUSTED, due polls are recorded as not attempted (unknown) until ingestion catches up. See [the spool guide](spool.md).
-- **Maintains the telemetry database**: it moves staged rows into their day tables every 15 minutes and runs the retention pass every hour.
+- **Maintains the telemetry database**: it moves staged rows into their day tables every 15 minutes, and every hour it rolls up each complete quarter-hour and then runs the retention pass. Native data expires only once a rollup covers it; see [Rollups and native-data retention](rollups.md).
 
 To see what the collector would do with one device right now, run a single diagnostic cycle. It uses the same configuration and plan, writes nothing, and is safe to run beside the service:
 
@@ -111,6 +111,7 @@ $ journalctl -u vakr-collector | grep 'collector.preflight_failed'
 | `collector.spool_refused` | The spool refused observations. A telemetry-loss incident records exactly what (see [the spool guide](spool.md)). |
 | `ingest.write_failed` | The telemetry database refused a write. Observations stay in the spool and are retried. |
 | `telemetry.move_failed`, `telemetry.retention_failed` | A maintenance pass failed. It runs again later, and no data is lost. |
+| `telemetry.rollups`, `telemetry.rollups_behind` | What the hourly rollup pass did, and whether it stopped at its bounds with backlog left (see [rollups](rollups.md)). |
 | `collector.checkpoint_failed` | The rate baselines could not be saved. A restart now would cost one rate interval. |
 | `collector.component_failed` | An internal part stopped unexpectedly. The collector shuts down cleanly, exits 1, and systemd restarts it (at most five times in ten minutes). |
 | `collector.stopped` | The graceful stop finished, and how long it took. |

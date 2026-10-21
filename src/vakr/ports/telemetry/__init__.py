@@ -5,7 +5,7 @@ A ``TelemetryBackend`` groups every telemetry port of one store with its
 contract suites (``telemetry_factory`` fixture) use only this protocol.
 
 Dependencies:
-    vakr.ports.telemetry.query, storage, results: The definitions.
+    vakr.ports.telemetry.query, storage, rollup_source, results: The definitions.
 
 Safety:
     See ``vakr.ports``: no driver types cross these interfaces.
@@ -26,6 +26,7 @@ from vakr.ports.telemetry.results import (
     TelemetryCapabilities,
     WriteResult,
 )
+from vakr.ports.telemetry.rollup_source import RollupSource
 from vakr.ports.telemetry.storage import (
     CollectorHealthRepository,
     ObservationWriter,
@@ -42,6 +43,7 @@ __all__ = [
     "RetentionPolicy",
     "RetentionReport",
     "RollupRepository",
+    "RollupSource",
     "TelemetryBackend",
     "TelemetryBackendFactory",
     "TelemetryCapabilities",
@@ -121,6 +123,21 @@ class TelemetryBackend(Protocol):
 
         Returns:
             RollupRepository: The port.
+
+        Raises:
+            None
+        """
+        ...
+
+    @property
+    def rollup_source(self) -> RollupSource:
+        """Native reads for the rollup job.
+
+        Args:
+            None
+
+        Returns:
+            RollupSource: The port.
 
         Raises:
             None

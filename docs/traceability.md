@@ -184,7 +184,7 @@ Code is in `src/vakr/adapters/sqlite/telemetry/` (own file `telemetry.db`, appli
 | DB-007, ARCH-001 | Implemented | `keys.py`; driver only inside the adapter | contract `test_db007_*`; `test_arch001_only_adapters_import_the_driver` | | `lifecycle/update/backup.py` (portable self-update) also uses `sqlite3`. |
 | DB-008 | Implemented | `store.py` | `test_busy_database_is_a_retryable_error_without_sql` | E.20 | |
 | RET-001..003, RET-007 | Implemented | `retention.py` | `test_ret001_*`, `test_ret002_*`; contract `test_retention_follows_policy` | `database.md` | Amendment 4: queries see exactly 30/400 days; disk holds up to 31/431. |
-| RET-004/006/009 (storage) | Implemented | `rollups.py`, `rollup_codec.py` | `test_ret009_*`, `test_e21_*`; contract `test_rollup_repository_*` | E.21 | Amendment 3 (owner): float32 interface rollup values. The rollup job is M4. |
+| RET-004/006/009 (storage) | Implemented | `rollups.py`, `rollup_codec.py` | `test_ret009_*`, `test_e21_*`; contract `test_rollup_repository_*` | E.21 | Amendment 3 (owner): float32 interface rollup values. The rollup job arrived in M4 (see "Rollups and retention (M4)"). |
 | ROLL-T04, ROLL-T05 (storage) | Pass | `retention.py`, `rollup_codec.py` | `test_roll_t04_*`, `test_rollups_keep_counts_without_values_and_other_widths` | | |
 | ICMP-003/004/005 (storage) | Implemented | `codec_probe.py` | `test_icmp004_*`, `test_icmp003_probe_trains_of_1_to_5_*` | E.21 | Amendment 5: `-1` no reply, `NULL` not sent, plus `sent_count`. |
 | API-005/006, 10.6 | Implemented (adapter) | `raw_reads.py`, `series.py`, `downsample.py` | `test_api006_point_caps_and_page_sizes_are_bounded` | E.21 ladder | |
@@ -253,6 +253,26 @@ Code is in `src/vakr/ingest/` and `src/vakr/health/spool_check.py`, with tests i
 | 6.4 backpressure | Implemented (spool side) | `capacity.py`, `Spool.admits_new_work` | `test_spool_capacity::*`, `test_spool_health::test_spool_t07_*` | `spool.md` | The scheduler must consult `admits_new_work()` (M3 wiring). |
 | OBS-001/003/007, OPS-001 (spool) | In progress | `status.py`, `inspect.py`, `health/spool_check.py` | `test_spool_health::*` | `spool.md` | No Prometheus metrics yet (OBS-005). |
 | SPOOL-T01..T08, QUEUE-T01, INGEST-T01..T03 | Verified | as above | `test_spool_t0N_*`, `test_queue_t01_*`, `test_ingest_t0N_*` | | INGEST-T04 is an Enterprise benchmark, not MVP. |
+
+## Rollups and retention (M4)
+
+The job is `src/vakr/app/collector/rollup_job.py` (with `rollup_build.py` and `rollup_settings.py`), the arithmetic `src/vakr/logic/rollup.py`, the read port `src/vakr/ports/telemetry/rollup_source.py` (memory and SQLite adapters), and the health check `src/vakr/health/rollup_check.py`. See [rollups](operations/rollups.md), Appendix E.10, and ADR-021 amendment 6. The telemetry schema is unchanged.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| RET-001..003 (with the job) | Implemented | `maintenance.py`, `service.py` (`collector_job`) | ROLL-T04 `test_roll_t04_native_rows_expire_only_behind_rollup_coverage`, `test_roll_t04_upkeep_runs_the_job_before_each_retention_pass`, `test_rollup_wiring::test_ret007_a_failing_rollup_pass_still_lets_retention_run`, `test_col_service::test_empty_inventory_starts_idles_and_stops_cleanly` | `rollups.md`, E.10, E.27 #13 | Native data expires only behind the rollup frontier. Retention still runs when a rollup pass fails. |
+| RET-004 | Implemented | `logic/rollup.py` (`summarize`), `rollup_build.py` (`interface_buckets`) | ROLL-T01 `test_logic_rollup::test_roll_t01_*`, `test_rollup_build::test_roll_t01_*` | `rollups.md`, E.10 | All six interface metrics: minimum, mean, nearest-rank p95, maximum, coverage counts, quality union. |
+| RET-005 | Not used | | | ADR-021 amendment 3 | Packets and errors are kept through day 400 (MVP-ACC-02). |
+| RET-006 | Partial | `rollup_build.py` (`icmp_buckets`), `rollup_source.py` | ROLL-T02 `test_rollup_build::test_roll_t02_*`, `test_ret006_an_agent_restart_survives_in_the_icmp_bucket`; contract `test_ret006_device_evidence_*` | `rollups.md`, E.10 | RTT and jitter distributions, loss from counts, and a restart flag. Probe totals, SNMP counts, and restart counts and times need a schema change (ADR-021 amendment 6). |
+| RET-008 | Implemented | `logic/rollup.py` (`loss_summary`) | ROLL-T02 `test_logic_rollup::test_roll_t02_*`, `test_loss_summaries_always_satisfy_the_bucket_rules` | E.10 | One decimal place, half to even (E.7). Degraded cycles give no loss (invariant 2). |
+| RET-009 | Implemented | `rollup_job.py`, `rollup_settings.py` | ROLL-T03 `test_roll_t03_*`, `test_time_budget_stops_a_pass_and_the_next_one_continues`, `test_buckets_wait_for_the_spool_and_for_e10_completeness`, `test_a_ten_day_backlog_drains_over_bounded_passes`, `test_rollup_wiring::*` | `rollups.md`, E.10 | Resumes at the frontier, with one transaction per bucket. Bounded at 672 buckets and 120 s per pass. Thin buckets are counted and logged. |
+| ROLL-T01 | Pass | `logic/rollup.py`, `rollup_build.py` | `test_roll_t01_rates_keep_exact_max_and_nearest_rank_p95`, `test_roll_t01_interface_max_p95_and_coverage_counts_are_exact` | | 30-second polling, so p95 is not simply the maximum. |
+| ROLL-T02 | Pass | `logic/rollup.py`, `rollup_build.py` | `test_roll_t02_loss_comes_from_summed_counts_not_averaged_percentages`, `test_roll_t02_icmp_loss_from_summed_counts_and_rtt_from_every_reply` | | 5 of 12 lost is 41.7%, not the 33.3% average. |
+| ROLL-T03 | Pass | `rollup_job.py` | `test_roll_t03_an_interrupted_job_resumes_without_missing_or_duplicate_buckets` | | The catalog's bucket count matches an uninterrupted run. |
+| ROLL-T04 | Pass | `rollup_job.py`, `retention.py`, `maintenance.py` | `test_roll_t04_native_rows_expire_only_behind_rollup_coverage`, `test_roll_t04_upkeep_runs_the_job_before_each_retention_pass` | | |
+| ROLL-T05 | Pass | `rollup_build.py`, `rollup_job.py` | `test_roll_t05_missing_samples_stay_coverage_gaps_in_rollups_and_graphs`, `test_roll_t05_thin_and_empty_coverage_stay_visible`, `test_an_outage_is_stepped_over_without_writing_empty_buckets` | `rollups.md` | A thin bucket keeps 10 of 15. An empty quarter-hour has no row and graphs as a gap. |
+| 5.2 rollup source | Implemented | `ports/telemetry/rollup_source.py`, `adapters/memory/telemetry_rollup_source.py`, `adapters/sqlite/telemetry/rollup_{source,scan,rows}.py` | contract `contract_rollup_source.py` (memory with rollups on and off, SQLite) | `storage.md` | Slim interface rows, about 0.6 s per bucket at the MVP workload. |
+| OPS-001 (rollups) | Implemented | `health/rollup_check.py`, `adapters/sqlite/telemetry/rollup_health.py` | `test_rollup_health.py` | `rollups.md`, `database.md`, E.10 | WARNING beyond 3 h of lag; CRITICAL when native data past retention still waits. Perfdata `rollup_lag_s`, `rollup_waiting_age_s`. |
 
 ## Owner decisions of 2026-10-20
 

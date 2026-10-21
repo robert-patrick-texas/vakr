@@ -10,6 +10,7 @@ Example:
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
+from tests.contract.contract_rollup_source import RollupSourceContract
 from tests.contract.contract_telemetry_series import TelemetrySeriesContract
 from tests.contract.contract_telemetry_state import TelemetryStateContract
 from tests.contract.contract_telemetry_write import TelemetryWriteContract
@@ -37,3 +38,7 @@ class TestMemoryTelemetryState(TelemetryStateContract):
 
 class TestMemoryMetadataIdentity(MetadataIdentityContract):
     """IFID-007, META-008 transfer, and the change counter on the memory adapter."""
+
+
+class TestMemoryRollupSource(RollupSourceContract):
+    """RET-004, RET-009, DB-004 rollup reads on the in-memory telemetry store."""

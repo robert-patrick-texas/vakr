@@ -9,6 +9,7 @@ Example:
     $ uv run pytest tests/contract/sqlite_telemetry/test_sqlite_telemetry_contracts.py
 """
 
+from tests.contract.contract_rollup_source import RollupSourceContract
 from tests.contract.contract_telemetry_series import TelemetrySeriesContract
 from tests.contract.contract_telemetry_state import TelemetryStateContract
 from tests.contract.contract_telemetry_write import TelemetryWriteContract
@@ -24,3 +25,7 @@ class TestSqliteTelemetrySeries(TelemetrySeriesContract):
 
 class TestSqliteTelemetryState(TelemetryStateContract):
     """DB-005, STATE-003, OBS-001, DB-007 on a SQLite telemetry file."""
+
+
+class TestSqliteRollupSource(RollupSourceContract):
+    """RET-004, RET-009, DB-004 rollup reads on the SQLite telemetry store."""

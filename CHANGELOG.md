@@ -4,6 +4,10 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Added
+
+- The hourly 15-minute rollup job (RET-004 to RET-009): the collector now rolls up every complete quarter-hour before retention runs, so native data finally expires after 30 days (ROLL-T04). A 0.2.x backlog drains in bounded passes of at most 7 days and 2 minutes each. A new `rollups` check in `vakr check health` and `vakr doctor` warns when rollups fall behind. No database schema changes. See [rollups](docs/operations/rollups.md).
+
 ### Changed
 
 - The install and field-data guides find the newest release themselves instead of asking for a version. GitHub's "latest release" links skip pre-releases, so the guides read the same release list that self-update uses.

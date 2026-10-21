@@ -5,7 +5,7 @@ All persistence goes through typed `Protocol`s in `vakr.ports` (blueprint [5.2](
 | Port module | Protocols |
 |---|---|
 | `vakr.ports.metadata` | `MetadataUnitOfWork` (with `change_counter()`); `DeviceRepository`, `InterfaceRepository` (with `transfer_owner`), `SiteRepository`, `TagRepository`, `GroupRepository`, `PolicyRepository`, `CollectorRepository`, `AuditRepository`, `IdentityReviewRepository`; generic `EntityRepository` and `NamedRepository`; filters. The review repository, change counter, and ownership transfer arrived with the M3 inventory loader ([E.26](../../tool-blueprint.md#e26-inventory-and-reconciliation)). |
-| `vakr.ports.telemetry` | `TelemetryBackend`; `ObservationWriter`, `ObservationQuery`, `CurrentStateQuery`, `RollupRepository`, `CollectorHealthRepository`, `RetentionManager`; `TelemetryCapabilities`, `WriteResult`, `RetentionPolicy`, `RetentionReport` |
+| `vakr.ports.telemetry` | `TelemetryBackend`; `ObservationWriter`, `ObservationQuery`, `CurrentStateQuery`, `RollupRepository`, `RollupSource` (the rollup job's bounded native reads, M4), `CollectorHealthRepository`, `RetentionManager`; `TelemetryCapabilities`, `WriteResult`, `RetentionPolicy`, `RetentionReport` |
 | `vakr.ports.clock` | `Clock`, `SystemClock`, `ManualClock` |
 
 The 5.2 `TagGroupRepository` is split into `TagRepository` and `GroupRepository`, which share the generic protocol. `DashboardRepository` and `UserSessionRepository` arrive with their features in M4. `MigrationManager` is in `vakr.ports.migrations`, and the SQLite implementation is in `vakr.adapters.sqlite.migrations` (see the [database operations guide](../operations/database.md)).
@@ -61,6 +61,7 @@ Backends declare their differences in `TelemetryCapabilities` instead of `if bac
 | `TelemetryWriteContract` | DB-004 round trips of every type, `None` values, quality, ordering; STORE-009 idempotency; STORE-010 rejected batches |
 | `TelemetrySeriesContract` | STORE-012 gaps and quality, API-006 point cap, STATE-004 per-collector series, DB-006 native/rollup boundary, rollup repository, retention |
 | `TelemetryStateContract` | DB-005 latest valid evidence, freshness, ties, listings; OBS-001 collector health; DB-007 |
+| `RollupSourceContract` | RET-004/006/009 rollup reads: slim interface samples, device evidence (cycles, poll schedule, SNMP restarts), keyset pages per subject and collector, the native horizon |
 
 The suites take their implementation from two fixtures:
 

@@ -3712,6 +3712,27 @@ Summary values (min, average, median, max, jitter) are computed in floating poin
 - Compact native partitions are dropped one UTC day at a time, after day 30.
 - Compact rollup partitions are dropped one UTC month at a time, once the month's last bucket is more than 400 days old. Up to about 430 days are therefore kept (RET-002).
 
+Rules adopted with the M4 rollup job (`vakr.app.collector.rollup_job`, RET-004 to RET-009). The operator guide is [docs/operations/rollups.md](docs/operations/rollups.md).
+
+| Setting or rule | Default |
+|---|---|
+| When it runs | Hourly, in the collector's retention pass, before retention (E.27) |
+| Completeness | The bucket ends more than 10 minutes in the past **and** more than 10 minutes before the append time of the oldest observation still waiting in the spool. Until the ingester's first write after a start, records left in the spool hold every bucket back |
+| Resume point | The rollup frontier (`coverage_end`), or the oldest native observation when no rollup exists. Stretches with no native data are skipped |
+| Per-pass bounds | At most 672 buckets (7 days); no new bucket after 120 s; at most 500 subjects per read. Constants, not options |
+| Atomicity | One write transaction per bucket, for every subject. The frontier is therefore always a bucket every subject has finished, and a re-run bucket replaces itself (RET-009) |
+| Expected count | The device schedule's slots in the bucket. The schedule is the latest poll record scheduled from 1 h before the bucket's start to its end: its scheduled time gives the phase and its effective interval the period. With no such record: `ceil(900 s / polling.default_interval)`, 15 at 60 s. If the interval changes inside a bucket, the latest interval counts for the whole bucket |
+| Sample count | Observations in the bucket, one per instant (the larger UUID wins, DB-004) |
+| Interface metrics | All six (in and out bit, packet, and error rates): minimum, mean (`math.fsum`), nearest-rank p95 (`vakr.logic.stats.p95`, E.17 #13), maximum |
+| ICMP loss | Central value `100 × Σlost / Σsent`, never an average of percentages (RET-008); per-cycle minimum, p95, and maximum; each to one decimal place, half to even (E.7). Cycles flagged `NOT_ATTEMPTED` or `COLLECTOR_DEGRADED` count as samples but give no loss value (invariant 2) |
+| ICMP RTT | Minimum, median (the central value, half to even), p95, and maximum over every reply in the bucket |
+| ICMP jitter | Minimum, mean (half to even), p95, and maximum of the per-cycle jitter |
+| Quality | Union of the members' flags. ICMP buckets add `BASELINE_UPTIME_RESET` when an SNMP observation in the bucket detected an agent restart (RET-006) |
+| Incomplete buckets (RET-009) | Subject buckets with fewer samples than expected keep their counts and are counted in each pass's `telemetry.rollups` log line |
+| Health `rollups` | WARNING when the frontier is more than 3 h behind the end of the newest complete bucket that holds native data. CRITICAL when native data older than `telemetry.native_retention_days` still waits for a rollup |
+
+ADR-021 amendment 6 records what the existing rollup rows cannot hold without a schema change: probe totals, SNMP counts, and restart counts and times.
+
 ### E.11 Scheduler hashing
 
 Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`collector_name` or `collector_name + "/" + device_uuid`), read as a big-endian integer, so Python and Go produce identical schedules. Python's built-in `hash()` shall not be used, because it is salted per process.
@@ -4103,7 +4124,7 @@ Decisions taken with the M3 collector:
 10. **"Collector unhealthy" in E.1** means overload or event-loop lag above 1 s, the conditions that distort every measurement. One device's DNS or credential failure does not turn another device's lost probes into `UNKNOWN`.
 11. **Baselines.** Elapsed time is monotonic within one kernel boot (`/proc/sys/kernel/random/boot_id`), so it stays monotonic across a service restart (RATE-001), and is wall-clock time across a reboot. A baseline taken from another `ifIndex` is not used (`BASELINE_MISSING_PRIOR`). A sample with no counter at all does not replace the baseline; the E.4 gap rule still bounds the older one. Each device's last `sysUpTime` reading is checkpointed too, so continuity (E.5, E.17 #10) is judged across a restart instead of invalidating every rate.
 12. **Capacity** comes from the metadata interface records (override, contracted rate, `ifHighSpeed`, `ifSpeed`), read per device at each re-plan and after each discovery. A device without records gets absolute rates with `CAPACITY_UNKNOWN`, and no 32-bit wrap is accepted (RATE-010, E.17 #8). The contracted rate is never the utilization denominator until policy can say so.
-13. **Rollups.** `vakr.app.collector.maintenance.ROLLUP_HOOK` is where the M4 job plugs in. Today it computes nothing, so the hourly retention pass expires no native data, because no rollup covers it (E.10, ROLL-T04).
+13. **Rollups.** The hourly pass runs the rollup job (`vakr.app.collector.rollup_job`, built by `collector_job` when the service starts) and then retention, so native data expires only behind rollup coverage (E.10, ROLL-T04). A `TelemetryUpkeep` given no job uses `NoRollups`, which keeps every native row.
 14. **Collector health** is the worst of the scheduler's state (E.25 #7), the spool's (E.24), and `DEGRADED` when any step failed on the collector side during the period.
 15. **Inventory seam.** The collector depends on the four-method `InventorySource` protocol only, and calls it in worker threads. `vakr.app.collector.inventory.INVENTORY_FACTORY` builds `InventoryService`, and `INVENTORY_RELOAD` hands it a reloaded policy on SIGHUP (`replace_policy`); until they are wired, `EmptyInventory` applies. `poll_plan` raising `NotFoundError` means the device was removed between two reads: it is left out of that re-plan, and a discovery whose recording raises it is dropped, neither counted nor logged as a failure.
 16. **Discovery never loops.** Outcomes are kept per device in memory. Polling never waits for discovery: a device without a plan still gets ICMP under its strategy and a Stage 1 read of `sysUpTime.0`, so reachability shows up before, or without, interfaces.

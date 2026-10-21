@@ -85,9 +85,9 @@ The telemetry file follows ADR-021's layout C+H; [Appendix E.21](../../tool-blue
 
 - **Day partitions.** Each UTC day has one table per observation type: `obs_iface_d20261001` for interface samples, and likewise `obs_icmp`, `obs_snmp`, `obs_poll`, and `obs_health`. A table is created when the first row of its day arrives. Rows are clustered by interface or device, collector, and time, so a graph of one interface reads one contiguous range per day.
 - **Staging.** New rows first go to a small, time-ordered staging table per type (`obs_iface_hot`, ...). Every 15 minutes the service moves rows older than 2 minutes into their day tables in one transaction and then resets the WAL with a truncating checkpoint. Late rows, such as a peer's backfill after a partition, go straight to their day table.
-- **Rollups.** 15-minute buckets for every interface metric (traffic, packets, errors) and every ICMP metric (latency, loss, jitter) live in one table per UTC month, `roll_iface_m202610` and `roll_icmp_m202610`. Each row holds all metrics of one interface or device, collector, and bucket in a packed form. Interface values are kept to 7 significant digits (float32 precision); ICMP values exactly (ADR-021 amendment 3).
+- **Rollups.** 15-minute buckets for every interface metric (traffic, packets, errors) and every ICMP metric (latency, loss, jitter) live in one table per UTC month, `roll_iface_m202610` and `roll_icmp_m202610`. Each row holds all metrics of one interface or device, collector, and bucket in a packed form. Interface values are kept to 7 significant digits (float32 precision); ICMP values exactly (ADR-021 amendment 3). The collector builds them every hour; see [Rollups and native-data retention](rollups.md).
 - **Catalog.** `partition_catalog` lists every day and month table, and `partition_template` holds the table definitions that migrations maintain.
-- **Retention.** An hourly pass expires native data older than `telemetry.native_retention_days` (30), but never data the rollups do not yet cover, and rollups older than `telemetry.rollup_retention_days` (400). Expired data disappears from every query at once. The tables that hold only expired data are dropped whole, never deleted row by row, so the disk keeps up to 31 days of native data and 431 days of rollups at its high-water mark. Their space is reused by the next tables, so the file stops growing; `VACUUM INTO` gives space back if you ever need to shrink it.
+- **Retention.** An hourly pass expires native data older than `telemetry.native_retention_days` (30), but never data the rollups do not yet cover ([why and how to watch it](rollups.md)), and rollups older than `telemetry.rollup_retention_days` (400). Expired data disappears from every query at once. The tables that hold only expired data are dropped whole, never deleted row by row, so the disk keeps up to 31 days of native data and 431 days of rollups at its high-water mark. Their space is reused by the next tables, so the file stops growing; `VACUUM INTO` gives space back if you ever need to shrink it.
 
 You should never need to look inside the file, but every table is plain SQLite. The pinned integer codes for states and families are listed in its `vocab_code` table.
 
@@ -107,6 +107,8 @@ Two warnings are telemetry-specific:
 - **Staged rows older than 30 minutes.** The service is not running its 15-minute maintenance, so staging keeps growing. Queries stay correct, only slower. Check that the vakr services are running and look in their journal for maintenance errors.
 
 Neither is ever reported as a device or interface problem: storage trouble is vakr's own health.
+
+A separate `rollups` check reports whether the hourly rollup job keeps up, because native data expires only behind it. Its thresholds and what to do are in [Rollups and native-data retention](rollups.md#the-rollups-health-check).
 
 ## Migrations
 

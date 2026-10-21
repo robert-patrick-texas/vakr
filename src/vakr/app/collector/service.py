@@ -44,6 +44,7 @@ from vakr.app.collector.pipeline import SpoolPump
 from vakr.app.collector.plans import PlanBook
 from vakr.app.collector.reload import reload_service
 from vakr.app.collector.replan import Replanner
+from vakr.app.collector.rollup_job import collector_job
 from vakr.app.collector.shutdown import shut_down
 from vakr.app.collector.snmp_step import CollectorSnmpStep
 from vakr.app.collector.tally import FaultTally
@@ -81,7 +82,7 @@ class CollectorService:
             parts: From ``build_parts``.
             timings: Cadences (E.27); the defaults in production.
             clock: Time source; the system clocks by default.
-            rollups: The rollup job; the ``ROLLUP_HOOK`` placeholder by default.
+            rollups: The rollup hook; the real job (``collector_job``) by default.
 
         Returns:
             None
@@ -114,7 +115,8 @@ class CollectorService:
                                    self.timings.poll_interval_override_s)  # fmt: skip
         self.replanner.defaults = parts.scheduler.defaults
         self.discovery.on_plan = self.replanner.refresh_capacity
-        self.upkeep = TelemetryUpkeep(parts.telemetry, clock, self.timings, rollups)
+        job = rollups if rollups is not None else collector_job(parts, clock, self.ingester)
+        self.upkeep = TelemetryUpkeep(parts.telemetry, clock, self.timings, job)
         self.failed: str | None = None
         self.exit_code: int | None = None  # set by a hard stop; overrides 0 or 1
         self._stop, self.loops_stop = asyncio.Event(), asyncio.Event()

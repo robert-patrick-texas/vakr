@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (amendment 1). Amended by the M2 adapter: key, rollup rows and precision, retention, details (amendments 2-5; the owner approved amendment 3's float32 rollups on 2026-10-20) |
+| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (amendment 1). Amended by the M2 adapter: key, rollup rows and precision, retention, details (amendments 2-5; the owner approved amendment 3's float32 rollups on 2026-10-20). Amended by the M4 rollup job: what the rows cannot hold yet (amendment 6) |
 | Date | 2026-10-20 |
 | Decides | Physical layout of Compact-profile telemetry in SQLite: tables, keys, partitions, PRAGMAs, batching, idempotency, rollups, retention |
 | Requirements | Blueprint 5.1, 5.3, 10.1-10.6, 27.2-27.5, Appendix E.8 and E.10; STORE-009, STORE-010, STORE-011, RET-001..RET-009, DASH-003, DASH-004, STATE-001..STATE-004, MVP-ACC-05 |
@@ -339,3 +339,21 @@ The `RetentionManager` contract expires native data at `now - native`, aligned t
 * **Downsampling** on the width ladder is `SqliteObservationQuery.downsampled_series`, an adapter extension. The port's `interface_series` and `icmp_series` must return one point per observation and truncate at the cap (contract test `test_api006_point_cap_and_metric_family`), so they cannot downsample. **Port gap:** M4 should add a downsampling read to `ObservationQuery`, with a reference version.
 * **Rollup computation (M4).** Computing a bucket needs every native value of the bucket for every series. No port returns that, and building 48,000 domain objects per bucket only to read six numbers from each would cost about a second per bucket. The computation therefore belongs inside the adapter, as an adapter-level operation beside `maintain`, using SQL for counts and `vakr.logic.stats.p95` on the fetched floats (amendment 1).
 * **Health** checks the fixed tables every run and leaves partitions to `vakr db status --full`, because a full `quick_check` of 40 GB takes minutes.
+
+## Amendment 6: what the rollup rows cannot hold yet (2026-10-20, M4 rollup job)
+
+The M4 rollup job (`vakr.app.collector.rollup_job`) fills amendment 3's packed rows **without changing the schema**. Self-update rollback never restores `telemetry.db` (E.14), so an older release must still open it, and `test_a_second_telemetry_migration_needs_a_rollback_story` refuses a migration `0002`. Each metric slot holds the expected, sample, and valid counts, the minimum, a central value, the nearest-rank p95, the maximum, and the quality union. Within that, the job keeps:
+
+* **RET-004 (interfaces):** maximum and p95 of in and out bit rates, and the same for packets and errors (RET-005's permission to drop them is not used, as amendment 3 says); coverage counts; the quality union, which carries restart and counter-reset flags (`BASELINE_UPTIME_RESET`, `BASELINE_GAP`, and so on).
+* **RET-006 and RET-008 (ICMP):** loss from summed probe counts as the central value, with per-cycle minimum, p95, and maximum, all to one decimal place (E.7). A cycle that lost everything keeps the maximum at 100. RTT minimum, median, p95, and maximum are taken over every reply; the median is the RTT bucket's central (`mean`) field, because `RollupBucket` has no median field. Jitter keeps minimum, mean, p95, and maximum. Cycles flagged `NOT_ATTEMPTED` or `COLLECTOR_DEGRADED` count as samples but give no loss value (invariant 2). An agent restart that SNMP saw in the bucket sets `BASELINE_UPTIME_RESET` on the device's ICMP buckets.
+
+**Missing, and needing a schema change.** These are recorded here for the owner; the job ships what fits:
+
+1. **Probe totals.** 10.5 asks for sent, received, and lost totals. Only the loss they give and the cycle counts are kept.
+2. **SNMP success and failure counts** per bucket (10.5). No rollup slot exists for SNMP device observations.
+3. **Restart evidence counts and references, and outage or state-transition references** (10.5, RET-006). Only a flag survives, and only on a bucket that has an ICMP cycle (or, for interfaces, a sample). How many restarts, and when inside the 15 minutes, is lost once native data expires.
+4. **Interface state summaries.** Interfaces that are not up/up have no samples (E.27 #7), so they show as gaps, not as counted down time.
+
+Each would need new rollup slots, so new `vocab_code` rows (`RollupSlot.roll_icmp` codes 4 and up) and new `Metric` members. That is a telemetry migration, and the tripwire asks for read-compatibility with older releases first. The payload codec already decodes any of the 8 slots generically, so an older release could read rows with extra slots. Only the pinned vocabulary and the metric enum need the migration.
+
+**Where the computation runs.** Amendment 5 expected the computation inside the adapter. It is split instead. A read port, `RollupSource`, returns slim rows: six floats and the flags per interface sample, not domain objects. `vakr.app.collector.rollup_build` then computes with `vakr.logic.rollup`. Both backends therefore share one computation, and the `contract_rollup_source` suite compares their reads. At the MVP workload (100 devices, 1,600 interfaces) a bucket takes about 0.6 s: reads, computation, and one write transaction. Amendment 5 estimated about 1 s with full domain objects. E.10 bounds a pass at 672 buckets and 120 s.

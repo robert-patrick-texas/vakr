@@ -28,6 +28,7 @@ from vakr.adapters.sqlite.metadata.health import check_metadata_db
 from vakr.adapters.sqlite.telemetry.health import check_telemetry_db
 from vakr.config.health import check_config
 from vakr.credentials.health import check_credentials
+from vakr.health.api_check import check_api
 from vakr.health.lifecycle_checks import check_tls_policy, check_trusted_cas, check_update
 from vakr.health.model import CheckResult, Status
 from vakr.health.rollup_check import check_rollups
@@ -84,6 +85,7 @@ CHECKS: tuple[Check, ...] = (
     check_spool,
     check_telemetry_db,
     check_rollups,
+    check_api,
 )
 
 

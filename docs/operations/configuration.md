@@ -175,6 +175,16 @@ Packaged entries:
 | `auth.login_failure_reset` | duration, >= 60s, <= 86400s | `"15m"` | restart | v0.2.1 | A run of failed logins with no new failure for this long is forgotten, and the next failure counts from one again (SEC-012, Appendix E.12). |
 | `auth.password_min_length` | int, >= 8, <= 128 | `15` | restart | v0.2.1 | Fewest characters a new password may have (NIST SP 800-63B for a single-factor password, Appendix E.12). Existing passwords keep working; the rule applies when one is set. |
 
+### `[api]`
+
+| Option | Type | Default | Reload | Added in | Description |
+|---|---|---|---|---|---|
+| `api.listen_address` | str | `"127.0.0.1"` | restart | v0.2.1 | IP address the HTTP listener binds. The default, loopback, serves only a reverse proxy on the same host, which terminates TLS (SEC-013, docs/operations/web-access.md). vakr itself serves plain HTTP. Empty turns the TCP listener off and leaves only the local socket. |
+| `api.port` | int, >= 1, <= 65535 | `8080` | restart | v0.2.1 | TCP port of the HTTP listener on api.listen_address. |
+| `api.socket_path` | str | `""` | restart | v0.2.1 | Unix socket for vakr tui and the CLI on this node. Empty means /run/vakr/api.sock. Each connection gets the role of the connecting account (SO_PEERCRED): root and members of vakr-admin are admins, members of vakr are operators, and everyone else is refused (Appendix E.12). |
+| `api.trusted_proxies` | list[str] | `[]` | restart | v0.2.1 | Addresses or CIDR networks of reverse proxies whose Forwarded, X-Forwarded-For, and X-Forwarded-Proto headers vakr believes (SEC-013). Empty believes nobody: the client is the connecting address and the scheme is plain HTTP. With nginx on the same host, set ["127.0.0.1/32", "::1/128"]. |
+| `api.max_body_bytes` | int, >= 1024, <= 524288 | `65536` | restart | v0.2.1 | Largest request body vakr-api accepts, in bytes. A larger request is answered 413 without reading the rest (SEC-019). Every API v1 request body is a small JSON object. |
+
 ### `[rates]`
 
 | Option | Type | Default | Reload | Added in | Description |

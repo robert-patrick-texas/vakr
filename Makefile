@@ -32,6 +32,12 @@ version:
 docstrings:
 	uv run python tools/check-docstrings/check_docstrings.py src tests tools
 
+# OpenAPI document of API v1 (API-008), checked in; tests/unit/api/test_api_openapi.py
+# fails when it is stale. Run after changing any route, parameter, or view.
+.PHONY: openapi
+openapi:
+	uv run vakr api openapi --output docs/api/openapi.json
+
 # Opt-in SNMP load check: the 100-device MVP fleet from snmpsim within one 60 s
 # interval (blueprint 4.2, 27.2). Takes about 30 s; not part of `make check`.
 .PHONY: snmp-load

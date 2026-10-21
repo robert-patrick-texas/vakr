@@ -114,6 +114,7 @@ To start monitoring:
 2. List the devices in `/etc/vakr/inventory.toml`, then run `vakr inventory validate`, `vakr inventory plan`, and `sudo vakr inventory apply` ([inventory](inventory.md)).
 3. Enable the collector and `vakr.target`, the unit that starts and stops all vakr services together: `sudo systemctl enable --now vakr-collector.service vakr.target` ([collector](collector.md)).
 4. Watch the result with `vakr status` or `vakr tui` ([status and TUI](status-and-tui.md)).
+5. Start the API for the web UI, integrations, and the local socket: `sudo systemctl enable --now vakr-api.service`, then put it behind TLS with a reverse proxy ([API](api.md), [web access](web-access.md)).
 
 ## Automatic updates
 

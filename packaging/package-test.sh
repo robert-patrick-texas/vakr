@@ -8,9 +8,11 @@
 #  3. In a fresh ubuntu:26.04 container: install N, check files, users,
 #     directories, config, and commands; remove; reinstall; upgrade to N+1
 #     keeping the operator's config; purge (packaging/container/install-test.sh).
-#  4. In an ubuntu:26.04 container booted with systemd: the timer and the
-#     collector are shipped disabled; the collector verifies, starts on an
-#     empty inventory, reloads, and stops cleanly; the timer can be enabled;
+#  4. In an ubuntu:26.04 container booted with systemd: the timer, the
+#     collector, and the API are shipped disabled; the collector verifies,
+#     starts on an empty inventory, reloads, and stops cleanly; the API serves
+#     loopback HTTP and its socket (root admin, others refused) beside the
+#     collector and stops cleanly; the timer can be enabled;
 #     and an upgrade restarts vakr.target only if it was running
 #     (packaging/container/systemd-test.sh). Set
 #     PACKAGE_TEST_SYSTEMD=0 where privileged containers are not allowed.

@@ -10,7 +10,7 @@ refuses to start.
 
 Dependencies:
     vakr.config.keyword_check, vakr.scheduler.settings, vakr.ingest.settings,
-    vakr.inventory.settings, vakr.auth.settings: The subsystem rules.
+    vakr.inventory.settings, vakr.auth.settings, vakr.api.settings: The subsystem rules.
 
 Safety:
     Read-only. Messages name options and values, never secrets.
@@ -22,6 +22,7 @@ Example:
 
 from collections.abc import Callable
 
+from vakr.api.settings import api_problems
 from vakr.auth.settings import auth_problems
 from vakr.config.keyword_check import keyword_problems
 from vakr.config.loader import EffectiveConfig
@@ -35,6 +36,7 @@ RULES: tuple[tuple[str, Callable[[EffectiveConfig], list[str]]], ...] = (
     ("inconsistent spool settings", spool_problems),
     ("invalid inventory file", inventory_problems),
     ("inconsistent auth settings", auth_problems),
+    ("invalid api settings", api_problems),
 )
 """``(what is wrong, rule)`` pairs, run in order; the first failing rule is reported."""
 

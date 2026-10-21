@@ -99,7 +99,7 @@ The TUI is fully usable in a 120×30 terminal. In a narrower one, the least impo
 
 ### Not in this release
 
-- `--api-url` is accepted and refused: the API that a remote TUI would use arrives in a later release (M4). `--profile` (blueprint 13.1) waits for the API as well.
+- `--api-url` is accepted and refused: `vakr-api` now serves the [API](api.md), but the TUI does not use it yet. `--profile` (blueprint 13.1) waits for that switch as well.
 - Interface detail with a sparkline history (blueprint 13.3) is a later addition.
 - `sysDescr`, `sysObjectID`, `sysName`, `sysLocation`, and `sysContact` are not stored in inventory yet. The device screen says so; `vakr snmp discover` shows them for one device.
 - State-change times are not recorded yet, so within a bucket and severity the list falls back to natural name order.

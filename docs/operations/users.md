@@ -7,7 +7,7 @@ vakr's web UI and API sign people in with **local accounts** stored in the metad
 | **admin** | Everything an operator can, plus manage accounts, inventory, policies, dashboards, kiosk tokens, rediscovery, and identity reviews. |
 | **operator** | Read monitoring state, graphs, dashboards, inventory, and collector health. Nothing that changes configuration (SEC-006). |
 
-Permissions are checked in the application, not just by hiding buttons (blueprint 3.1). This release adds the accounts, the password rules, and the session machinery underneath. The web UI and API that use them arrive with the `vakr-api` service in a later release.
+Permissions are checked in the application, not just by hiding buttons (blueprint 3.1). Accounts sign in to the JSON API of the `vakr-api` service ([API](api.md)); the web pages built on it arrive in a later release.
 
 - [First run: `vakr setup`](#first-run-vakr-setup)
 - [Managing accounts: `vakr user`](#managing-accounts-vakr-user)
@@ -78,7 +78,7 @@ At most four hashes are computed at once, since each needs 64 MiB. A login that 
 
 ## Sessions
 
-Signing in to the web UI creates a **server-side session**. The browser gets an opaque random token (256 bits) in a cookie. The server stores only its SHA-256 digest, so a copy of the database cannot be replayed as a login.
+Signing in (`POST /api/v1/auth/login`, [API](api.md#signing-in-over-http)) creates a **server-side session**. The browser gets an opaque random token (256 bits) in a cookie. The server stores only its SHA-256 digest, so a copy of the database cannot be replayed as a login.
 
 | Limit | Default | Option |
 |---|---|---|
@@ -118,7 +118,7 @@ A NOC wall screen cannot type a password every 30 minutes. An admin creates a **
 - is shown once at creation and stored only as a digest;
 - can be revoked at any time, with immediate effect.
 
-At most 100 kiosk tokens can exist. Kiosk tokens are managed from the web UI, which arrives with `vakr-api`.
+At most 100 kiosk tokens can exist. The API accepts them as `Authorization: Bearer vkk_...`; creating and revoking them arrives with the web UI.
 
 ## Where the secrets live
 
@@ -147,7 +147,7 @@ On the monitoring node itself, `vakr tui` and the CLI will talk to the API over 
 | a member of `vakr` | operator |
 | anyone else | refused |
 
-Group membership is that of the *connecting process*, the same rule the kernel uses for file access. After `sudo usermod -aG vakr-admin alice`, Alice must log out and in again before the new group counts. The socket arrives with `vakr-api`. Until then, `vakr status` and `vakr tui` read the databases directly, as described in [status and TUI](status-and-tui.md).
+Group membership is that of the *connecting process*, the same rule the kernel uses for file access. After `sudo usermod -aG vakr-admin alice`, Alice must log out and in again before the new group counts. Members of `vakr-admin` need not also be in `vakr`: the socket is reachable by every account (mode 0666 in `/run/vakr`, mode 0751), and `vakr-api` refuses everyone else itself. `vakr-api` serves the socket ([API](api.md#the-local-socket)); `vakr status` and `vakr tui` still read the databases directly, as described in [status and TUI](status-and-tui.md), until they move to it.
 
 ## Audit records
 

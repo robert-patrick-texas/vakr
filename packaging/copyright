@@ -50,6 +50,57 @@ Copyright: Sébastien Eustace and contributors
 License: MIT
 Comment: The full text is in the tomlkit-*.dist-info/licenses directory.
 
+Files: opt/vakr/venv/lib/python3.*/site-packages/fastapi*
+Copyright: 2018 Sebastián Ramírez and contributors
+License: MIT
+Comment: The web framework of vakr-api. The full text is in the
+ fastapi-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/starlette* opt/vakr/venv/lib/python3.*/site-packages/uvicorn*
+Copyright: 2017-present Encode OSS Ltd
+License: BSD-3-Clause
+Comment: The ASGI toolkit and server of vakr-api. The full texts are in the
+ starlette-*.dist-info and uvicorn-*.dist-info licenses directories.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/pydantic* opt/vakr/venv/lib/python3.*/site-packages/annotated_types* opt/vakr/venv/lib/python3.*/site-packages/typing_inspection*
+Copyright: Samuel Colvin and other contributors
+License: MIT
+Comment: pydantic, pydantic-core, annotated-types, and typing-inspection. The
+ full texts are in their dist-info/licenses directories.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/annotated_doc*
+Copyright: Sebastián Ramírez and contributors
+License: MIT
+Comment: The full text is in the annotated_doc-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/h11*
+Copyright: Nathaniel J. Smith and contributors
+License: MIT
+Comment: The HTTP/1.1 protocol implementation uvicorn uses. The full text is in
+ the h11-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/anyio*
+Copyright: Alex Grönholm and contributors
+License: MIT
+Comment: The full text is in the anyio-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/idna* opt/vakr/venv/lib/python3.*/site-packages/click*
+Copyright: Kim Davies and contributors (idna); Pallets (click)
+License: BSD-3-Clause
+Comment: The full texts are in the idna-*.dist-info and click-*.dist-info
+ licenses directories.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/typing_extensions*
+Copyright: Python Software Foundation and contributors
+License: PSF-2.0
+Comment: The full text is in the typing_extensions-*.dist-info/licenses directory.
+
+Files: opt/vakr/venv/lib/python3.*/site-packages/opentelemetry*
+Copyright: The OpenTelemetry Authors
+License: Apache-2.0
+Comment: opentelemetry-api, a dependency of fastapi. The full text is in the
+ opentelemetry_api-*.dist-info/licenses directory.
+
 License: Apache-2.0
  Licensed under the Apache License, Version 2.0 (the "License"); you may not
  use this file except in compliance with the License. You may obtain a copy of

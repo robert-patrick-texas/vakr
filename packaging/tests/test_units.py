@@ -147,6 +147,36 @@ def test_collector_unit_joins_the_target_hardened_and_disabled() -> None:
     assert drop_in.is_dir()  # the ICMP fallback names this unit (ICMP-012)
 
 
+def test_api_unit_joins_the_target_hardened_and_disabled() -> None:
+    """6.2, 15.3, SVC-009, PKG-003: vakr user, no capability, read-only but state and socket.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    api = unit("vakr-api.service")
+    settings = dict(api["Service"])
+    assert settings["ExecStart"] == "/opt/vakr/venv/bin/vakr api serve"
+    assert (settings["Type"], settings["User"], settings["Group"]) == ("notify", "vakr", "vakr")
+    assert settings["RestartPreventExitStatus"] == "78"
+    assert "ExecReload" not in settings  # every [api] option applies at restart
+    for key, value in (("NoNewPrivileges", "yes"), ("ProtectSystem", "strict"),
+                       ("ReadWritePaths", "/var/lib/vakr /run/vakr"), ("ProtectHome", "yes"),
+                       ("PrivateTmp", "yes"), ("CapabilityBoundingSet", "")):  # fmt: skip
+        assert settings[key] == value, key
+    assert "AF_NETLINK" not in settings["RestrictAddressFamilies"]
+    assert "RuntimeDirectory" not in settings  # tmpfiles owns /run/vakr; stop must not delete it
+    assert ("PartOf", "vakr.target") in api["Unit"]
+    assert api["Install"] == [("WantedBy", "vakr.target")]
+    prerm = (PKG / "scripts/deb/prerm").read_text(encoding="utf-8")
+    assert "vakr-api.service" in prerm
+
+
 def test_target_is_the_common_contract() -> None:
     """Section 6.2: vakr.target hangs off multi-user.target and is not auto-enabled.
 
@@ -195,7 +225,7 @@ def test_tmpfiles_modes_match_the_layout() -> None:
     """
     rows = {r[1]: (r[0], r[2], r[3], r[4]) for r in table(PKG / "tmpfiles.d/vakr.conf")}
     assert rows == {
-        "/run/vakr": ("d", "0750", "vakr", "vakr"),
+        "/run/vakr": ("d", "0751", "vakr", "vakr"),  # the API socket is reachable (E.30)
         "/var/lib/vakr": ("d", "0750", "vakr", "vakr"),
         "/var/cache/vakr": ("d", "0750", "root", "vakr"),
         "/etc/vakr": ("d", "0755", "root", "vakr"),

@@ -73,13 +73,15 @@ check_accounts_and_dirs() {
         equals "$(getent passwd vakr | cut -d: -f6,7)" "/var/lib/vakr:/usr/sbin/nologin"
     check "group vakr exists" getent group vakr
     check "group vakr-admin exists" getent group vakr-admin
-    check "/run/vakr is 0750 vakr:vakr" owner_mode /run/vakr "750 vakr vakr"
+    check "/run/vakr is 0751 vakr:vakr" owner_mode /run/vakr "751 vakr vakr"
     check "/var/lib/vakr is 0750 vakr:vakr" owner_mode /var/lib/vakr "750 vakr vakr"
     check "/var/cache/vakr is 0750 root:vakr" owner_mode /var/cache/vakr "750 root vakr"
     check "/etc/vakr is 0755 root:vakr" owner_mode /etc/vakr "755 root vakr"
     check "/etc/vakr/secrets is 0750 root:vakr" owner_mode /etc/vakr/secrets "750 root vakr"
     check "/etc/vakr/tls/ca.d is 0755 root:root" owner_mode /etc/vakr/tls/ca.d "755 root root"
     check "postinst created $CONFIG as 0640 root:vakr" owner_mode "$CONFIG" "640 root vakr"
+    check "vakr-api.service is not enabled (PKG-003)" \
+        test ! -e /etc/systemd/system/vakr.target.wants/vakr-api.service
     check "vakr-update.timer is not enabled (UPD-003)" \
         test ! -e /etc/systemd/system/timers.target.wants/vakr-update.timer
     check "vakr.target is not enabled before vakr setup (PKG-003)" \

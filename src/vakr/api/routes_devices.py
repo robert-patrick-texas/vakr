@@ -1,0 +1,246 @@
+"""Device list, device detail, a device's interfaces, and its reachability history (12.3, 12.4).
+
+- ``GET /api/v1/devices``: the device list in 7.7 order (Attention, Active,
+  Offline/Retired, then severity and natural name), searchable, filterable
+  by bucket, and, with ``site``, ``tag``, ``group``, ``provider``, or
+  ``admin_state``, browsable by those groupings (UI-005, UI-009). Paged
+  (API-005); ``counts`` and ``health`` describe every matching device.
+- ``GET /api/v1/devices/{device_uuid}``: the device screen: facts, warnings,
+  every position's verdict, and the interface table (TUI-004..006, UI-003).
+- ``GET /api/v1/devices/{device_uuid}/interfaces``: the device's interfaces,
+  sticky, WAN, and high-priority first, paged (UI-006, UI-016, UI-017).
+- ``GET /api/v1/devices/{device_uuid}/history/reachability``: latency, loss,
+  jitter, and the per-probe smoke, one series set per position, never
+  merged (12.6, MPOS-008).
+
+All need the operator role.
+
+Dependencies:
+    fastapi: Routing.
+    vakr.query: ``OverviewQueries``, ``CatalogQueries``, ``HistoryQueries``.
+
+Safety:
+    Every read is bounded (E.19, E.28, E.29); telemetry trouble is reported
+    inside the 200 answer, never as a device being down.
+
+Example:
+    >>> any(r.path == "/devices" for r in router.routes)
+    True
+"""
+
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
+
+from vakr.api.context import ApiContext, call, get_context
+from vakr.api.errors import ApiError, ErrorEnvelope, Responses
+from vakr.api.paging import offset_of
+from vakr.api.params import (
+    DEFAULT_LIMIT,
+    Collector,
+    Cursor,
+    Limit,
+    Search,
+    collector_id,
+    device_scope,
+    graph_request,
+)
+from vakr.api.principals import Viewer
+from vakr.api.responses import next_offset, paged, view_response
+from vakr.api.schemas import DeviceListPage, InterfaceListPage
+from vakr.domain.enums import StatusBucket
+from vakr.domain.ids import DeviceId
+from vakr.query import (
+    DeviceDetailView,
+    DeviceListRequest,
+    DeviceScope,
+    DeviceSort,
+    GraphRequest,
+    InterfaceListRequest,
+    InterfaceScope,
+    InterfaceSort,
+)
+from vakr.query.latency_views import LatencyView
+
+router = APIRouter(tags=["devices"])
+Context = Annotated[ApiContext, Depends(get_context)]
+NOT_FOUND: Responses = {404: {"model": ErrorEnvelope, "description": "no such device"}}
+
+
+def device_exists(context: ApiContext, device_id: DeviceId) -> bool:
+    """Tell whether a device is in the inventory (blocking).
+
+    Args:
+        context: The services.
+        device_id: The device.
+
+    Returns:
+        bool: True when it exists (retired included).
+
+    Raises:
+        StorageError: If the metadata store cannot be read.
+    """
+    with context.metadata() as uow:
+        return uow.devices.get(device_id) is not None
+
+
+def missing(device_id: UUID) -> ApiError:
+    """Build the 404 for an unknown device.
+
+    Args:
+        device_id: The UUID asked for.
+
+    Returns:
+        ApiError: 404 ``not_found``.
+
+    Raises:
+        None
+    """
+    return ApiError(404, "not_found", f"no device {device_id}")
+
+
+@router.get("/devices", response_model=DeviceListPage, summary="Device list (7.7 order)")
+async def devices(
+    _: Viewer,
+    context: Context,
+    scope: Annotated[DeviceScope | None, Depends(device_scope)],
+    search: Search = "",
+    bucket: Annotated[list[StatusBucket], Query(max_length=3)] = [],  # noqa: B006 - FastAPI copies it
+    sort: DeviceSort = DeviceSort.STATUS,
+    include_retired: bool = False,
+    limit: Limit = DEFAULT_LIMIT,
+    cursor: Cursor = None,
+) -> JSONResponse:
+    """Return one page of the device list.
+
+    Args:
+        _: The caller (operator or admin).
+        context: The services.
+        scope: Site, tag, group, provider, or admin-state filter, if any.
+        search: Substring of name, address, site, or tag.
+        bucket: Only these buckets (repeat the parameter).
+        sort: ``status`` (7.7), ``name``, ``site``, or ``age``.
+        include_retired: Also list retired devices.
+        limit: Page size.
+        cursor: ``page.next_cursor`` of the previous page.
+
+    Returns:
+        JSONResponse: ``DeviceListPage``.
+
+    Raises:
+        ValidationError: If a bound is broken (422).
+    """
+    request = DeviceListRequest(search, frozenset(bucket), sort, offset_of(cursor), limit,
+                                include_retired)  # fmt: skip
+    if scope is None:
+        view = await call(context.overview.device_list, request)
+    else:
+        view = await call(context.overview.browse, scope, request)
+    following = next_offset(view.offset, view.limit, view.total)
+    return view_response(paged(DeviceListPage, view, view.limit, view.total, following))
+
+
+@router.get(
+    "/devices/{device_uuid}",
+    response_model=DeviceDetailView,
+    responses=NOT_FOUND,
+    summary="Device screen",
+)
+async def device(device_uuid: UUID, _: Viewer, context: Context) -> JSONResponse:
+    """Return the device screen.
+
+    Args:
+        device_uuid: The device.
+        _: The caller.
+        context: The services.
+
+    Returns:
+        JSONResponse: ``DeviceDetailView``.
+
+    Raises:
+        ApiError: 404 for an unknown device.
+    """
+    view = await call(context.overview.device_detail, str(device_uuid))
+    if view is None:
+        raise missing(device_uuid)
+    return view_response(view)
+
+
+@router.get(
+    "/devices/{device_uuid}/interfaces",
+    response_model=InterfaceListPage,
+    responses=NOT_FOUND,
+    summary="A device's interfaces, primary interest first",
+)
+async def device_interfaces(
+    device_uuid: UUID,
+    _: Viewer,
+    context: Context,
+    search: Search = "",
+    sort: InterfaceSort = InterfaceSort.PRIORITY,
+    include_retired: bool = False,
+    collector: Collector = None,
+    limit: Limit = DEFAULT_LIMIT,
+    cursor: Cursor = None,
+) -> JSONResponse:
+    """Return one page of a device's interfaces.
+
+    Args:
+        device_uuid: The device.
+        _: The caller.
+        context: The services.
+        search: Substring of interface name, alias, description, provider, or circuit.
+        sort: ``priority``, ``name``, ``traffic``, or ``utilization``.
+        include_retired: Also list retired interfaces.
+        collector: Position whose current values to show.
+        limit: Page size.
+        cursor: ``page.next_cursor`` of the previous page.
+
+    Returns:
+        JSONResponse: ``InterfaceListPage``.
+
+    Raises:
+        ApiError: 404 for an unknown device.
+    """
+    device_id = DeviceId(device_uuid)
+    if not await call(device_exists, context, device_id):
+        raise missing(device_uuid)
+    scope = InterfaceScope(device_id=device_id, include_retired=include_retired)
+    request = InterfaceListRequest(search, scope, sort, offset_of(cursor), limit,
+                                   collector_id(collector))  # fmt: skip
+    view = await call(context.overview.catalog.interface_list, request)
+    return view_response(paged(InterfaceListPage, view, view.limit, view.total, view.next_offset))
+
+
+@router.get(
+    "/devices/{device_uuid}/history/reachability",
+    response_model=LatencyView,
+    responses=NOT_FOUND,
+    summary="Latency, loss, jitter, and smoke per position",
+)
+async def reachability(
+    device_uuid: UUID,
+    _: Viewer,
+    context: Context,
+    request: Annotated[GraphRequest, Depends(graph_request)],
+) -> JSONResponse:
+    """Return the device's reachability history (12.6, MPOS-008).
+
+    Args:
+        device_uuid: The device.
+        _: The caller.
+        context: The services.
+        request: Range, source, point cap, and optional position.
+
+    Returns:
+        JSONResponse: ``LatencyView`` with the actual resolution and zone (API-006).
+
+    Raises:
+        ApiError: 404 for an unknown device.
+    """
+    view = await call(context.history.device_latency, DeviceId(device_uuid), request)
+    if view is None:
+        raise missing(device_uuid)
+    return view_response(view)

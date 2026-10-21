@@ -88,6 +88,7 @@ def test_nfpm_places_only_integration_points_outside_opt() -> None:
     outside = sorted(e["dst"] for e in entries if not e["dst"].startswith("/opt/vakr"))
     assert outside == [
         "/usr/bin/vakr",
+        "/usr/lib/systemd/system/vakr-api.service",
         "/usr/lib/systemd/system/vakr-collector.service",
         "/usr/lib/systemd/system/vakr-update.service",
         "/usr/lib/systemd/system/vakr-update.timer",

@@ -55,3 +55,4 @@ vakr: unusual-interpreter python [opt/vakr/python/lib/python3.*/encodings/rot_13
 # /usr/lib/systemd/system, so this is the one override outside /opt/vakr
 # (owner approval 2026-10-20).
 vakr: systemd-service-file-refers-to-unusual-wantedby-target vakr.target [usr/lib/systemd/system/vakr-collector.service]
+vakr: systemd-service-file-refers-to-unusual-wantedby-target vakr.target [usr/lib/systemd/system/vakr-api.service]

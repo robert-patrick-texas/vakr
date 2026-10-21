@@ -1544,7 +1544,7 @@ allowed_target_cidrs = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
 denied_target_addresses = ["169.254.169.254/32"]
 ```
 
-Enterprise profiles add settings the MVP catalog does not have yet; they arrive with their features and are listed here so the shape is known: `[metadata] backend` and `dsn_secret`, `[telemetry] backend` and `dsn_secret`, `[security] trusted_proxy_cidrs` and `public_dashboards_enabled`, and `[polling] adaptive_polling`.
+Enterprise profiles add settings the MVP catalog does not have yet; they arrive with their features and are listed here so the shape is known: `[metadata] backend` and `dsn_secret`, `[telemetry] backend` and `dsn_secret`, `[security] public_dashboards_enabled`, and `[polling] adaptive_polling`. Reverse-proxy trust is `[api] trusted_proxies` (Appendix E.30, decision 1).
 
 Inventory lives in `/etc/vakr/inventory.toml` ([inventory guide](docs/operations/inventory.md), E.26), not in `config.toml`:
 
@@ -4209,3 +4209,49 @@ Decisions taken with the M3 status views:
 10. **Data path (TUI-007, 13.1).** Until the M4 API exists, `vakr status` and `vakr tui` use `vakr.query.StatusQueries` in-process over the metadata and telemetry ports, which TUI-007 allows. Section 13.1's default of a protected local API applies once the API exists. `--api-url` is refused until then.
 
 Gaps recorded for later milestones: E.2 row 8's "incomplete discovery" and "pending identity review" are not evaluated because no port exposes discovery completeness or pending reviews yet (row 8 still matches a partial SNMP reply). `sysDescr`, `sysObjectID`, `sysName`, `sysLocation`, and `sysContact` (12.4) are not stored in inventory, so the device screen says so instead. The SQLite stores have no read-only mode, so these commands open read-write connections that only read.
+
+### E.30 API service (M4)
+
+`vakr-api.service` runs `vakr api serve` (`vakr.app.api`): JSON API v1 (`vakr.api`) on loopback TCP for a reverse proxy, and the local Unix socket for the TUI and CLI. The operator guides are [API](docs/operations/api.md) and [web access](docs/operations/web-access.md); the endpoint contract is [`docs/api/openapi.json`](docs/api/openapi.json).
+
+| Setting or bound | Default | Allowed range or notes |
+|---|---|---|
+| `api.listen_address` | `127.0.0.1` | IP literal; empty turns TCP off. Plain HTTP; TLS ends at the proxy (SEC-013) |
+| `api.port` | 8080 | 1 to 65535 |
+| `api.socket_path` | empty: `/run/vakr/api.sock` | absolute path |
+| `api.trusted_proxies` | none | addresses or CIDR networks whose `Forwarded` / `X-Forwarded-*` headers count |
+| `api.max_body_bytes` | 65,536 | 1,024 to 524,288; larger bodies get 413 before they are read |
+| Socket and directory modes | socket 0666; `/run/vakr` 0751 `vakr:vakr` | decision 2 |
+| Request head | 16 KiB (h11 limit) | constant; larger is 400 |
+| Connections plus requests in progress | 100 on TCP, 32 on the socket | constant; more get 503 |
+| Keep-alive idle / graceful stop | 5 s / 10 s | constant; the unit's `TimeoutStopSec` is 30 s |
+| Session cookie | `__Host-vakr_session`, `Secure`, over HTTPS; `vakr_session` over loopback HTTP; `HttpOnly`, `SameSite=Lax`, `Path=/`, `Max-Age` = remaining absolute lifetime | decision 3 |
+| CSRF header | `X-CSRF-Token` (E.12 token) on every cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` | the login is exempt; origin checks still apply |
+| Login body | JSON only; username at most 256, password at most 1,024 characters as input | the services apply E.12's 64 and 256 |
+| Concurrent password logins | 8 checked, 32 waiting | constant; more get 429 at once |
+| Request ID | `X-Request-ID` from a trusted proxy if 1 to 64 of `A-Za-z0-9._-`, else 32 hex digits | named in every error envelope |
+| Session purge | every 5 min, at most 10 batches of 500 rows per table | constant |
+| Startup wait for both listeners | 10 s | constant |
+| Failed startup check | exit 78, `RestartPreventExitStatus=78` | as E.27 |
+| Restart policy | `Restart=on-failure`, `RestartSec=10s`, at most 5 starts in 10 min | SVC-009 |
+| Unit limits | `MemoryMax=1G`, `TasksMax=256`, `LimitNOFILE=4096`; no capabilities | 15.3 |
+| `api` health check | `GET /api/v1/health/ready` on the socket, 2 s timeout | OK when not installed or not running |
+| Page, points, ranges, exports | E.19, E.28 | unchanged |
+
+Decisions taken with the M4 API:
+
+1. **Proxy trust lives with the listener.** Section 11.3 listed `[security] trusted_proxy_cidrs` as a future enterprise key; the owner's M4 task names `[api] trusted_proxies`. **Contradiction recorded; choice:** `api.trusted_proxies`, beside the listener it qualifies; 11.3 now points here. Empty trusts nobody: forwarded headers from any other peer are ignored and logged once (`api.untrusted_forwarding`). Hops are read from the right while each address is a trusted proxy; an unparseable entry stops at the proxy that wrote it. When both kinds are present, `X-Forwarded-*` wins over `Forwarded`, because nginx sets the former and passes a client's `Forwarded` through unless configured otherwise.
+2. **The socket is reachable by every account; the server decides.** E.12 makes members of `vakr-admin` admins on the socket, but a `/run/vakr` of 0750 `vakr:vakr` (11.1, tmpfiles) would have kept out any admin not also in `vakr`. **Contradiction recorded; choice:** `/run/vakr` becomes 0751 (others may traverse, not list) and the socket 0666, and `vakr-api` refuses, with 403 `peer_refused` on every endpoint, any account that is neither root nor in either group: PostgreSQL's peer-authentication model. The self-update lock in `/run/vakr` is 0600 root, so others still cannot open it.
+3. **`SameSite=Lax`, not `Strict`.** Links into vakr from tickets, chat, and alert e-mail must keep the session for a server-rendered front end; every state change also needs the CSRF token and no GET changes state, so `Strict` would add nothing. Each scheme reads only its own cookie name, so a plain-HTTP cookie can never stand in for the secure one.
+4. **Plain HTTP.** A login over plain HTTP from a non-loopback client is refused (403 `insecure_transport`). Over plain HTTP from loopback (local testing) it works, without `Secure`, because browsers drop secure cookies on `http://`.
+5. **CSRF defence in depth.** Besides the token, any state-changing TCP request whose `Sec-Fetch-Site` is `cross-site` or `same-site`, or whose `Origin` names another host than `Host`, is refused (403 `cross_site`); the login also needs `Content-Type: application/json`, which no cross-site form can send. Socket and kiosk requests carry no cookie, so CSRF does not apply to them.
+6. **Who may call what.** Anonymous: `health/live`, `health/ready` (component names and states only), `auth/login`. Operator: every read, `version` and `health/detail` included (the release number is not shown to anonymous callers). Admin: `POST /interfaces/{uuid}/identity-resolution`. Kiosk tokens are accepted only as `Authorization: Bearer vkk_...`; session tokens only as the cookie. No command creates kiosk tokens yet; that arrives with the web UI.
+7. **One paging contract.** Every list takes `limit` and `cursor` and answers `page.next_cursor` and `page.total` (API-005). Repository lists use keyset cursors. Device and interface lists are ordered by live status or traffic; their cursor is an opaque position in a freshly computed order, so traversal is complete and duplicate-free under a fixed snapshot (API-T02), and a device that changes status between two pages can move across the boundary.
+8. **Views as they are.** Answers are the `vakr.query` views through `to_jsonable`; the OpenAPI document declares them as response models, but FastAPI does not re-validate them, so large graphs stay cheap. Graph and ranking answers keep each collector's series apart (MPOS-008) and disclose resolution, zone, quality, and truncation per series (API-006). Telemetry trouble is a 200 with `available: false` (UI-014).
+9. **The interface identity decision.** `POST /api/v1/interfaces/{uuid}/identity-resolution` with `{"review_id", "decision": "map" | "new"}` wraps `vakr interface review map|new`. `map` maps the review's row to the interface in the path; `new` gives the row a new identity, and the path's interface must be on the review's device. The actor in identity history and audit is the username, or `local:<account>` on the socket.
+10. **Exports** are synchronous within E.28's bounds (API-012's asynchronous large exports are deferred, 27.4). Ranking exports have their own CSV columns; text cells a spreadsheet would read as formulas are prefixed with `'`.
+11. **Service shape.** One process, two uvicorn servers (stock h11 on TCP, `PeerProtocol` on the socket) sharing one app; uvicorn's signal handling, proxy-header rewriting, `Server` header, and access log are off. No `RuntimeDirectory=`: tmpfiles owns `/run/vakr`, and systemd would delete it, with the self-update lock, at every stop; the unit gets `ReadWritePaths=/var/lib/vakr /run/vakr` instead. SIGHUP is logged and ignored, because every `[api]` and `[auth]` option is `restart`.
+12. **The API never writes telemetry.** Its query services see `ReadOnlyTelemetry`, which refuses the batch writer, rollup writes, retention, and maintenance (6.2). It reads `telemetry.db` beside the running collector in WAL mode, as user `vakr`.
+13. **Dependencies.** `fastapi` and `uvicorn` without extras: `[standard]` would add a CLI, Jinja2, form parsing, uvloop, httptools, websockets, and a file watcher, none of which the API uses; h11 behind a local proxy meets 12.9 at MVP scale. FastAPI compiles its routes on an app's first request (about 0.4 s once per process).
+14. **Web front end.** Undecided (Jinja/HTMX or a static single-page app). `create_app(context, web=...)` is the one hook where it attaches, outside `/api/`; the CSP (same origin, no inline script) is the one pages will get.
+15. **TUI data path.** The socket exists, but `vakr status` and `vakr tui` still use the query services in-process (E.29 #10) until the TUI moves to the socket.

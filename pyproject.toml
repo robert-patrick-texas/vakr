@@ -22,9 +22,15 @@ classifiers = [
 dependencies = [
     "argon2-cffi>=25.1.0",   # Argon2id local password hashing with rehash on login (SEC-009, E.12)
     "cryptography>=50.0.2",  # certificate inspection for enterprise CAs (EGRESS-003)
+    # JSON API v1 of vakr-api (API-001, API-008). Plain fastapi, not [standard]: that extra
+    # adds a CLI, Jinja2, form parsing, and uvicorn[standard], none of which the API uses.
+    "fastapi>=0.156.4",
     "pysnmp>=7.1.30",        # asyncio SNMPv2c collection and discovery (SNMP-015, ADR-034)
     "textual>=8.2.8",        # read-only terminal UI, vakr tui (TUI-001, ADR-013)
     "tomlkit>=0.15.2",       # comment-preserving TOML edits for config upgrades (CFGM-002)
+    # ASGI server of vakr-api. Plain uvicorn (pure-Python h11), not [standard]: no uvloop,
+    # httptools, websockets, or file watcher; behind a local proxy h11 is fast enough (12.9).
+    "uvicorn>=0.54.0",
 ]
 
 [project.urls]
@@ -37,6 +43,7 @@ vakr = "vakr.cli.main:main"
 [dependency-groups]
 dev = [
     "coverage>=7.16.2",
+    "httpx2>=2.15.1",  # transport of the FastAPI/Starlette TestClient in the API tests
     "hypothesis>=6.170.5",
     "pysmi>=2.0.0",  # imported by snmpsim 1.2.2 but not declared by it (ADR-034)
     "pytest>=9.1.1",

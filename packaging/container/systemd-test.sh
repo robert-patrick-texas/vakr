@@ -12,18 +12,40 @@ source "$(dirname "${BASH_SOURCE[0]}")/testlib.sh"
 prop() { systemctl show --property "$1" --value "$2"; }
 active_since() { prop ActiveEnterTimestampMonotonic vakr.target; }
 
+# api_get PATH tcp|unix: GET from vakr-api with the bundled Python's http.client
+# (the image has no curl); prints "<status> <body>".
+cat >/tmp/api_get.py <<'PY'
+import http.client, socket, sys
+path, where = sys.argv[1], sys.argv[2]
+class Unix(http.client.HTTPConnection):
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.settimeout(5)
+        self.sock.connect("/run/vakr/api.sock")
+conn = Unix("localhost", timeout=5) if where == "unix" else http.client.HTTPConnection("127.0.0.1", 8080, timeout=5)
+conn.request("GET", path)
+answer = conn.getresponse()
+print(answer.status, answer.read().decode())
+PY
+chmod 0644 /tmp/api_get.py
+api_get() { PYTHONDONTWRITEBYTECODE=1 /opt/vakr/venv/bin/python3 /tmp/api_get.py "$@"; }
+api_get_as() { local user=$1; shift; runuser -u "$user" -- env PYTHONDONTWRITEBYTECODE=1 /opt/vakr/venv/bin/python3 /tmp/api_get.py "$@" 2>&1; }
+
 stage_debs
 apt-get -qq update
 
 section "first install starts and enables nothing (PKG-003, UPD-003)"
 apt_get install "$DEB_N"
-for unit in vakr.target vakr-collector.service vakr-update.service vakr-update.timer; do
+for unit in vakr.target vakr-collector.service vakr-api.service vakr-update.service \
+    vakr-update.timer; do
     check "$unit loads cleanly" equals "$(prop LoadState "$unit")" loaded
 done
 check "units verify under the running systemd" \
-    systemd-analyze verify vakr.target vakr-collector.service vakr-update.service vakr-update.timer
+    systemd-analyze verify vakr.target vakr-collector.service vakr-api.service \
+    vakr-update.service vakr-update.timer
 check "vakr-collector.service is disabled" \
     equals "$(systemctl is-enabled vakr-collector.service)" disabled
+check "vakr-api.service is disabled" equals "$(systemctl is-enabled vakr-api.service)" disabled
 check "vakr-update.timer is disabled" equals "$(systemctl is-enabled vakr-update.timer)" disabled
 check "vakr-update.timer is not running" equals "$(systemctl is-active vakr-update.timer)" inactive
 check "vakr.target is not running" equals "$(systemctl is-active vakr.target)" inactive
@@ -62,6 +84,40 @@ check "vakr status shows the device" grep -q lab-rtr1 <<<"$(vakr status --json)"
 check "the community never appears in command output" bash -c \
     "! { vakr inventory list; vakr inventory plan; vakr status --json; } 2>&1 | grep -qF '$community'"
 
+section "API serves loopback HTTP and the local socket; strangers are refused (6.2, E.12)"
+check "vakr-api.service starts (READY=1 after its startup checks)" systemctl start vakr-api.service
+check "API is active" equals "$(systemctl is-active vakr-api.service)" active
+check "API runs as vakr" equals "$(prop User vakr-api.service)" vakr
+check "API holds no capability (15.3)" \
+    bash -c '! systemctl show -p CapabilityBoundingSet --value vakr-api.service | grep -qi cap_'
+check "loopback /api/v1/health/live answers 200 without auth" \
+    grep -q '^200 ' <<<"$(api_get /api/v1/health/live tcp)"
+check "loopback data needs a role (401 without a session)" \
+    grep -q '^401 ' <<<"$(api_get /api/v1/devices tcp)"
+check "the socket is /run/vakr/api.sock, mode 0666, in /run/vakr 0751 (E.30)" \
+    bash -c '[ "$(stat -c %a /run/vakr/api.sock)" = 666 ] && [ "$(stat -c %a /run/vakr)" = 751 ]'
+check "root on the socket is admin (E.12)" \
+    grep -q '"role":"admin"' <<<"$(api_get /api/v1/auth/session unix)"
+check "root on the socket gets /api/v1/health/live" grep -q '^200 ' <<<"$(api_get /api/v1/health/live unix)"
+check "an unprivileged account is refused on the socket (403 peer_refused)" \
+    grep -q '^403 .*peer_refused' <<<"$(api_get_as nobody /api/v1/health/live unix)"
+check "vakr check health asks the API over its socket" grep -q 'api: ready' <<<"$(vakr check health)"
+check "the API serves beside the running collector (SQLite WAL, both as vakr)" \
+    systemctl start vakr-collector.service
+sleep 2
+check "collectors list shows the running collector" \
+    grep -q '"position"' <<<"$(api_get /api/v1/collectors unix)"
+check "metadata stays vakr-owned with both services running" \
+    bash -c '! find /var/lib/vakr -maxdepth 1 -name "*.db*" ! -user vakr | grep -q .'
+systemctl stop vakr-collector.service
+check "systemctl stop vakr-api" systemctl stop vakr-api.service
+check "API exited 0" equals "$(prop ExecMainStatus vakr-api.service)" 0
+check "the socket is removed at stop" test ! -e /run/vakr/api.sock
+check "journal records a clean API stop" \
+    grep -q 'api.stopped' <<<"$(journalctl -u vakr-api.service --no-pager)"
+check "the auth key exists, 0600 vakr (E.12)" \
+    bash -c '[ "$(stat -c "%a %U" /var/lib/vakr/auth.key)" = "600 vakr" ]'
+
 section "operator enables the daily update timer (UPD-003)"
 check "systemctl enable --now vakr-update.timer" systemctl enable --now vakr-update.timer
 check "timer is active" equals "$(systemctl is-active vakr-update.timer)" active
@@ -87,10 +143,11 @@ check "upgrade leaves a stopped vakr.target stopped" \
     equals "$(systemctl is-active vakr.target)" inactive
 
 section "remove stops units; purge removes enablement links (PKG-005)"
-systemctl start vakr.target vakr-collector.service
+systemctl start vakr.target vakr-collector.service vakr-api.service
 apt_get remove vakr
 check "remove stopped the timer" equals "$(systemctl is-active vakr-update.timer)" inactive
 check "remove stopped the collector" bash -c '! systemctl is-active --quiet vakr-collector.service'
+check "remove stopped the API" bash -c '! systemctl is-active --quiet vakr-api.service'
 check "remove stopped vakr.target" equals "$(systemctl is-active vakr.target)" inactive
 apt_get purge vakr
 check "purge removed the timer's enablement link" \

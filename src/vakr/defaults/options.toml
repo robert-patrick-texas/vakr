@@ -700,6 +700,53 @@ since = "0.2.1"
 reload = "restart"
 description = "Fewest characters a new password may have (NIST SP 800-63B for a single-factor password, Appendix E.12). Existing passwords keep working; the rule applies when one is set."
 
+# The vakr-api service: JSON API v1 for the web UI, TUI, and CLI (milestone M4:
+# blueprint 6.2, 14, 15.4, SEC-013; Appendix E.30). TLS ends at a reverse proxy.
+
+[[options]]
+key = "api.listen_address"
+type = "str"
+default = "127.0.0.1"
+since = "0.2.1"
+reload = "restart"
+description = "IP address the HTTP listener binds. The default, loopback, serves only a reverse proxy on the same host, which terminates TLS (SEC-013, docs/operations/web-access.md). vakr itself serves plain HTTP. Empty turns the TCP listener off and leaves only the local socket."
+
+[[options]]
+key = "api.port"
+type = "int"
+min = 1
+max = 65535
+default = 8080
+since = "0.2.1"
+reload = "restart"
+description = "TCP port of the HTTP listener on api.listen_address."
+
+[[options]]
+key = "api.socket_path"
+type = "str"
+default = ""
+since = "0.2.1"
+reload = "restart"
+description = "Unix socket for vakr tui and the CLI on this node. Empty means /run/vakr/api.sock. Each connection gets the role of the connecting account (SO_PEERCRED): root and members of vakr-admin are admins, members of vakr are operators, and everyone else is refused (Appendix E.12)."
+
+[[options]]
+key = "api.trusted_proxies"
+type = "list[str]"
+default = []
+since = "0.2.1"
+reload = "restart"
+description = "Addresses or CIDR networks of reverse proxies whose Forwarded, X-Forwarded-For, and X-Forwarded-Proto headers vakr believes (SEC-013). Empty believes nobody: the client is the connecting address and the scheme is plain HTTP. With nginx on the same host, set [\"127.0.0.1/32\", \"::1/128\"]."
+
+[[options]]
+key = "api.max_body_bytes"
+type = "int"
+min = 1024
+max = 524288
+default = 65536
+since = "0.2.1"
+reload = "restart"
+description = "Largest request body vakr-api accepts, in bytes. A larger request is answered 413 without reading the rest (SEC-019). Every API v1 request body is a small JSON object."
+
 # Rate derivation in the collector (RATE-003, RATE-009; Appendix E.4, E.27).
 # E.17 defers these keys to the M3 collector, which uses them.
 

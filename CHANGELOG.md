@@ -12,9 +12,17 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - New `[auth]` options: `session_idle_timeout` (30 min), `session_lifetime` (12 h), `kiosk_token_lifetime` (30 d), `login_throttle_after` (5), `login_throttle_max_delay` (30 s), `login_failure_reset` (15 min), and `password_min_length` (15). Their defaults apply without any edit.
 - Metadata schema 3 adds accounts, sessions, kiosk tokens, and failed-login counts. The package runs `vakr db migrate`, which takes a backup first.
 - New runtime dependency `argon2-cffi` (MIT).
+- The `vakr-api` service (`vakr api serve`, `vakr-api.service`, shipped disabled): JSON API v1 on loopback HTTP (`127.0.0.1:8080`) for a TLS reverse proxy, and on the local socket `/run/vakr/api.sock`, where root and `vakr-admin` members are admins, `vakr` members operators, and everyone else is refused (E.12). It serves the device list, device and interface detail, traffic, packet, error, utilization, status, and reachability history with disclosed resolution and one series per position, the overview, rankings, high-priority and WAN views, search, sites, tags, groups, collector health, identity history and reviews, bounded CSV/JSON exports, and the admin's identity-review decision (API-001 to API-008, API-012). See [the API guide](docs/operations/api.md).
+- Sign-in over HTTP (SEC-010 to SEC-013): `POST /api/v1/auth/login` sets an `HttpOnly`, `SameSite=Lax` session cookie, `Secure` and `__Host-` prefixed over HTTPS; sign-in over plain HTTP is refused except from loopback. Every cookie-authenticated change needs the session's `X-CSRF-Token`; cross-site browser requests are refused; CORS is off. Failed sign-ins are delayed and throttled with `Retry-After`. Forwarded headers count only from `api.trusted_proxies`. [Web access](docs/operations/web-access.md) has a complete nginx configuration.
+- Every API answer has a stable error envelope (`code`, `message`, `request_id`, `fields`), the security headers of blueprint 15.4, and `Cache-Control: no-store`; request bodies are limited to 64 KiB.
+- The OpenAPI document of API v1 is checked in as [`docs/api/openapi.json`](docs/api/openapi.json); `vakr api openapi` prints it and `make openapi` regenerates it (API-008).
+- A new `api` check in `vakr check health` and `vakr doctor` asks the running API over its socket. It is OK while the service is not installed or not running.
+- New `[api]` options: `listen_address` (`127.0.0.1`), `port` (8080), `socket_path` (`/run/vakr/api.sock`), `trusted_proxies` (none), and `max_body_bytes` (65536). Their defaults apply without any edit.
+- New runtime dependencies `fastapi` (MIT) and `uvicorn` (BSD-3-Clause), with `starlette`, `pydantic`, `pydantic-core`, `h11`, `anyio`, `idna`, `click`, `annotated-types`, `typing-inspection`, `annotated-doc`, and `opentelemetry-api`; licenses are listed in the package's copyright file.
 
 ### Changed
 
+- `/run/vakr` is now mode 0751 (was 0750), so members of `vakr-admin` who are not in `vakr` can reach the API socket; `vakr-api` decides each connection's role itself. The package's tmpfiles entry applies it at installation and every boot.
 - The install and field-data guides find the newest release themselves instead of asking for a version. GitHub's "latest release" links skip pre-releases, so the guides read the same release list that self-update uses.
 
 ## 0.2.1 - 2026-10-20

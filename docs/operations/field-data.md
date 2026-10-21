@@ -8,7 +8,17 @@ The field kit only reads. It changes nothing on the host apart from writing the 
 
 ### Before vakr is installed
 
-Download `vakr-fieldkit.pyz` from the assets of the latest release on the [releases page](https://github.com/robert-patrick-texas/vakr/releases), then run it with [uv](https://docs.astral.sh/uv/). uv fetches Python 3.15 itself, so the system Python doesn't matter.
+Download `vakr-fieldkit.pyz` from the newest release, the same way the [install guide](install.md#1-download-a-release) finds it. The release's `SHA256SUMS` lists the kit, so you can verify it exactly as in [step 2 of the install guide](install.md#2-verify-the-download) before you run it.
+
+```sh
+repo=robert-patrick-texas/vakr
+version=$(curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=1" |
+    sed -n 's/^ *"tag_name": *"v\([^"]*\)".*/\1/p')
+base=https://github.com/$repo/releases/download/v${version:?not found}
+curl -fL -O "$base/vakr-fieldkit.pyz" -O "$base/SHA256SUMS" -O "$base/SHA256SUMS.sig"
+```
+
+Then run it with [uv](https://docs.astral.sh/uv/). uv fetches Python 3.15 itself, so the system Python doesn't matter.
 
 ```sh
 uv run --python 3.15 vakr-fieldkit.pyz collect \

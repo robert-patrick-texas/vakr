@@ -41,7 +41,13 @@ check "update state records success" grep -q '"result": "success"' /var/lib/vakr
 check "both databases are at the current schema" vakr db status
 check "database files are vakr-owned" \
     bash -c '! find /var/lib/vakr -maxdepth 1 -name "*.db*" ! -user vakr | grep -q .'
-check "new options are listed" grep -qi "new configuration options since $FROM" /tmp/update.log
+added=$(vakr config new-options --since "$FROM" | sed -n 's/^options added since .*: //p')
+if [ "${added:-0}" -gt 0 ]; then
+    check "the $added new options are listed" grep -qi "new configuration options since $FROM" /tmp/update.log
+else
+    # A release that adds no options prints no options summary.
+    check "no new options are claimed" bash -c '! grep -qi "new configuration options" /tmp/update.log'
+fi
 health=$(vakr check health 2>&1)
 code=$?
 echo "check health (exit $code): ${health:0:200}"

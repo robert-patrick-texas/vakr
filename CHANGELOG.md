@@ -2,6 +2,12 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## Unreleased
+
+### Changed
+
+- The install and field-data guides find the newest release themselves instead of asking for a version. GitHub's "latest release" links skip pre-releases, so the guides read the same release list that self-update uses.
+
 ## 0.2.1 - 2026-10-20
 
 Fixes from the first production walk-through (0.2.0 installed from GitHub, a device polled, and a field bundle collected and decrypted). No configuration options or database schemas change.

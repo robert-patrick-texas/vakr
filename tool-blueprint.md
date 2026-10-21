@@ -107,7 +107,7 @@ The following decisions are part of this baseline:
 | Compatibility policy | Breaking changes to configuration, API, CLI, and schemas are accepted until the project moves to third-party/enterprise readiness after MVP. Automated config upgrade and data migrations still apply so operators never re-enter settings by hand (ADR-031, CFGM-002). |
 | Packaging | MVP ships as a `.deb` for Ubuntu 26.04 LTS. RHEL-family (AlmaLinux/Rocky/RHEL) `.rpm` packaging comes after MVP (PKG-001, PKG-006). |
 | Documentation publishing | Every Markdown file is published as HTML to GitHub Pages using the portable `tools/md2html` converter (DOCPUB-001). |
-| Web stack | FastAPI/Starlette, server-rendered Jinja templates, HTMX for partial updates, minimal locally served JavaScript, and Apache ECharts for time-series visualization. A framework change requires an ADR. |
+| Web stack | FastAPI/Starlette serves JSON API v1 and a static SvelteKit app (Svelte 5, TypeScript) built at package time and served same-origin by `vakr-api`. uPlot is the default time-series chart, ECharts is loaded lazily for specialty visualizations, and TanStack Query, Table, and Virtual manage server data and large tables. All assets are local (ADR-035, superseding ADR-013's Jinja/HTMX layer). A framework change requires an ADR. |
 | TUI stack | Textual, consuming the same application/query services as the API. |
 | Metadata persistence | SQLite for Lite, Compact (MVP), and small/standalone use; PostgreSQL for Standard and Enterprise use. |
 | Operational telemetry | SQLite for the Lite (lab/CI) and Compact (MVP production) profiles, TimescaleDB for the optional Standard profile, and ClickHouse for the Enterprise profile. |
@@ -1964,7 +1964,7 @@ Document a threat model covering credential theft, SQL/command injection, SSRF-l
 ### 15.4 Web controls
 
 - Secure cookies, CSRF, content security policy, frame restrictions, MIME sniffing protection, referrer policy, and safe cache headers.
-- HTML auto-escaping remains enabled.
+- HTML escaping remains on: Svelte escapes interpolated text, and `{@html}` is forbidden by lint (ADR-035).
 - State-changing methods are not exposed as GET.
 - Public pages use a separate template/context allowlist.
 - Reverse-proxy header trust is explicit.
@@ -2977,7 +2977,7 @@ The source drafts were strong on polling, identity, scheduling, ClickHouse durab
 | Interface ambiguity workflow | The sources prohibited ambiguous auto-merge but did not define operator resolution. | Added review, explicit map/new decision, evidence display, and audit. |
 | Data freshness | A latest value can be old but look current. | Current-state models and UI/TUI always expose age, freshness, collector, and quality. |
 | Storage exhaustion | The drafts required no silent loss but did not fully define collector behavior when spool is full. | Added capacity states and a fail-safe pause of normal polling with unknown/not-attempted semantics. |
-| Front-end stack and accessibility | Framework choice, asset delivery, public kiosk behavior, and accessibility were open. | Adopted server-rendered FastAPI/Jinja/HTMX/ECharts, local assets, WCAG 2.2 AA, and kiosk requirements. |
+| Front-end stack and accessibility | Framework choice, asset delivery, public kiosk behavior, and accessibility were open. | Adopted server-rendered FastAPI/Jinja/HTMX/ECharts, local assets, WCAG 2.2 AA, and kiosk requirements. The presentation layer was later replaced by a static SvelteKit app with uPlot, ECharts, and TanStack (ADR-035). |
 | TUI data boundary | Direct database access would bypass application semantics and backend abstraction. | TUI uses application/query services or the local versioned API only. |
 | Backup/restore and upgrades | Completion criteria mentioned docs but not executable recovery behavior. | Added backup, restore, spool recovery, projection rebuild, migration, and upgrade acceptance tests. |
 | Open-source teaching outcome | Documentation rules did not define labs, examples, or learner acceptance. | Added Lite labs, simulators, tutorials, annotated concurrency/counter/identity material, and documentation acceptance tests. |
@@ -3205,7 +3205,7 @@ The [ADR-021 benchmark](docs/performance/adr021-compact-sqlite-benchmark.md) and
 - PostgreSQL, TimescaleDB, and ClickHouse adapters. The ports and contract tests exist so these can be added without redesign.
 - Public anonymous dashboards.
 - Adaptive interval changes (poll-health diagnostics stay on).
-- Server-Sent Events (the MVP uses HTMX polling).
+- Server-Sent Events (the MVP web UI polls with TanStack Query, ADR-035).
 - OIDC/SSO.
 - Multiple worker processes per collector.
 - Asynchronous bulk export.
@@ -3470,7 +3470,7 @@ CI may build artifacts for testing but cannot sign releases.
 
 | ID | Requirement |
 |---|---|
-| TOOLS-001 | `tools/check-updates` shall report newer versions of Python, Go, uv, ruff, ty, nfpm, locked Python dependencies, Go modules, pinned GitHub Actions, and vendored front-end assets (ECharts, HTMX), with links to release notes. |
+| TOOLS-001 | `tools/check-updates` shall report newer versions of Python, Go, uv, ruff, ty, nfpm, locked Python dependencies, Go modules, pinned GitHub Actions, and the web UI's npm packages and Node release (ADR-035), with links to release notes. |
 | TOOLS-002 | Each release runs `tools/check-updates`, and each available update is either applied or deferred with a reason in the changelog. Automated update PRs (Dependabot or Renovate) may supplement this but do not replace it. |
 | TOOLS-003 | Moving to a new Python minor version is a normal release change. `.python-version`, `requires-python`, the bundled interpreter, and the CI matrix change together, and the release notes say so. |
 
@@ -3570,7 +3570,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | ADR-010 | Local auth with admin and operator/user roles | Accepted baseline |
 | ADR-011 | Alerting remains external | Accepted baseline |
 | ADR-012 | Adaptive diagnostics always on; interval changes opt-in | Accepted baseline |
-| ADR-013 | FastAPI/Jinja/HTMX/ECharts web stack and Textual TUI | Proposed default; approve in Phase 1 |
+| ADR-013 | FastAPI/Jinja/HTMX/ECharts web stack and Textual TUI | FastAPI and Textual accepted; the Jinja/HTMX presentation layer is superseded by ADR-035 (2026-10-21) |
 | ADR-014 | MessagePack append-segment spool envelope | Proposed default; validate in Phase 10 |
 | ADR-015 | Interface reconciliation weights and auto-match thresholds | Required before Phase 6 completion |
 | ADR-016 | ClickHouse physical schema, ordering, partitioning, codecs, projections | Required from benchmark before Enterprise release |
@@ -3591,6 +3591,8 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | ADR-031 | Compatibility policy: breaking changes accepted until post-MVP enterprise readiness; config and data migrations remain mandatory | Accepted 2026-10-19 |
 | ADR-032 | Outbound HTTPS through enterprise proxies and TLS-inspection CAs; verification never disabled (section 28.3.1). Non-compliant CAs are refused by default; the opt-in `network.tls_strict_x509 = false` relaxes only the strict profile (EGRESS-007). | Accepted 2026-10-20; strict-profile policy accepted by the owner 2026-10-20 |
 | ADR-033 | Interface classification from description keywords, with vakr-side tags for the rest (META-012, META-013) | Accepted 2026-10-20 |
+| ADR-034 | SNMP library (PySNMP v1arch asyncio), adapter guards, and simulators ([ADR-034](docs/adr/ADR-034-snmp-library-and-simulator.md)) | Proposed; implemented in milestone M3, awaiting owner review |
+| ADR-035 | Web presentation layer: static SvelteKit app, uPlot default charts, lazy ECharts for specialty charts, TanStack for server data and tables ([ADR-035](docs/adr/ADR-035-web-presentation-stack.md)) | Accepted 2026-10-21 (owner) |
 
 ## Appendix D. Recommended first implementation milestone
 
@@ -4241,7 +4243,7 @@ Gaps recorded for later milestones: E.2 row 8's "incomplete discovery" and "pend
 Decisions taken with the M4 API:
 
 1. **Proxy trust lives with the listener.** Section 11.3 listed `[security] trusted_proxy_cidrs` as a future enterprise key; the owner's M4 task names `[api] trusted_proxies`. **Contradiction recorded; choice:** `api.trusted_proxies`, beside the listener it qualifies; 11.3 now points here. Empty trusts nobody: forwarded headers from any other peer are ignored and logged once (`api.untrusted_forwarding`). Hops are read from the right while each address is a trusted proxy; an unparseable entry stops at the proxy that wrote it. When both kinds are present, `X-Forwarded-*` wins over `Forwarded`, because nginx sets the former and passes a client's `Forwarded` through unless configured otherwise.
-2. **The socket is reachable by every account; the server decides.** E.12 makes members of `vakr-admin` admins on the socket, but a `/run/vakr` of 0750 `vakr:vakr` (11.1, tmpfiles) would have kept out any admin not also in `vakr`. **Contradiction recorded; choice:** `/run/vakr` becomes 0751 (others may traverse, not list) and the socket 0666, and `vakr-api` refuses, with 403 `peer_refused` on every endpoint, any account that is neither root nor in either group: PostgreSQL's peer-authentication model. The self-update lock in `/run/vakr` is 0600 root, so others still cannot open it.
+2. **The socket is reachable by every account; the server decides.** E.12 makes members of `vakr-admin` admins on the socket, but a `/run/vakr` of 0750 `vakr:vakr` (11.1, tmpfiles) would have kept out any admin not also in `vakr`. **Contradiction recorded; choice:** `/run/vakr` becomes 0751 (others may traverse, not list) and the socket 0666, and `vakr-api` refuses, with 403 `peer_refused` on every endpoint, any account that is neither root nor in either group: PostgreSQL's peer-authentication model. The self-update lock in `/run/vakr` is 0600 root, so others still cannot open it. The owner confirmed this choice on 2026-10-21.
 3. **`SameSite=Lax`, not `Strict`.** Links into vakr from tickets, chat, and alert e-mail must keep the session for a server-rendered front end; every state change also needs the CSRF token and no GET changes state, so `Strict` would add nothing. Each scheme reads only its own cookie name, so a plain-HTTP cookie can never stand in for the secure one.
 4. **Plain HTTP.** A login over plain HTTP from a non-loopback client is refused (403 `insecure_transport`). Over plain HTTP from loopback (local testing) it works, without `Secure`, because browsers drop secure cookies on `http://`.
 5. **CSRF defence in depth.** Besides the token, any state-changing TCP request whose `Sec-Fetch-Site` is `cross-site` or `same-site`, or whose `Origin` names another host than `Host`, is refused (403 `cross_site`); the login also needs `Content-Type: application/json`, which no cross-site form can send. Socket and kiosk requests carry no cookie, so CSRF does not apply to them.
@@ -4253,5 +4255,5 @@ Decisions taken with the M4 API:
 11. **Service shape.** One process, two uvicorn servers (stock h11 on TCP, `PeerProtocol` on the socket) sharing one app; uvicorn's signal handling, proxy-header rewriting, `Server` header, and access log are off. No `RuntimeDirectory=`: tmpfiles owns `/run/vakr`, and systemd would delete it, with the self-update lock, at every stop; the unit gets `ReadWritePaths=/var/lib/vakr /run/vakr` instead. SIGHUP is logged and ignored, because every `[api]` and `[auth]` option is `restart`.
 12. **The API never writes telemetry.** Its query services see `ReadOnlyTelemetry`, which refuses the batch writer, rollup writes, retention, and maintenance (6.2). It reads `telemetry.db` beside the running collector in WAL mode, as user `vakr`.
 13. **Dependencies.** `fastapi` and `uvicorn` without extras: `[standard]` would add a CLI, Jinja2, form parsing, uvloop, httptools, websockets, and a file watcher, none of which the API uses; h11 behind a local proxy meets 12.9 at MVP scale. FastAPI compiles its routes on an app's first request (about 0.4 s once per process).
-14. **Web front end.** Undecided (Jinja/HTMX or a static single-page app). `create_app(context, web=...)` is the one hook where it attaches, outside `/api/`; the CSP (same origin, no inline script) is the one pages will get.
+14. **Web front end.** A static SvelteKit app (ADR-035, accepted 2026-10-21). `create_app(context, web=...)` is the one hook where it attaches, outside `/api/`. Pages get the same-origin CSP, with the SHA-256 hashes of the build's inline bootstrap script added to `script-src`.
 15. **TUI data path.** The socket exists, but `vakr status` and `vakr tui` still use the query services in-process (E.29 #10) until the TUI moves to the socket.

@@ -11,6 +11,7 @@ Example: `<HealthPanel health={overview.health} />`
 -->
 <script lang="ts">
 	import type { HealthView, Reading } from '#lib/api/types.ts';
+	import { scrollRegion } from '#lib/state/kiosk-context.ts';
 	import ReadingText from './ReadingText.svelte';
 	import StatusBadge from './StatusBadge.svelte';
 
@@ -35,34 +36,37 @@ Example: `<HealthPanel health={overview.health} />`
 	}
 </script>
 
-<table class="density-compact">
-	<caption>Health of vakr itself (not of the devices)</caption>
-	<thead>
-		<tr>
-			<th scope="col">Component</th>
-			<th scope="col">State</th>
-			<th scope="col">Report age</th>
-			<th scope="col">Spool use</th>
-		</tr>
-	</thead>
-	<tbody>
-		{#each [['Inventory database', health.metadata], ['Telemetry database', health.telemetry]] as const as [name, reading] (name)}
-			{@const b = badge(reading)}
+<!-- No cell holds a link, on any page, so a narrow screen's scroll area must take focus itself. -->
+<div class="table-wrap" {...scrollRegion(true, 'Health of vakr itself')}>
+	<table class="density-compact">
+		<caption>Health of vakr itself (not of the devices)</caption>
+		<thead>
 			<tr>
-				<th scope="row">{name}</th>
-				<td><StatusBadge small color={b.color} icon={b.icon} label={b.label} /></td>
-				<td>—</td>
-				<td>—</td>
+				<th scope="col">Component</th>
+				<th scope="col">State</th>
+				<th scope="col">Report age</th>
+				<th scope="col">Spool use</th>
 			</tr>
-		{/each}
-		{#each health.collectors as c (c.collector_id)}
-			{@const b = badge(c.state)}
-			<tr>
-				<th scope="row">Collector {c.position}</th>
-				<td><StatusBadge small color={b.color} icon={b.icon} label={b.label} /></td>
-				<td><ReadingText reading={c.age} compact /></td>
-				<td><ReadingText reading={c.spool} compact /></td>
-			</tr>
-		{/each}
-	</tbody>
-</table>
+		</thead>
+		<tbody>
+			{#each [['Inventory database', health.metadata], ['Telemetry database', health.telemetry]] as const as [name, reading] (name)}
+				{@const b = badge(reading)}
+				<tr>
+					<th scope="row">{name}</th>
+					<td><StatusBadge small color={b.color} icon={b.icon} label={b.label} /></td>
+					<td>—</td>
+					<td>—</td>
+				</tr>
+			{/each}
+			{#each health.collectors as c (c.collector_id)}
+				{@const b = badge(c.state)}
+				<tr>
+					<th scope="row">Collector {c.position}</th>
+					<td><StatusBadge small color={b.color} icon={b.icon} label={b.label} /></td>
+					<td><ReadingText reading={c.age} compact /></td>
+					<td><ReadingText reading={c.spool} compact /></td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+</div>

@@ -15,6 +15,7 @@ Example: `<RankingTables kind="utilization" view={ranking} />`
 	import type { ErrorRanking, UtilizationRanking } from '#lib/api/types.ts';
 	import { interfaceHref } from '#lib/links.ts';
 	import { bitRate, count, percent } from '#lib/format/units.ts';
+	import { inKiosk, scrollRegion } from '#lib/state/kiosk-context.ts';
 	import Link from './Link.svelte';
 
 	type Props =
@@ -23,6 +24,8 @@ Example: `<RankingTables kind="utilization" view={ranking} />`
 
 	const props: Props = $props();
 	const limit = $derived(props.limit ?? 10);
+	const kiosk = inKiosk();
+	const region = $derived(props.kind === 'utilization' ? 'Top utilization' : 'Top errors');
 </script>
 
 {#snippet coverage(c: { valid: number; expected: number })}
@@ -35,7 +38,7 @@ Example: `<RankingTables kind="utilization" view={ranking} />`
 	<Link href={interfaceHref(ref.interface_id)}>{ref.device} {ref.name}</Link>
 {/snippet}
 
-<div class="table-wrap">
+<div class="table-wrap" {...scrollRegion(kiosk, region)}>
 	<table class="density-compact">
 		{#if props.kind === 'utilization'}
 			<caption>Top utilization, p95 over {props.view.window_name} ({props.view.position})</caption>

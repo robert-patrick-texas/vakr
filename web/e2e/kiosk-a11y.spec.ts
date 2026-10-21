@@ -36,6 +36,18 @@ for (const scheme of ['light', 'dark'] as const) {
 			await shown(page);
 			await scan(path);
 		}
+		// A screen narrower than the tables makes them scroll; with their links shown as text,
+		// the scroll area itself must be reachable by keyboard (axe scrollable-region-focusable).
+		await page.setViewportSize({ width: 480, height: 900 });
+		for (const path of BOARDS) {
+			await page.goto(path);
+			await shown(page);
+			await scan(`${path} (narrow)`);
+			if (path === '/kiosk/high-priority') {
+				const wide = page.locator('.table-wrap').first();
+				expect(await wide.evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+			}
+		}
 		await page.goto('/kiosk/rotate?pages=overview,weather');
 		await expect(page.locator('[data-state="kiosk-invalid"]')).toBeVisible();
 		await scan('/kiosk/rotate (invalid)');

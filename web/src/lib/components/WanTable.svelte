@@ -12,6 +12,7 @@ Example: `<WanTable rows={page.rows} position={page.position} />`
 	import type { InterfaceListRow } from '#lib/api/types.ts';
 	import { bitRate } from '#lib/format/units.ts';
 	import { deviceHref, interfaceHref } from '#lib/links.ts';
+	import { inKiosk, scrollRegion } from '#lib/state/kiosk-context.ts';
 	import Link from './Link.svelte';
 	import ReadingText from './ReadingText.svelte';
 
@@ -24,9 +25,10 @@ Example: `<WanTable rows={page.rows} position={page.position} />`
 	}
 
 	const { rows, position }: Props = $props();
+	const kiosk = inKiosk();
 </script>
 
-<div class="table-wrap">
+<div class="table-wrap" {...scrollRegion(kiosk, 'WAN circuits')}>
 	<table class="density-compact">
 		<caption>WAN circuits (current values from {position})</caption>
 		<thead>

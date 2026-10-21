@@ -26,6 +26,7 @@ Example:
 		type RowData
 	} from '@tanstack/svelte-table';
 	import { announce } from '#lib/a11y/announce.svelte.ts';
+	import { inKiosk, scrollRegion } from '#lib/state/kiosk-context.ts';
 	import { ariaSort, type Column } from './table.ts';
 
 	interface Props {
@@ -50,6 +51,7 @@ Example:
 		hideCaption = false
 	}: Props = $props();
 
+	const kiosk = inKiosk();
 	const features = tableFeatures({ rowSortingFeature });
 	// The page passes a constant column list, so the definitions are built once.
 	// svelte-ignore state_referenced_locally
@@ -90,7 +92,7 @@ Example:
 	}
 </script>
 
-<div class="table-wrap">
+<div class="table-wrap" {...scrollRegion(kiosk, caption)}>
 	<table class:density-compact={compact}>
 		<caption class:sr-only={hideCaption}>{caption}</caption>
 		<thead>

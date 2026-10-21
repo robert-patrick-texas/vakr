@@ -3725,6 +3725,14 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | Kiosk sessions | Separate operator-role kiosk tokens; idle expiry disabled; absolute expiry 30 days |
 | Login throttling | Progressive delay starting at the 5th consecutive failure per account and source address, capped at 30 s |
 | Local TUI/CLI authorization | Unix socket `/run/vakr/api.sock` with `SO_PEERCRED`: root and members of `vakr-admin` get admin; members of `vakr` get operator; everyone else is refused. |
+| Throttle schedule (M4) | Delay after the *n*th consecutive failure (*n* ≥ `auth.login_throttle_after`, 5): 2^(*n*−5) s, so 1, 2, 4, 8, 16 s, then capped at `auth.login_throttle_max_delay` (30 s). The failed attempt's answer is delayed that long, and an attempt arriving before the wait is over is refused without checking the password and without an audit record. A run with no failure for `auth.login_failure_reset` (15 min) restarts at zero; a success clears it. Unknown usernames are throttled and answered exactly like real ones (AUTH-004). |
+| Throttle state (M4) | Per (keyed HMAC-SHA-256 digest of the attempted username, client address), in `metadata.db`. At most 10,000 runs are kept; the quietest are evicted first. |
+| Password policy (M4) | At least `auth.password_min_length` (15) characters (NIST SP 800-63B, single-factor), at most 256, after NFKC normalisation. No composition rules. Refused: the username, a single repeated character, control characters. |
+| Password hashing bound (M4) | At most 4 Argon2 computations at once (64 MiB each); a caller waits at most 10 s for a slot, then fails as busy. |
+| Usernames (M4) | 1–64 characters from `a-z 0-9 . _ @ -`, starting with a letter or digit; stored trimmed and lower case, so comparison is case-insensitive. Accounts are disabled, never deleted. The last enabled admin cannot be disabled or demoted. |
+| Session tokens (M4) | 256 random bits, URL-safe base64, prefixed `vks_` (session) or `vkk_` (kiosk); only the SHA-256 digest is stored. Last use is written at most once per 60 s, so idle expiry can come up to 60 s early, never late. At most 20 sessions per account (the oldest ends first) and 100 kiosk tokens. Expired rows are purged at most 500 per table per pass. |
+| Session rotation (M4) | Every login starts a new session and ends the one the client presented. A password change, role change, or disable ends every session of that account. Rotation of a live session keeps its absolute expiry. |
+| CSRF tokens (M4) | `base64url(HMAC-SHA-256(csrf key, "vakr-csrf-v1" ‖ session UUID))`, compared in constant time. The CSRF and throttle keys are derived from the 256-bit installation key in `/var/lib/vakr/auth.key` (mode 0600, owner `vakr`), created on first use and refused if anyone else can read it. Losing it only invalidates open forms and failure counts. |
 
 ### E.13 Replication (two positions)
 

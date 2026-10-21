@@ -8,6 +8,12 @@ before applying all of them, so a concurrent edit becomes a
 ``ConflictError`` instead of a lost update (DB-003) and a failed commit
 applies nothing (DB-002).
 
+Authentication tables (M4, E.12) differ in two ways: users are unique by
+``username`` rather than ``name``, and sessions, kiosk tokens, and login
+failures are unversioned rows that can be deleted. A deletion is staged as
+a tombstone, and those tables skip the version check (last writer wins,
+which is what a "last seen" time or a failure counter needs).
+
 Dependencies:
     threading: The commit lock.
     vakr.domain.errors: Conflict and duplicate errors.
@@ -30,9 +36,16 @@ from vakr.domain.errors import ConflictError, DuplicateError
 
 TABLES = (
     "device", "interface", "site", "tag", "group", "policy", "collector",
-    "identity_history", "audit", "review",
+    "identity_history", "audit", "review", "user", "session", "kiosk_token", "login_failure",
 )  # fmt: skip
-NAMED = frozenset({"device", "site", "tag", "group", "policy", "collector"})
+UNIQUE = {
+    "device": "name", "site": "name", "tag": "name", "group": "name", "policy": "name",
+    "collector": "name", "user": "username",
+}  # fmt: skip
+"""Tables with a natural key besides the ID, and the attribute that holds it."""
+UNVERSIONED = frozenset({"session", "kiosk_token", "login_failure"})
+TOMBSTONE: Any = object()
+"""Staged in ``pending`` for a row this transaction deleted."""
 
 
 class MemoryMetadataStore:
@@ -92,7 +105,8 @@ class Transaction:
             None
         """
         if key in self.pending[table]:
-            return self.pending[table][key]
+            staged = self.pending[table][key]
+            return None if staged is TOMBSTONE else staged
         return self.store.tables[table].get(key)
 
     def records(self, table: str) -> list[Any]:
@@ -109,7 +123,7 @@ class Transaction:
         """
         merged = dict(self.store.tables[table])
         merged.update(self.pending[table])
-        return list(merged.values())
+        return [record for record in merged.values() if record is not TOMBSTONE]
 
     def put(self, table: str, record: Any, based_on: int | None) -> None:
         """Stage a new (``based_on=None``) or changed record.
@@ -130,6 +144,21 @@ class Transaction:
             self.based_on[slot] = based_on
         self.pending[table][record.id] = record
 
+    def delete(self, table: str, key: UUID) -> None:
+        """Stage the removal of a row from an unversioned table.
+
+        Args:
+            table: Table name; one of ``UNVERSIONED``.
+            key: Record ID.
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        self.pending[table][key] = TOMBSTONE
+
     def commit(self) -> None:
         """Apply every staged change atomically, or none.
 
@@ -148,7 +177,11 @@ class Transaction:
                 for (table, key), based_on in self.based_on.items():
                     self._check(table, key, based_on)
                 for table, records in self.pending.items():
-                    self.store.tables[table].update(records)
+                    for key, record in records.items():
+                        if record is TOMBSTONE:
+                            self.store.tables[table].pop(key, None)
+                        else:
+                            self.store.tables[table][key] = record
         finally:
             # A failed commit leaves nothing staged, like a failed SQL COMMIT.
             self.rollback()
@@ -183,6 +216,8 @@ class Transaction:
             ConflictError: If the committed version moved.
             DuplicateError: If the record is new but its ID or name is taken.
         """
+        if table in UNVERSIONED:
+            return
         committed = self.store.tables[table].get(key)
         if based_on is None and committed is not None:
             raise DuplicateError(table, "id", key)
@@ -190,8 +225,12 @@ class Transaction:
             raise ConflictError(
                 table, key, expected_version=based_on, actual_version=committed.version
             )
-        if table in NAMED:
-            name = self.pending[table][key].name
+        if (attribute := UNIQUE.get(table)) is not None:
+            name = getattr(self.pending[table][key], attribute)
             for other in self.store.tables[table].values():
-                if other.name == name and other.id != key and other.id not in self.pending[table]:
-                    raise DuplicateError(table, "name", name)
+                if (
+                    getattr(other, attribute) == name
+                    and other.id != key
+                    and other.id not in self.pending[table]
+                ):
+                    raise DuplicateError(table, attribute, name)

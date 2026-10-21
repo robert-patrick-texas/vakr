@@ -20,6 +20,7 @@ classifiers = [
     "Topic :: System :: Networking :: Monitoring",
 ]
 dependencies = [
+    "argon2-cffi>=25.1.0",   # Argon2id local password hashing with rehash on login (SEC-009, E.12)
     "cryptography>=50.0.2",  # certificate inspection for enterprise CAs (EGRESS-003)
     "pysnmp>=7.1.30",        # asyncio SNMPv2c collection and discovery (SNMP-015, ADR-034)
     "textual>=8.2.8",        # read-only terminal UI, vakr tui (TUI-001, ADR-013)

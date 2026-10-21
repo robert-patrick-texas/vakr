@@ -18,6 +18,7 @@ This page covers the entities, the observation contract, the envelope encoding, 
 | `interfaces` | `Interface`, `InterfaceAnnotation`, and the owned/observed field groups |
 | `control` | `CollectionPolicy`, `IdentityHistoryEntry`, `AuditEvent` |
 | `reviews` | `IdentityReview`, `ReviewState`: discovered interfaces whose identity waits for an administrator (IFID-007, E.26) |
+| `users`, `sessions` | `Role`, `User`, `LoginFailure`, `Session`, `KioskToken`, `canonical_username`: local accounts and their sessions; hashes and token digests stay out of `repr` (SEC-005, SEC-010, E.12) |
 | `observations` | `IcmpObservation`, the `Observation` union; re-exports every observation type |
 | `snmp_observations`, `interface_observations`, `polls` | `SnmpDeviceObservation`, `InterfaceObservation`, `DevicePoll`, `CollectorHealthObservation` |
 | `codec`, `codec_fields`, `codec_values` | Plain-dict encoding of every observation type |

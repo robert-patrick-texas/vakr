@@ -17,14 +17,15 @@ repository call or from ``commit()``; either way nothing from this unit of
 work is committed.
 
 Dependencies:
-    vakr.ports.metadata.repository: The repositories it exposes.
+    vakr.ports.metadata.repository, reviews, auth: The repositories it exposes.
 
 Safety:
     Adapters must map driver errors to domain errors before they cross this
     boundary, and must never hold a transaction open outside the block.
 
 ``reviews`` and ``change_counter`` were added with the M3 inventory loader
-(port extension, E.26).
+(port extension, E.26); the ``AuthRepositories`` base with M4 local
+authentication (E.12).
 
 Example:
     >>> sorted(n for n in dir(MetadataUnitOfWork) if not n.startswith("_"))[:3]
@@ -35,6 +36,7 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Protocol
 
+from vakr.ports.metadata.auth import AuthRepositories
 from vakr.ports.metadata.repository import (
     AuditRepository,
     CollectorRepository,
@@ -48,8 +50,8 @@ from vakr.ports.metadata.repository import (
 from vakr.ports.metadata.reviews import IdentityReviewRepository
 
 
-class MetadataUnitOfWork(Protocol):
-    """A transaction spanning all metadata repositories."""
+class MetadataUnitOfWork(AuthRepositories, Protocol):
+    """A transaction spanning all metadata repositories, including authentication's."""
 
     @property
     def devices(self) -> DeviceRepository:

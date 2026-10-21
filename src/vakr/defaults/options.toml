@@ -627,6 +627,79 @@ since = "0.2.0"
 reload = "live"
 description = "Addresses or CIDR networks that are never polled (15.5, SEC-015). The defaults are the cloud metadata services, which answer anyone on the host. Setting this list replaces the defaults."
 
+# Local authentication for the web UI and API (milestone M4: SEC-009..012, Appendix E.12).
+# Accounts are managed with vakr setup and vakr user; these keys tune sessions and throttling.
+
+[[options]]
+key = "auth.session_idle_timeout"
+type = "duration"
+min = 300
+max = 86400
+default = "30m"
+since = "0.2.1"
+reload = "restart"
+description = "A signed-in session ends after this long without a request (SEC-010, Appendix E.12). Must not exceed auth.session_lifetime. Use is recorded at most once a minute, so a session can end up to a minute earlier, never later."
+
+[[options]]
+key = "auth.session_lifetime"
+type = "duration"
+min = 600
+max = 604800
+default = "12h"
+since = "0.2.1"
+reload = "restart"
+description = "A signed-in session ends this long after login however active it is, and the user signs in again (absolute expiry, SEC-010, Appendix E.12)."
+
+[[options]]
+key = "auth.kiosk_token_lifetime"
+type = "duration"
+min = 86400
+max = 31536000
+default = "30d"
+since = "0.2.1"
+reload = "restart"
+description = "How long a kiosk token for an unattended display stays valid after an admin creates it (Appendix E.12). Kiosk tokens have the operator role and no idle expiry."
+
+[[options]]
+key = "auth.login_throttle_after"
+type = "int"
+min = 1
+max = 100
+default = 5
+since = "0.2.1"
+reload = "restart"
+description = "From this many consecutive failed logins for one account from one address, each failure is answered after a delay and the next attempt must wait as long: 1 s, doubling with each further failure, up to auth.login_throttle_max_delay (SEC-012, Appendix E.12). A successful login clears the count."
+
+[[options]]
+key = "auth.login_throttle_max_delay"
+type = "duration"
+min = 1
+max = 300
+default = "30s"
+since = "0.2.1"
+reload = "restart"
+description = "Longest delay before the next login attempt for one account from one address (SEC-012, Appendix E.12)."
+
+[[options]]
+key = "auth.login_failure_reset"
+type = "duration"
+min = 60
+max = 86400
+default = "15m"
+since = "0.2.1"
+reload = "restart"
+description = "A run of failed logins with no new failure for this long is forgotten, and the next failure counts from one again (SEC-012, Appendix E.12)."
+
+[[options]]
+key = "auth.password_min_length"
+type = "int"
+min = 8
+max = 128
+default = 15
+since = "0.2.1"
+reload = "restart"
+description = "Fewest characters a new password may have (NIST SP 800-63B for a single-factor password, Appendix E.12). Existing passwords keep working; the rule applies when one is set."
+
 # Rate derivation in the collector (RATE-003, RATE-009; Appendix E.4, E.27).
 # E.17 defers these keys to the M3 collector, which uses them.
 

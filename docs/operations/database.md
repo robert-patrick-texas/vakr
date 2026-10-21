@@ -2,12 +2,12 @@
 
 On the Compact profile (the MVP), vakr keeps everything in two SQLite files in `/var/lib/vakr`:
 
-- **`metadata.db`** holds the inventory: sites, tags, groups, devices, interfaces and their annotations, collection policies, collectors, interface identity history, and the audit log.
+- **`metadata.db`** holds the inventory: sites, tags, groups, devices, interfaces and their annotations, collection policies, collectors, interface identity history, and the audit log. Since schema 3 it also holds local accounts, login sessions, kiosk tokens, and failed-login counts ([users](users.md)).
 - **`telemetry.db`** holds what the collectors measured: 30 days of one-minute observations and 400 days of 15-minute rollups, laid out as [ADR-021](../adr/ADR-021-compact-sqlite-telemetry.md) describes.
 
 This page covers where the files are, how to check, migrate, back up, and restore them, how telemetry is stored and expired, and what to do when vakr refuses to use a database.
 
-Neither database holds secrets. Devices name their SNMP credential, and the credential itself stays in `/etc/vakr/secrets/credentials.toml` ([credentials](credentials.md)). As a result, a backup without the credentials file cannot poll devices, and the credentials file needs stronger handling than the database backups ([blueprint 16.5](../../tool-blueprint.md#165-backup-scope)).
+Neither database holds device credentials. Devices name their SNMP credential, and the credential itself stays in `/etc/vakr/secrets/credentials.toml` ([credentials](credentials.md)). As a result, a backup without the credentials file cannot poll devices, and the credentials file needs stronger handling than the database backups ([blueprint 16.5](../../tool-blueprint.md#165-backup-scope)). `metadata.db` does hold the Argon2id hashes of local account passwords and SHA-256 digests of session tokens. Neither can be turned back into a password or a token, but treat `metadata.db` and its backups as confidential ([users](users.md#where-the-secrets-live)).
 
 ## Files
 

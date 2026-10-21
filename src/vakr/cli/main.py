@@ -27,6 +27,7 @@ from vakr.version import get_version
 COMMAND_MODULES: tuple[str, ...] = (
     "vakr.cli.cmd_doctor",
     "vakr.cli.cmd_check",
+    "vakr.cli.cmd_setup",
     "vakr.cli.cmd_config",
     "vakr.cli.cmd_credentials",
     "vakr.cli.cmd_selfupdate",
@@ -41,6 +42,7 @@ COMMAND_MODULES: tuple[str, ...] = (
     "vakr.cli.cmd_inventory",
     "vakr.cli.cmd_interface",
     "vakr.cli.cmd_collector",
+    "vakr.cli.cmd_user",
 )
 """Subcommand modules, in the order they appear in ``vakr --help``."""
 

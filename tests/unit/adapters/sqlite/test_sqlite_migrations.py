@@ -121,7 +121,8 @@ def test_db007_schema_has_no_row_ids(tmp_path: Path) -> None:
         tmp_path / "metadata.db",
         "SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name <> 'schema_migrations'",
     )
-    assert len(tables) == 14  # 10 record tables (identity_review since 0002), 4 membership
+    # 10 record tables (identity_review since 0002), 4 membership, 4 authentication (0003)
+    assert len(tables) == 18
     assert all("WITHOUT ROWID" in str(sql) for _, sql in tables)
 
 

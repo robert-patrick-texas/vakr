@@ -4,6 +4,14 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Added
+
+- Local accounts for the coming web UI and API (SEC-005, SEC-006): `sudo vakr setup` creates the first admin, and `sudo vakr user list|add|passwd|disable|enable|role|revoke-sessions` manages accounts. Passwords are asked for twice at a hidden prompt and never accepted as arguments. Every change is audited with the invoking operator. See [the users guide](docs/operations/users.md).
+- The authentication layer below HTTP (`vakr.auth`): Argon2id hashing with transparent rehash on login (SEC-009); opaque server-side sessions with idle and absolute expiry, rotation, and revocation (SEC-010); kiosk tokens for wall displays; CSRF tokens bound to sessions (SEC-011); per-account-and-address login throttling (SEC-012); and the Unix-socket peer-credential roles from Appendix E.12. The `vakr-api` service will use it.
+- New `[auth]` options: `session_idle_timeout` (30 min), `session_lifetime` (12 h), `kiosk_token_lifetime` (30 d), `login_throttle_after` (5), `login_throttle_max_delay` (30 s), `login_failure_reset` (15 min), and `password_min_length` (15). Their defaults apply without any edit.
+- Metadata schema 3 adds accounts, sessions, kiosk tokens, and failed-login counts. The package runs `vakr db migrate`, which takes a backup first.
+- New runtime dependency `argon2-cffi` (MIT).
+
 ### Changed
 
 - The install and field-data guides find the newest release themselves instead of asking for a version. GitHub's "latest release" links skip pre-releases, so the guides read the same release list that self-update uses.

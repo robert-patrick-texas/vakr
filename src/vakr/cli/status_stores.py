@@ -1,10 +1,12 @@
-"""Open the installed databases for the read-only status views (``vakr status``, ``vakr tui``).
+"""Open the installed databases for the status views' local path (``vakr status``, ``vakr tui``).
 
 This is the composition root for the query services: the only place the
-status views touch an adapter. It never creates a database. A node where
-``metadata.db`` does not exist yet has "no data yet"; a node without
-``telemetry.db``, or with one this release cannot read, still shows its
-inventory, with every status "Unknown — telemetry unavailable" (13.4).
+status views touch an adapter. It is used with ``--local``, or when
+``vakr-api`` is not running (``vakr.cli.status_source``, E.29 #10). It
+never creates a database. A node where ``metadata.db`` does not exist yet
+has "no data yet"; a node without ``telemetry.db``, or with one this
+release cannot read, still shows its inventory, with every status
+"Unknown — telemetry unavailable" (13.4).
 
 The SQLite stores offer no read-only mode yet, so connections open
 read-write, which never creates a missing file; the services issue only
@@ -116,12 +118,15 @@ def _unreadable(detail: str) -> Callable[[], TelemetryBackend]:
     return fail
 
 
-def open_status(paths: InstallPaths, command: str) -> StatusStores:
+def open_status(
+    paths: InstallPaths, command: str, config: EffectiveConfig | None = None
+) -> StatusStores:
     """Open both databases without creating either, and build the service.
 
     Args:
         paths: Installation layout (``VAKR_ROOT`` relocates it in tests).
         command: Command name for warnings.
+        config: The configuration already loaded by the caller; loaded here when ``None``.
 
     Returns:
         StatusStores: The service and how to close it.
@@ -131,7 +136,7 @@ def open_status(paths: InstallPaths, command: str) -> StatusStores:
         MigrationError: If the metadata schema is not current.
         StorageError: If the metadata database cannot be read.
     """
-    config = load_config(paths, command)
+    config = config if config is not None else load_config(paths, command)
     try:
         settings = settings_from_config(config)
     except ValueError as exc:
@@ -151,7 +156,7 @@ def open_status(paths: InstallPaths, command: str) -> StatusStores:
         try:
             store = SqliteTelemetryStore(tele_path)
         except (MigrationError, StorageError) as exc:
-            telemetry = _unreadable(str(exc))
+            telemetry = _unreadable(f"telemetry database unusable: {exc}")  # as vakr-api says
         else:
             telemetry = sqlite_telemetry_factory(store)
             closers.append(store.close)

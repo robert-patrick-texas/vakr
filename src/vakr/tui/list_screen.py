@@ -4,16 +4,16 @@ Keys: ``/`` search, ``f`` cycle the bucket filter, ``s`` cycle the sort,
 ``r`` refresh now, ``Enter`` open the device, ``h`` health, ``?`` help,
 ``]``/``[`` next/previous page, ``q`` quit; arrows and PageUp/PageDown move.
 
-Every refresh reads through ``StatusQueries`` in a worker thread
-(``asyncio.to_thread``), so a slow disk never freezes the screen, and only
-one refresh runs at a time (``exclusive``). If a refresh fails, the rows
-already shown stay, and the summary says in bold that they are stale and
-why; they are never presented as current (13.4).
+Every refresh reads through the ``StatusSource`` (``vakr-api`` or the
+local databases) in a worker thread, one at a time (``vakr.tui.reading``),
+so a slow disk or API never freezes the screen. If a refresh fails, the
+rows already shown stay, and the summary says in bold that they are stale
+and why; they are never presented as current (13.4).
 
 Dependencies:
     textual: Screen, widgets, bindings.
-    vakr.query: ``StatusQueries`` and the views (TUI-007: no SQL, no adapters).
-    vakr.tui.*: Columns, table filling, controls, and the other screens.
+    vakr.query: ``StatusSource`` and the views (TUI-007: no SQL, no adapters).
+    vakr.tui.*: Columns, table filling, controls, reads, and the other screens.
 
 Safety:
     Read-only: no key changes anything on the node.
@@ -23,25 +23,22 @@ Example:
     ['slash', 'f', 's']
 """
 
-import asyncio
 from datetime import datetime
 from typing import ClassVar
 
-from rich.markup import escape
 from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.events import Resize
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static
 
-from vakr.domain.errors import StorageError
-from vakr.query import DeviceListRequest, DeviceListView, StatusQueries
-from vakr.query.labels import health_line
-from vakr.query.text import display_zone, local_time
+from vakr.query import DeviceListRequest, DeviceListView, StatusSource
+from vakr.query.text import display_zone
 from vakr.tui.columns import DEVICE_COLUMNS
 from vakr.tui.device_screen import DeviceScreen
 from vakr.tui.list_controls import ListControls, SearchBox
 from vakr.tui.modals import HealthScreen
+from vakr.tui.reading import READ_ERRORS, Reader, SupersededError, failure_text, header_text
 from vakr.tui.tables import fill
 
 
@@ -58,14 +55,14 @@ class DeviceListScreen(Screen[None]):
         Binding("left_square_bracket", "page(-1)", "Prev page", show=False),
     ]
 
-    def __init__(self, queries: StatusQueries, refresh_s: float, zone: str, title: str) -> None:
+    def __init__(self, source: StatusSource, refresh_s: float, zone: str, title: str) -> None:
         """Prepare the screen; nothing is read until it mounts.
 
         Args:
-            queries: The read service.
+            source: Where the views come from.
             refresh_s: Seconds between automatic refreshes.
             zone: Display timezone name (empty for the host's).
-            title: Product and version for the header.
+            title: Product, version, and data path for the header.
 
         Returns:
             None
@@ -74,7 +71,8 @@ class DeviceListScreen(Screen[None]):
             None
         """
         super().__init__()
-        self._queries = queries
+        self._source = source
+        self._reader = Reader()
         self._refresh_s = refresh_s
         self._zone = display_zone(zone)
         self._title = title
@@ -147,9 +145,11 @@ class DeviceListScreen(Screen[None]):
             None
         """
         try:
-            view = await asyncio.to_thread(self._queries.device_list, request)
-        except StorageError as exc:
-            self._error = f"inventory unreadable: {exc}; run `vakr doctor`"
+            view = await self._reader.read(self._source.device_list, request)
+        except SupersededError:
+            return
+        except READ_ERRORS as exc:
+            self._error = failure_text(exc)
         else:
             self._view, self._error, self._loaded_at = view, None, view.generated_at
         self._show()
@@ -170,11 +170,9 @@ class DeviceListScreen(Screen[None]):
         if view is not None:
             table = self.query_one("#devices", DataTable)
             fill(table, DEVICE_COLUMNS, view.rows, lambda r: str(r.device_id), self.size.width)
-            when = local_time(view.generated_at, self._zone)
-            self.query_one("#header", Static).update(
-                f"{self._title} · {when} · {escape(health_line(view.health))} · "
-                f"refresh {self._refresh_s:g} s"
-            )
+            took = self._reader.elapsed_s
+            header = header_text(self._title, view, self._zone, self._refresh_s, took)
+            self.query_one("#header", Static).update(header)
         summary = self.controls.summary(view, self._error, self._loaded_at, self._zone)
         self.query_one("#summary", Static).update(summary)
 
@@ -206,7 +204,7 @@ class DeviceListScreen(Screen[None]):
             None
         """
         if (key := event.row_key.value) is not None:
-            self.app.push_screen(DeviceScreen(self._queries, key, self._refresh_s))
+            self.app.push_screen(DeviceScreen(self._source, key, self._refresh_s))
 
     def action_search(self) -> None:
         """Show and focus the search box.

@@ -19,7 +19,7 @@ Example:
 from collections.abc import Sequence
 from dataclasses import fields
 
-from vakr.query import DeviceDetailView, DeviceListView, InterfaceRow, Reading
+from vakr.query import DeviceDetailView, DeviceListView, HealthView, InterfaceRow, Reading
 from vakr.query.labels import health_line
 from vakr.query.text import display_zone, local_time
 
@@ -71,15 +71,32 @@ def table(
     return ["  ".join(c.ljust(size[i]) for i, c in enumerate(line)).rstrip() for line in lines]
 
 
-def render_list(view: DeviceListView, zone_name: str) -> str:
+def _health(health: HealthView, source: str) -> list[str]:
+    """Return the health line, then the data path when it is known (E.29 #10).
+
+    Args:
+        health: Storage and collector health.
+        source: Where the view came from, such as ``"vakr-api socket"``; empty to omit.
+
+    Returns:
+        list[str]: One or two lines.
+
+    Raises:
+        None
+    """
+    return [health_line(health), *([f"data: {source}"] if source else [])]
+
+
+def render_list(view: DeviceListView, zone_name: str, source: str = "") -> str:
     """Render the device list.
 
     Args:
         view: The device list.
         zone_name: Display timezone name (``time.timezone``; empty is the host's).
+        source: The data path, shown under the health line; empty to omit.
 
     Returns:
-        str: Summary line, health line, table, and footer.
+        str: Summary line, health line, data path, table, and footer.
 
     Raises:
         None
@@ -103,7 +120,7 @@ def render_list(view: DeviceListView, zone_name: str) -> str:
         ]
         for r in view.rows
     ]
-    lines = [head, health_line(view.health), ""]
+    lines = [head, *_health(view.health, source), ""]
     lines += table(LIST_HEADERS, rows, _MAX_WIDTH) if rows else ["no devices match"]
     end = view.offset + len(view.rows)
     lines += ["", f"showing {view.offset + 1 if rows else 0} to {end} of {view.total}"]
@@ -130,11 +147,12 @@ def _fact(label: str, reading: Reading) -> str:
     return f"  {label:<27} {reading.text}{reason}"
 
 
-def render_detail(view: DeviceDetailView) -> str:
+def render_detail(view: DeviceDetailView, source: str = "") -> str:
     """Render one device: summary facts, warnings, interfaces, and notes.
 
     Args:
         view: The device detail.
+        source: The data path, shown under the health line; empty to omit.
 
     Returns:
         str: The text.
@@ -143,7 +161,7 @@ def render_detail(view: DeviceDetailView) -> str:
         None
     """
     r = view.row
-    lines = [f"{r.name} — {r.status.icon} {r.status.label}", health_line(view.health), ""]
+    lines = [f"{r.name} — {r.status.icon} {r.status.label}", *_health(view.health, source), ""]
     lines += [_fact(label, reading) for label, reading in view.facts]
     if r.positions and len(r.positions) > 1:
         lines += ["", "Positions:"]

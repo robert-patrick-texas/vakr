@@ -34,6 +34,7 @@ LEVELS = {
     ("GET", "/api/v1/auth/session"): VIEW,
     ("GET", "/api/v1/devices"): VIEW,
     ("GET", "/api/v1/devices/{device_uuid}"): VIEW,
+    ("GET", "/api/v1/device-lookup"): VIEW,
     ("GET", "/api/v1/devices/{device_uuid}/interfaces"): VIEW,
     ("GET", "/api/v1/devices/{device_uuid}/history/reachability"): VIEW,
     ("GET", "/api/v1/interfaces"): VIEW,
@@ -64,7 +65,7 @@ LEVELS = {
 """Every route and the least role it needs; the session route needs any caller."""
 FILL = {"{kind}": "errors", "{device_uuid}": str(uuid.uuid4()),
         "{interface_uuid}": str(uuid.uuid4()), "{collector_uuid}": str(uuid.uuid4())}  # fmt: skip
-QUERY = {"/api/v1/search": {"q": "core"}}
+QUERY = {"/api/v1/search": {"q": "core"}, "/api/v1/device-lookup": {"key": "core"}}
 BODY = {"/api/v1/interfaces/{interface_uuid}/identity-resolution":
         {"review_id": str(uuid.uuid4()), "decision": "map"},
         "/api/v1/auth/login": {"username": "nobody", "password": new_password()}}  # fmt: skip

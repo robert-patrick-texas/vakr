@@ -95,15 +95,17 @@ class ApiKit:
         auth_settings: AuthSettings | None = None,
         max_body: int = 65536,
         telemetry: bool = True,
+        fleet: Fleet | None = None,
     ) -> ApiKit:
         """Build the kit.
 
         Args:
-            positions: Collector positions of the fleet.
+            positions: Collector positions of a new, empty fleet.
             proxies: ``api.trusted_proxies`` entries.
             auth_settings: Authentication settings; E.12 defaults when ``None``.
             max_body: ``api.max_body_bytes``.
             telemetry: False for a node without a telemetry database.
+            fleet: A fleet built already (``mixed_fleet()``), instead of an empty one.
 
         Returns:
             ApiKit: The kit.
@@ -111,7 +113,7 @@ class ApiKit:
         Raises:
             None
         """
-        fleet = Fleet(positions)
+        fleet = fleet or Fleet(positions)
         keys = AuthKeys.from_master(secrets.token_bytes(32))
         hashing = Passwords(cheap_hasher())
         auth = build_auth_services(fleet.uow, clock=fleet.clock, keys=keys,

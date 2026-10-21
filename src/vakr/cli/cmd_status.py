@@ -1,4 +1,4 @@
-"""``vakr status``: current state of every device, or of one, from the local databases.
+"""``vakr status``: current state of every device, or of one, from ``vakr-api`` or the databases.
 
 ``vakr status`` lists devices in the 7.7 order: Attention first, then
 Active, then Offline/Retired. Each line shows the status icon and label,
@@ -7,21 +7,25 @@ it is. ``vakr status DEVICE`` shows one device's summary and interface
 table, with the reason beside every value that is not available.
 ``--json`` prints the same views as a versioned JSON document.
 
-It reads the databases in ``/var/lib/vakr`` and never creates them: on a
-node without ``metadata.db`` it says "no data yet". Run as root, it first
-switches to the ``vakr`` service user, like ``vakr db``.
+It asks the running ``vakr-api`` over its local socket; when the API is not
+running, or with ``--local``, it reads the databases in ``/var/lib/vakr``
+instead, and the output says which (13.1, E.29 #10). It never creates a
+database: on a node without ``metadata.db`` it says "no data yet". On the
+local path, run as root, it first switches to the ``vakr`` service user,
+like ``vakr db``.
 
 Exit status follows the Nagios plugin convention, so monitoring scripts can
 call it directly:
 
 - 0: every listed device is Active or Offline (nothing needs attention);
 - 1: at least one listed device is in Attention (red or amber);
-- 3: no data yet, storage unreadable, telemetry unavailable, or no such
-  device: vakr cannot say what the state is;
+- 3: no data yet, storage unreadable, telemetry unavailable, no such
+  device, or a ``vakr-api`` that does not answer or refuses the account:
+  vakr cannot say what the state is;
 - 2: a usage error (argparse); Nagios CRITICAL is not used.
 
 Dependencies:
-    vakr.cli.status_stores: Opens the databases and the query service.
+    vakr.cli.status_source: Picks the API socket or the databases.
     vakr.cli.status_render, status_json: Text and JSON output.
 
 Safety:
@@ -36,16 +40,16 @@ import argparse
 import sys
 
 from vakr.cli.common import SubParsers
-from vakr.cli.service_user import drop_to_service_user
 from vakr.cli.status_json import detail_document, error_document, list_document
 from vakr.cli.status_render import render_detail, render_list
-from vakr.cli.status_stores import NoDataYetError, StatusStores, open_status
+from vakr.cli.status_source import DataSource, open_source
+from vakr.cli.status_stores import NoDataYetError
 from vakr.domain.enums import StatusBucket
 from vakr.domain.errors import StorageError, ValidationError
 from vakr.domain.paging import DEFAULT_PAGE_LIMIT
 from vakr.paths import InstallPaths
 from vakr.ports.migrations import MigrationError
-from vakr.query import DeviceListRequest, DeviceListView, DeviceSort
+from vakr.query import DeviceListRequest, DeviceListView, DeviceSort, SourceUnavailableError
 
 EXIT_OK = 0
 EXIT_ATTENTION = 1
@@ -79,6 +83,8 @@ def register(subparsers: SubParsers) -> None:
     parser.add_argument("--limit", type=int, default=DEFAULT_PAGE_LIMIT,
                         help=f"devices per page, 1-500 (default {DEFAULT_PAGE_LIMIT})")  # fmt: skip
     parser.add_argument("--offset", type=int, default=0, help="skip this many devices")
+    parser.add_argument("--local", action="store_true",
+                        help="read the local databases instead of asking vakr-api")  # fmt: skip
     parser.set_defaults(func=run)
 
 
@@ -121,12 +127,12 @@ def list_exit_code(view: DeviceListView, filtered: bool) -> int:
     return EXIT_ATTENTION if view.counts.attention else EXIT_OK
 
 
-def _show_list(args: argparse.Namespace, stores: StatusStores) -> int:
+def _show_list(args: argparse.Namespace, data: DataSource) -> int:
     """Print the device list.
 
     Args:
         args: Parsed arguments.
-        stores: Open stores.
+        data: The open data source.
 
     Returns:
         int: The exit status.
@@ -134,6 +140,7 @@ def _show_list(args: argparse.Namespace, stores: StatusStores) -> int:
     Raises:
         StorageError: If the metadata store cannot be read.
         ValidationError: If the paging arguments are out of range.
+        SourceUnavailableError: If vakr-api cannot be used.
     """
     request = DeviceListRequest(
         search=args.search,
@@ -143,31 +150,33 @@ def _show_list(args: argparse.Namespace, stores: StatusStores) -> int:
         limit=args.limit,
         include_retired=args.include_retired,
     )
-    view = stores.queries.device_list(request)
+    view = data.source.device_list(request)
     code = list_exit_code(view, bool(args.search or args.bucket))
     if args.json:
-        sys.stdout.write(list_document(view, code))
+        sys.stdout.write(list_document(view, code, data.kind))
     else:
-        sys.stdout.write(render_list(view, str(stores.config.get("time.timezone", ""))))
+        zone = str(data.config.get("time.timezone", ""))
+        sys.stdout.write(render_list(view, zone, data.label))
         if view.total == 0 and code == EXIT_UNKNOWN:
             print(f"{COMMAND}: no devices in inventory yet", file=sys.stderr)
     return code
 
 
-def _show_device(args: argparse.Namespace, stores: StatusStores) -> int:
+def _show_device(args: argparse.Namespace, data: DataSource) -> int:
     """Print one device.
 
     Args:
         args: Parsed arguments with ``device``.
-        stores: Open stores.
+        data: The open data source.
 
     Returns:
         int: 3 when not found or telemetry is unavailable, 1 in Attention, else 0.
 
     Raises:
         StorageError: If the metadata store cannot be read.
+        SourceUnavailableError: If vakr-api cannot be used.
     """
-    view = stores.queries.device_detail(args.device)
+    view = data.source.device_detail(args.device)
     if view is None:
         return _fail(args, f"no device named {args.device!r}")
     if not view.health.telemetry_ok:
@@ -175,7 +184,8 @@ def _show_device(args: argparse.Namespace, stores: StatusStores) -> int:
     else:
         attention = view.row.status.bucket is StatusBucket.ATTENTION
         code = EXIT_ATTENTION if attention else EXIT_OK
-    sys.stdout.write(detail_document(view, code) if args.json else render_detail(view))
+    doc = detail_document(view, code, data.kind) if args.json else render_detail(view, data.label)
+    sys.stdout.write(doc)
     return code
 
 
@@ -191,20 +201,20 @@ def run(args: argparse.Namespace) -> int:
     Raises:
         None
     """
-    if (problem := drop_to_service_user()) is not None:
-        return _fail(args, problem)
     try:
-        stores = open_status(InstallPaths.from_environment(), COMMAND)
-    except NoDataYetError as exc:
+        data = open_source(InstallPaths.from_environment(), COMMAND, local=args.local)
+    except (NoDataYetError, SourceUnavailableError) as exc:
         return _fail(args, str(exc))
     except (MigrationError, StorageError) as exc:
         return _fail(args, f"cannot read the metadata database: {exc}")
     try:
-        return _show_device(args, stores) if args.device else _show_list(args, stores)
+        return _show_device(args, data) if args.device else _show_list(args, data)
     except ValidationError as exc:
         print(f"{COMMAND}: {exc}", file=sys.stderr)
         return 2
     except StorageError as exc:
         return _fail(args, f"cannot read the metadata database: {exc}")
+    except SourceUnavailableError as exc:
+        return _fail(args, str(exc))
     finally:
-        stores.close()
+        data.close()

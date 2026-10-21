@@ -16,7 +16,7 @@ from rich.text import Text
 
 from tests.unit.query.query_testkit import mixed_fleet
 from tests.unit.query.test_status_cli import seed
-from vakr.cli import cmd_tui
+from vakr.cli import status_source
 from vakr.cli.main import main
 from vakr.query import QueryLimits, Reading
 from vakr.tui.app import VakrTui
@@ -115,7 +115,7 @@ def root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_tui_command_line(
     root: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """13.1: ``--api-url`` is refused for now; ``--refresh`` is bounded; no data yet exits 3.
+    """13.1: ``--api-url`` and ``--profile`` are refused; ``--refresh`` is bounded; no data is 3.
 
     Args:
         root: State directory.
@@ -129,7 +129,9 @@ def test_tui_command_line(
         None
     """
     assert main(["tui", "--api-url", "https://vakr.example.net"]) == 3
-    assert "API arrives in a later release" in capsys.readouterr().err
+    assert "needs API credentials or tokens" in capsys.readouterr().err
+    assert main(["tui", "--profile", "noc"]) == 3
+    assert "--profile: a TUI on another host" in capsys.readouterr().err
     with pytest.raises(SystemExit) as exc:
         main(["tui", "--refresh", "1"])
     assert exc.value.code == 2
@@ -151,15 +153,21 @@ def test_tui_command_line(
         Raises:
             None
         """
-        started.update(refresh=app.refresh_s, zone=app.zone)
+        started.update(refresh=app.refresh_s, zone=app.zone, data=app.data)
 
     monkeypatch.setattr(VakrTui, "run", fake_run)
     seed(root)
     assert main(["tui"]) == 0
-    assert started == {"refresh": 10.0, "zone": ""}
+    assert started == {
+        "refresh": 10.0,
+        "zone": "",
+        "data": "local databases (vakr-api is not running)",
+    }
     assert main(["tui", "--refresh", "5"]) == 0
     assert started["refresh"] == 5.0
-    monkeypatch.setattr(cmd_tui, "drop_to_service_user", lambda: "cannot switch")
+    assert main(["tui", "--local"]) == 0
+    assert started["data"] == "local databases (--local)"
+    monkeypatch.setattr(status_source, "drop_to_service_user", lambda: "cannot switch")
     assert main(["tui"]) == 3
 
 

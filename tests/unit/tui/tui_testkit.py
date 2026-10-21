@@ -19,7 +19,7 @@ from collections.abc import Awaitable, Callable
 from textual.pilot import Pilot
 from textual.widgets import DataTable, Static
 
-from vakr.query import StatusQueries
+from vakr.query import StatusSource
 from vakr.tui.app import VakrTui
 
 TERMINAL = (120, 30)
@@ -27,14 +27,14 @@ TERMINAL = (120, 30)
 
 
 def drive[T](
-    queries: StatusQueries,
+    queries: StatusSource,
     script: Callable[[VakrTui, Pilot[None]], Awaitable[T]],
     size: tuple[int, int] = TERMINAL,
 ) -> T:
     """Run the app headless and apply ``script`` to it.
 
     Args:
-        queries: The service the app reads.
+        queries: The source the app reads: ``StatusQueries`` or the socket client.
         script: Async steps taking the app and the pilot.
         size: Terminal columns and rows.
 

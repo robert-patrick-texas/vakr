@@ -3934,6 +3934,93 @@
         ]
       }
     },
+    "/api/v1/device-lookup": {
+      "get": {
+        "description": "Return the device screen of the device named ``key``, else with that UUID.\n\nThe local status views take a name or a UUID; the lookup is the\nin-process one, so both data paths find the same device (E.29 #10).",
+        "operationId": "device_lookup_api_v1_device_lookup_get",
+        "parameters": [
+          {
+            "description": "Exact display name, else device UUID (vakr status DEVICE).",
+            "in": "query",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "description": "Exact display name, else device UUID (vakr status DEVICE).",
+              "maxLength": 1024,
+              "minLength": 1,
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceDetailView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such device"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Device screen by exact name or UUID",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
     "/api/v1/devices": {
       "get": {
         "description": "Return one page of the device list.",

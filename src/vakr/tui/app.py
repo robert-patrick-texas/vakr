@@ -1,14 +1,15 @@
 """``VakrTui``: the read-only Textual application behind ``vakr tui`` (TUI-001, ADR-013).
 
-The app owns nothing but a ``StatusQueries`` service and a refresh
-interval; screens do the reading, always through the service and always in
-a worker thread. It opens on the device list (TUI-002); ``Enter`` opens a
-device (TUI-004). There is no key that changes anything: the TUI is for
-looking, and administration stays in the CLI and, later, the web UI.
+The app owns nothing but a ``StatusSource`` (``vakr-api`` over its socket,
+or the local databases) and a refresh interval; screens do the reading,
+always through the source and always in a worker thread. It opens on the
+device list (TUI-002); ``Enter`` opens a device (TUI-004). There is no key
+that changes anything: the TUI is for looking, and administration stays in
+the CLI and the web UI.
 
 Dependencies:
     textual: The application framework (ADR-013).
-    vakr.query: Data access (TUI-007).
+    vakr.query: Data access through ``StatusSource`` (TUI-007).
     vakr.tui.list_screen: The first screen.
 
 Safety:
@@ -25,7 +26,7 @@ from typing import ClassVar
 from textual.app import App
 from textual.binding import Binding, BindingType
 
-from vakr.query import StatusQueries
+from vakr.query import StatusSource
 from vakr.tui.list_screen import DeviceListScreen
 from vakr.tui.modals import HelpScreen
 from vakr.version import get_version
@@ -55,13 +56,16 @@ class VakrTui(App[None]):
         Binding("q", "quit", "Quit"),
     ]
 
-    def __init__(self, queries: StatusQueries, *, refresh_s: float, zone: str = "") -> None:
-        """Bind the app to its query service.
+    def __init__(
+        self, source: StatusSource, *, refresh_s: float, zone: str = "", data: str = ""
+    ) -> None:
+        """Bind the app to its data source.
 
         Args:
-            queries: The read service.
+            source: Where the views come from.
             refresh_s: Seconds between automatic refreshes (E.29 bounds).
             zone: Display timezone name; empty means the host's (TIME-002).
+            data: The data path for the header, such as ``"vakr-api socket"``; empty to omit.
 
         Returns:
             None
@@ -70,9 +74,10 @@ class VakrTui(App[None]):
             None
         """
         super().__init__()
-        self.queries = queries
+        self.source = source
         self.refresh_s = refresh_s
         self.zone = zone
+        self.data = data
 
     def on_mount(self) -> None:
         """Open the device list.
@@ -86,8 +91,8 @@ class VakrTui(App[None]):
         Raises:
             None
         """
-        title = f"vakr {get_version()}"
-        self.push_screen(DeviceListScreen(self.queries, self.refresh_s, self.zone, title))
+        title = f"vakr {get_version()}" + (f" · data: {self.data}" if self.data else "")
+        self.push_screen(DeviceListScreen(self.source, self.refresh_s, self.zone, title))
 
     def action_help(self) -> None:
         """Show keys and what the states mean (13.2 ``?``).

@@ -139,7 +139,7 @@ Members of the `vakr` group can read `metadata.db` and therefore the password ha
 
 ## Local TUI and CLI access
 
-On the monitoring node itself, `vakr tui` and the CLI will talk to the API over the Unix socket `/run/vakr/api.sock` without a password. The kernel reports who connected (`SO_PEERCRED`), and the role follows from that account:
+On the monitoring node itself, `vakr status` and `vakr tui` talk to the API over the Unix socket `/run/vakr/api.sock` without a password. The kernel reports who connected (`SO_PEERCRED`), and the role follows from that account:
 
 | Connecting account | Role |
 |---|---|
@@ -147,7 +147,7 @@ On the monitoring node itself, `vakr tui` and the CLI will talk to the API over 
 | a member of `vakr` | operator |
 | anyone else | refused |
 
-Group membership is that of the *connecting process*, the same rule the kernel uses for file access. After `sudo usermod -aG vakr-admin alice`, Alice must log out and in again before the new group counts. Members of `vakr-admin` need not also be in `vakr`: the socket is reachable by every account (mode 0666 in `/run/vakr`, mode 0751), and `vakr-api` refuses everyone else itself. `vakr-api` serves the socket ([API](api.md#the-local-socket)); `vakr status` and `vakr tui` still read the databases directly, as described in [status and TUI](status-and-tui.md), until they move to it.
+Group membership is that of the *connecting process*, the same rule the kernel uses for file access. After `sudo usermod -aG vakr-admin alice`, Alice must log out and in again before the new group counts. Members of `vakr-admin` need not also be in `vakr`: the socket is reachable by every account (mode 0666 in `/run/vakr`, mode 0751), and `vakr-api` refuses everyone else itself. `vakr-api` serves the socket ([API](api.md#the-local-socket)). When it is not running, `vakr status` and `vakr tui` read the databases directly instead, as described in [status and TUI](status-and-tui.md#where-the-data-comes-from).
 
 ## Audit records
 

@@ -4294,7 +4294,7 @@ The web UI is the static SvelteKit app of ADR-035 in `web/`, served by `vakr-api
 | Ranking rows | 10 (default), 25, 50, 100 | E.28 |
 | Custom graph range | 1 minute to 400 days, ending at most 5 minutes ahead | E.28, checked in the browser and again by the API |
 | Page CSP | `default-src 'self'; script-src 'self' 'sha256-…'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'` | no `unsafe-inline`, `unsafe-eval`, or `unsafe-hashes`; the other E.30 headers apply too |
-| Node.js (build only) | the 24 LTS line (`web/.node-version`); the package builder pins 24.22.0 by image digest | decision 9 |
+| Node.js (build only) | 24.22.0 (24 LTS), pinned exactly in `web/.node-version` (CI's `setup-node`, the release preflight) and by image digest in the package builder; a test keeps the two equal | decision 9 |
 | TypeScript | 6.0.3 | decision 9 |
 
 Decisions taken with the M4 web UI:

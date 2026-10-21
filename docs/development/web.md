@@ -17,7 +17,7 @@ The web UI is a static SvelteKit app in `web/`, built to plain files that `vakr-
 
 | Tool | Version | Where it is pinned |
 |---|---|---|
-| Node.js | the 24 LTS line (24.22 when written) | `web/.node-version` (read by CI's `setup-node`), `engines` in `web/package.json` (`engine-strict` in `web/.npmrc`), and the builder image in `packaging/Dockerfile` |
+| Node.js | 24.22.0 (24 LTS), exact | `web/.node-version` (read by CI's `setup-node` and the release preflight), `engines` in `web/package.json` (`engine-strict` in `web/.npmrc`), and the builder image in `packaging/Dockerfile`, which a test keeps equal to `web/.node-version` |
 | npm | 11.19 or newer | `engines` |
 | Packages | exact versions | `web/package.json` (no ranges) and `web/package-lock.json` |
 
@@ -158,4 +158,4 @@ HTML carries the page CSP: the API's same-origin policy plus the bootstrap's has
 
 ## Updating dependencies
 
-`uv run tools/check-updates/check_updates.py` lists newer npm packages and Node releases beside the Python ones ([updates](updates.md)). Update with `npm install --save-exact --ignore-scripts <package>@<version>` in `web/`, run `make check` and `make web-e2e`, and update `packaging/copyright` if the set of bundled packages changes (the licence check names any that are missing). When the Node major line changes, change `web/.node-version`, `engines`, and the `node` stage of `packaging/Dockerfile` together.
+`uv run tools/check-updates/check_updates.py` lists newer npm packages and Node releases beside the Python ones ([updates](updates.md)). Update with `npm install --save-exact --ignore-scripts <package>@<version>` in `web/`, run `make check` and `make web-e2e`, and update `packaging/copyright` if the set of bundled packages changes (the licence check names any that are missing). When Node changes, change `web/.node-version` and the `node` stage of `packaging/Dockerfile` together (and `engines` for a new floor or major line).

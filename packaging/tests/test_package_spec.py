@@ -242,11 +242,11 @@ def test_build_inputs_are_pinned() -> None:
     dockerfile = (PKG / "Dockerfile").read_text(encoding="utf-8")
     assert re.search(r"FROM ghcr.io/astral-sh/uv:0\.13\.3@sha256:[0-9a-f]{64} ", dockerfile)
     assert re.search(r"FROM golang:1\.27\.3@sha256:[0-9a-f]{64} ", dockerfile)
-    node = re.search(r"FROM node:(\d+)\.\d+\.\d+-trixie-slim@sha256:[0-9a-f]{64} ", dockerfile)
+    node = re.search(r"FROM node:(\d+\.\d+\.\d+)-trixie-slim@sha256:[0-9a-f]{64} ", dockerfile)
     assert node is not None
-    # ADR-035 #16: the builder's Node is the major line web/.node-version pins.
+    # ADR-035 #16: the builder, CI, and the release host run the release web/.node-version pins.
     pinned = (PKG.parent / "web/.node-version").read_text(encoding="utf-8").strip()
-    assert node.group(1) == pinned.split(".")[0]
+    assert node.group(1) == pinned
     assert "nfpm/v2/cmd/nfpm@v2.48.0" in dockerfile
     requirements = [
         line

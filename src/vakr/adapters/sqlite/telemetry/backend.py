@@ -21,6 +21,7 @@ Example:
 
 from datetime import datetime
 
+from vakr.adapters.sqlite.telemetry.history import SqliteHistoryQuery
 from vakr.adapters.sqlite.telemetry.maintenance import MaintenanceReport, maintain
 from vakr.adapters.sqlite.telemetry.retention import SqliteRetentionManager
 from vakr.adapters.sqlite.telemetry.rollups import SqliteRollupRepository
@@ -47,11 +48,12 @@ class SqliteTelemetry:
     Attributes:
         capabilities: What the store supports.
         writer: Batch writer.
-        query: Series and raw reads (plus ``downsampled_series``).
+        query: Series and raw reads.
         current: Current-state reads.
         rollups: Rollup storage.
         collector_health: Latest collector health.
         retention: Retention.
+        history: Downsampled series and ranking summaries (M4, ``HistoryBackend``).
     """
 
     def __init__(self, store: SqliteTelemetryStore) -> None:
@@ -74,6 +76,7 @@ class SqliteTelemetry:
         self.rollups = SqliteRollupRepository(store)
         self.collector_health = SqliteCollectorHealthRepository(store)
         self.retention = SqliteRetentionManager(store)
+        self.history = SqliteHistoryQuery(store)
 
     def maintain(self, now: datetime) -> MaintenanceReport:
         """Move staged rows older than ``now - MOVE_LAG`` and truncate the WAL.

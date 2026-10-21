@@ -7,7 +7,8 @@ shows (DB-006, ROLL-T04). Without rollups (a Lite-style backend) native data
 simply expires after the policy duration.
 
 Dependencies:
-    vakr.adapters.memory.telemetry_store, telemetry_query, telemetry_state.
+    vakr.adapters.memory.telemetry_store, telemetry_query, telemetry_state,
+        telemetry_history.
     vakr.domain.rollups: Bucket alignment.
 
 Safety:
@@ -21,6 +22,7 @@ Example:
 
 from datetime import datetime
 
+from vakr.adapters.memory.telemetry_history import MemoryHistoryQuery
 from vakr.adapters.memory.telemetry_query import MemoryObservationQuery
 from vakr.adapters.memory.telemetry_state import MemoryCurrentStateQuery
 from vakr.adapters.memory.telemetry_store import (
@@ -130,6 +132,7 @@ class MemoryTelemetry:
         rollups: Rollup storage.
         collector_health: Latest collector health.
         retention: Retention.
+        history: Downsampled series and ranking summaries (M4, ``HistoryBackend``).
     """
 
     def __init__(self, store: MemoryTelemetryStore) -> None:
@@ -151,3 +154,4 @@ class MemoryTelemetry:
         self.rollups = MemoryRollupRepository(store)
         self.collector_health = MemoryCollectorHealthRepository(store)
         self.retention = MemoryRetentionManager(store)
+        self.history = MemoryHistoryQuery(store)

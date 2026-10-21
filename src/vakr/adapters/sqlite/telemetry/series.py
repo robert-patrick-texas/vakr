@@ -107,9 +107,9 @@ class SqliteObservationQuery:
 
     def downsampled_series(
         self, subject_id: UUID, collector_id: CollectorId, metric: Metric, window: TimeWindow,
-        *, max_points: int = MAX_SERIES_POINTS,
+        *, max_points: int = MAX_SERIES_POINTS, source: SeriesSource | None = None,
     ) -> Series:  # fmt: skip
-        """Return a series bucketed on the fixed width ladder (10.6); an adapter extension.
+        """Return a series bucketed on the fixed width ladder (10.6); see ``HistoryQuery``.
 
         Args:
             subject_id: Interface (interface metrics) or device (ICMP metrics).
@@ -117,6 +117,7 @@ class SqliteObservationQuery:
             metric: The metric.
             window: The window.
             max_points: Point cap, 1 to ``MAX_SERIES_POINTS``.
+            source: ``None`` to split at the native horizon, else one source throughout.
 
         Returns:
             Series: One min/mean/max point per bucket, gaps as ``None``.
@@ -125,7 +126,7 @@ class SqliteObservationQuery:
             ValidationError: If ``max_points`` is out of range.
         """
         return downsampled_series(self._store, subject_id, collector_id, metric, window,
-                                  max_points)  # fmt: skip
+                                  max_points, source)  # fmt: skip
 
     def read_raw(
         self, observation_type: ObservationType, subject_id: UUID, window: TimeWindow,

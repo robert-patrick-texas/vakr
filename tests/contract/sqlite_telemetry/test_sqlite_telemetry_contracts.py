@@ -3,12 +3,14 @@
 The suites are used unchanged; the fixture comes from this directory's conftest.
 
 Dependencies:
-    tests.contract.contract_telemetry_series, contract_telemetry_state, contract_telemetry_write.
+    tests.contract.contract_telemetry_series, contract_telemetry_state, contract_telemetry_write,
+        contract_telemetry_history.
 
 Example:
     $ uv run pytest tests/contract/sqlite_telemetry/test_sqlite_telemetry_contracts.py
 """
 
+from tests.contract.contract_telemetry_history import TelemetryHistoryContract
 from tests.contract.contract_telemetry_series import TelemetrySeriesContract
 from tests.contract.contract_telemetry_state import TelemetryStateContract
 from tests.contract.contract_telemetry_write import TelemetryWriteContract
@@ -24,3 +26,7 @@ class TestSqliteTelemetrySeries(TelemetrySeriesContract):
 
 class TestSqliteTelemetryState(TelemetryStateContract):
     """DB-005, STATE-003, OBS-001, DB-007 on a SQLite telemetry file."""
+
+
+class TestSqliteTelemetryHistory(TelemetryHistoryContract):
+    """10.6 downsampling, E.17 #13 ranking summaries, MPOS-008 on a SQLite telemetry file."""

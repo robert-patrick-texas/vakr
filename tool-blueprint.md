@@ -4109,6 +4109,48 @@ Decisions taken with the M3 collector:
 16. **Discovery never loops.** Outcomes are kept per device in memory. Polling never waits for discovery: a device without a plan still gets ICMP under its strategy and a Stage 1 read of `sysUpTime.0`, so reachability shows up before, or without, interfaces.
 17. **Test IDs.** Section 21 defines no end-to-end test IDs. The end-to-end test cites DISC-T01, RATE-T01, RATE-T02, SVC-T03, SVC-T04, and RATE-004.
 
+### E.28 History, rankings, and search queries (M4)
+
+These are the bounds and choices of the M4 read services in `vakr.query`: `HistoryQueries`, `RankingQueries`, `CatalogQueries`, and `OverviewQueries`. [Query services](docs/architecture/queries.md) explains them. All of them are constants in `vakr.query.history_limits` and `vakr.ports.telemetry.rankings`; none is an operator option.
+
+| Setting or bound | Default | Allowed range |
+|---|---|---|
+| Graph range presets | 1h, 6h, 24h, 7d, 30d, 90d, 400d (12.6); 24h when none is given | constant |
+| Custom graph range | 1 min to 400 days, ending at most 5 min in the future | constant; outside it the request is refused |
+| Points per series | 1,200 (E.19) | 1 to 1,200 per request |
+| `auto` source | Rollups for windows longer than 30 days; otherwise one point per observation when the window holds at most `max_points` polls, else native downsampled on the ladder | `native` or `rollup` override |
+| Native gap threshold | 1.5 × the effective poll interval (E.19) | constant |
+| Ranking windows | 15 min (DASH-003 default), 1 h, 6 h, 24 h | at most 1 day |
+| Ranking window end | UTC, aligned down to 1 min (15 min, 1 h) or 5 min (6 h, 24 h) | constant |
+| Ranking scans kept per service | 8 | constant |
+| Rows per ranking | 10 by default | 1 to 100 |
+| Interfaces one ranking read returns | 20,000 | 1 to 20,000 |
+| Excluded interfaces listed per ranking | 100; the rest are counted | constant |
+| High-priority and WAN rows on the overview | 25 | constant |
+| Event rows per overview feed | 50; loss incidents from the last 24 h; at most 5,000 open identity reviews read | constant |
+| State timeline | The last 7 days of the request, at most 10,080 samples | constant |
+| Per-probe "smoke" | Windows of at most 1,200 polls (the point cap) | follows `max_points` |
+| Synchronous export | 20,000 rows and 4 MiB | constant; larger is refused (API-012) |
+| Search | Plain case-insensitive substring, 256 characters (E.29), 50 hits per kind | 1 to 500 hits per kind |
+| Global interface list page | 100 / 500 (E.19) | 1 to 500 |
+
+Decisions taken with the M4 query services:
+
+1. **Exact rankings, and the 24-hour window.** Rankings compute the nearest-rank p95 of every native sample in the window (E.17 #13). The store does the work: the SQLite adapter scans each day partition as one primary-key range per interface and returns the rates as exact 17-digit text, and Python ranks them with `vakr.logic.stats.p95`. At MVP scale on the development host this takes about 0.13 s for 15 minutes, 0.25 s for 1 hour, 1.2 s for 6 hours, and 4.2 s for 24 hours (one collector; [measurements](docs/architecture/queries.md#performance-129-mvp-acc-05)). A 24-hour window reads about 2.3 million samples per collector, so its first computation exceeds the 2 s of 12.9.
+   - **Contradiction recorded:** DASH-003 allows user-selected windows, and 12.9 gives dashboards 2 s. The choice: keep exact values. The 2 s budget is met for the default windows (15 minutes, DASH-003), and an aligned scan is reused, so a dashboard refresh does not repeat it.
+   - **Follow-up:** a ranking projection maintained alongside the rollup job would bring 24-hour rankings within budget. Ranking from rollup p95 values instead would not be the window's p95.
+2. **Capacity over time.** Utilization graphs and rankings divide by today's capacity for the whole window, because capacity history is not kept.
+3. **Error rankings include logical interfaces.** E.17 #15 removes tunnels and other logical interfaces from utilization rankings, because their speed is nominal. Errors need no denominator, so those interfaces still rank by errors.
+4. **Packets for errors per million.** Interface samples store packet rates, not packet deltas. The packets of a sample are `(in_pps + out_pps) × elapsed`, summed over the counted samples and rounded once.
+5. **Default positions.** The local collector is `scheduler.collector_name`, else the short host name when the caller passes it (`settings_from_config(config, hostname)`). Traffic graphs, rankings, and lists default to the local collector. Without one, traffic graphs show every position, and rankings and lists use the first position in natural order. Latency graphs always show every position (MPOS-T04). A view never merges positions (MPOS-008).
+6. **Display timezone.** The zone is `time.timezone` when it is a known IANA zone. Otherwise it is the host's zone (TIME-002), from `TZ` or the `/etc/localtime` link, and otherwise `UTC`. The subject's site zone is disclosed beside it when the site has one.
+7. **Gap points and markers.** A native gap point sits one interval after the earlier sample. Quality flags become merged marker stretches: restart, discontinuity, baseline, partial, collector, over capacity, and gap. The stretch before the first point and the stretch after the last point are gaps when they are longer than the threshold.
+8. **Loss in buckets.** Rollup buckets compute loss from summed probe counts (RET-008). Native buckets average per-poll loss percentages, which is equal to counted loss when every poll sent the same number of probes. That holds at the E.9 default of 5; a mixed probe count would need a probe-count series.
+9. **Smoke.** Every probe is shown for windows of at most 1,200 polls. Longer windows show the band between the lowest and highest per-poll median in each bucket. Re-bucketed rollups do not show their p95, because the p95 values of different buckets cannot be combined.
+10. **Inventory index.** Search, lists, and rankings read a bounded in-memory index of the inventory, reused until `change_counter()` moves; collectors are reread every time. At MVP scale this meets 12.9 without a storage-side search port. A port is the enterprise-scale follow-up.
+11. **Overview events.** Restarts come from the status snapshot: management-agent restarts within `status.recent_restart_window`. Identity reviews come from the review repository. Telemetry-loss incidents come from a reader the caller injects. Rediscovery runs are not recorded by any store yet, so that feed reports "not available".
+12. **Browsing by provider.** `browse(DeviceScope(provider=...))` lists devices that have at least one interface of that provider.
+
 ### E.29 Status CLI and TUI (TUI-001 to TUI-008, 7.7, 13, STATE-003, TIME-005)
 
 | Setting or bound | Default | Allowed range |

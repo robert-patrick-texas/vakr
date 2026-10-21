@@ -1,4 +1,4 @@
-"""Backend-neutral current-state query services and view models (blueprint 6.5, TUI-007).
+"""Backend-neutral query services and view models (blueprint 6.5, 10.6, 12, TUI-007).
 
 ``StatusQueries`` answers the two questions an operator asks first: which
 devices need attention right now, and what does this one device look like.
@@ -6,6 +6,13 @@ It reads only through the metadata and telemetry ports, applies the
 measurement rules in ``vakr.logic`` (E.2 status, E.3 freshness, RATE-008
 capacity), and returns immutable, presentation-ready views. ``vakr status``
 and ``vakr tui`` both use it, so the CLI and the TUI can never disagree.
+
+The M4 read services behind the API and web UI are ``HistoryQueries``
+(graphs, latency smoke, state timelines), ``RankingQueries`` (top
+utilization and top errors), ``CatalogQueries`` (global interface list,
+WAN and high-priority views, global search), and ``OverviewQueries`` (the
+overview dashboard and grouped device browsing). Their views serialise with
+``to_jsonable``; ``docs/architecture/queries.md`` describes them.
 
 Modules:
     service: ``StatusQueries``, the facade.
@@ -16,6 +23,11 @@ Modules:
     views, detail_views: The view models.
     labels, text: Operator words and number formats.
     settings: Defaults and bounds (E.29).
+    history, graph_build, latency, timeline, history_*: Graph reads (10.6, E.19).
+    rankings, ranking_rows, ranking_views: Rankings (E.17 #13, #15).
+    catalog, catalog_*, search: Cross-device lists and search (12.1, 12.5).
+    overview, overview_*: The overview dashboard (12.2).
+    export, jsonable, units, zone: Export, JSON, SI units, display zone.
 
 Dependencies:
     vakr.ports, vakr.logic, vakr.domain: Data access, rules, and vocabulary.
@@ -31,8 +43,20 @@ Example:
     'unavailable'
 """
 
+from vakr.query.catalog import CatalogQueries
+from vakr.query.catalog_index import IndexCache
+from vakr.query.catalog_order import InterfaceListRequest, InterfaceSort
+from vakr.query.catalog_scope import InterfaceScope
 from vakr.query.detail_views import DeviceDetailView, InterfaceRow
+from vakr.query.export import ExportFormat, export_view
+from vakr.query.history import HistoryQueries
+from vakr.query.history_limits import RangePreset, RankingWindow
+from vakr.query.history_requests import GraphKind, GraphRequest, SourceChoice, TimeRange
+from vakr.query.jsonable import to_jsonable
 from vakr.query.listing import DeviceListRequest, DeviceSort
+from vakr.query.overview import DeviceScope, OverviewQueries
+from vakr.query.ranking_views import RankingRequest
+from vakr.query.rankings import RankingQueries
 from vakr.query.service import StatusQueries
 from vakr.query.settings import QueryLimits, QuerySettings, settings_from_config
 from vakr.query.views import (
@@ -50,19 +74,38 @@ from vakr.query.views import (
 __all__ = [
     "DASH",
     "BucketCounts",
+    "CatalogQueries",
     "CollectorHealthView",
     "DeviceDetailView",
     "DeviceListRequest",
     "DeviceListView",
     "DeviceRow",
+    "DeviceScope",
     "DeviceSort",
+    "ExportFormat",
+    "GraphKind",
+    "GraphRequest",
     "HealthView",
+    "HistoryQueries",
+    "IndexCache",
+    "InterfaceListRequest",
     "InterfaceRow",
+    "InterfaceScope",
+    "InterfaceSort",
+    "OverviewQueries",
     "PositionView",
     "QueryLimits",
     "QuerySettings",
+    "RangePreset",
+    "RankingQueries",
+    "RankingRequest",
+    "RankingWindow",
     "Reading",
+    "SourceChoice",
     "StatusQueries",
     "StatusView",
+    "TimeRange",
+    "export_view",
     "settings_from_config",
+    "to_jsonable",
 ]

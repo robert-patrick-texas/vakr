@@ -8,6 +8,7 @@ from configuration (``telemetry.native_retention_days`` and
 
 Dependencies:
     datetime: Durations.
+    vakr.domain.downsampling: The downsampling ladder, shared by every backend.
 
 Safety:
     Plain constants; every PRAGMA value is an integer formatted into a fixed
@@ -19,6 +20,8 @@ Example:
 """
 
 from datetime import timedelta
+
+from vakr.domain.downsampling import LADDER_S as DOWNSAMPLE_LADDER_S
 
 MAX_BATCH_ROWS = 50_000
 """Observations per ``write_batch`` (E.19, the STORE-011 upper target)."""
@@ -50,8 +53,8 @@ POLL_LOOKBACK = timedelta(days=1)
 POLL_LOOKAHEAD = timedelta(minutes=5)
 """How far after an interface sample its poll record is searched for (E.21)."""
 
-LADDER_S = (60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 14400, 21600, 28800, 43200, 86400)
-"""Downsampling bucket widths in seconds, narrowest first (ADR-021, E.21)."""
+LADDER_S = DOWNSAMPLE_LADDER_S
+"""Downsampling bucket widths in seconds, narrowest first (ADR-021, E.21); shared by backends."""
 
 QUANTIZED_ROLLUPS = frozenset({"roll_iface"})
 """Rollup families whose values may be rounded to float32 (E.21, ADR-021 amendment 3)."""

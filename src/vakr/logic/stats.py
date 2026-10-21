@@ -12,8 +12,14 @@ The p95 used by top-utilization rankings (DASH-003) and by interface rollups
 one of the samples, never an interpolated value, so the same samples give
 the same p95 in every component and every language.
 
+``exact_parts`` keeps a float sum exact while it is split: the ranking
+projection stores each bucket's packet total as the few non-overlapping
+floats whose real sum is exactly the bucket's sum, so ``math.fsum`` of any
+mix of stored parts and fresh samples is the correctly rounded total of
+every sample, whatever the split (DASH-004, E.17 #13, E.28).
+
 Dependencies:
-    fractions, math: Exact rationals and integer square roots.
+    fractions, math: Exact rationals, integer square roots, and finiteness.
 
 Safety:
     Pure. Empty inputs raise ``ValueError`` instead of returning zero, because
@@ -24,11 +30,14 @@ Example:
     (2, 2, 1)
     >>> percent_one_decimal(3, 2000), nearest_rank([40, 10, 30, 20], 95)
     (0.2, 40)
+    >>> from math import fsum
+    >>> (1e16 + 1.0) - 1e16, fsum(exact_parts([1e16, 1.0]) + exact_parts([-1e16]))
+    (0.0, 1.0)
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from fractions import Fraction
-from math import ceil, isqrt
+from math import ceil, isfinite, isqrt
 
 
 def _require(values: Sequence[object], minimum: int) -> None:
@@ -161,3 +170,42 @@ def p95[T: (int, float)](values: Sequence[T]) -> T:
         ValueError: If ``values`` is empty.
     """
     return nearest_rank(values, 95)
+
+
+def exact_parts(values: Iterable[float]) -> list[float]:
+    """Return non-overlapping floats whose real sum is exactly the real sum of ``values``.
+
+    Shewchuk's expansion (the algorithm inside ``math.fsum``): each value is
+    added with error-free two-sums, so nothing is rounded away. Splitting a
+    sum into parts and joining them later with ``math.fsum`` therefore gives
+    the same correctly rounded total as summing every value at once. A
+    non-finite value is kept as it is, so ``math.fsum`` treats it as it
+    would the original.
+
+    Args:
+        values: Finite floats whose partial sums stay finite, plus any
+            non-finite ones.
+
+    Returns:
+        list[float]: Usually one to three parts; empty for no values.
+
+    Raises:
+        None
+    """
+    parts: list[float] = []
+    special: list[float] = []
+    for value in values:
+        if not isfinite(value):
+            special.append(value)
+            continue
+        x, kept = value, 0
+        for y in parts:
+            big, small = (y, x) if abs(x) < abs(y) else (x, y)
+            high = big + small
+            low = small - (high - big)  # exactly what rounding dropped from high
+            if low:
+                parts[kept] = low
+                kept += 1
+            x = high
+        parts[kept:] = [x]
+    return parts + special

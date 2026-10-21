@@ -448,7 +448,7 @@ def test_roll_t04_upkeep_runs_the_job_before_each_retention_pass(tmp_path: Path)
         await task
 
     asyncio.run(one_pass())
-    assert upkeep.failures == {"move": 0, "retention": 0}
+    assert upkeep.failures == {"move": 0, "projection": 0, "retention": 0}
     assert store.rollups.coverage_end() == base + HOUR
     assert store.retention.native_horizon() == base + HOUR
     iface = fleet.subjects()[1][0]

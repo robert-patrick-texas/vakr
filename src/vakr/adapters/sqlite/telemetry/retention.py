@@ -1,7 +1,8 @@
 """``RetentionManager`` for the SQLite telemetry store (RET-001..003, RET-007, ROLL-T04, E.10).
 
-Retention never runs ``DELETE`` or ``VACUUM`` over telemetry. It works in
-two layers:
+Retention never runs ``DELETE`` or ``VACUUM`` over observations or rollups.
+It works in two layers, and then trims the small ranking projection
+(``ranking_projection.prune``, E.28) behind the native horizon:
 
 - **Horizons.** ``apply(now)`` moves the native horizon to
   ``now - policy.native``, aligned down to a 15-minute bucket and never past
@@ -48,6 +49,7 @@ from vakr.adapters.sqlite.telemetry.partitions import (
     state,
     tables,
 )
+from vakr.adapters.sqlite.telemetry.ranking_projection import prune
 from vakr.adapters.sqlite.telemetry.rollups import coverage_end_us
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.domain.rollups import ROLLUP_BUCKET_SECONDS, bucket_start
@@ -166,6 +168,7 @@ class SqliteRetentionManager:
             cutoff = None if frontier is None else bucket_start(min(now - policy.native, frontier))
             native = 0 if cutoff is None else _advance_native(conn, encode_time(cutoff))
             rollups = _advance_rollups(conn, encode_time(rollup_cut))
+            prune(conn, encode_time(now))  # the ranking projection never outlives native data
         return RetentionReport(now, cutoff, rollup_cut, native, rollups)
 
 

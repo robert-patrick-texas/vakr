@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (amendment 1). Amended by the M2 adapter: key, rollup rows and precision, retention, details (amendments 2-5; the owner approved amendment 3's float32 rollups on 2026-10-20). Amended by the M4 rollup job: what the rows cannot hold yet (amendment 6) |
+| Status | Accepted on benchmark evidence; owner sign-off pending. Amended at merge: rollup p95 is nearest-rank (amendment 1). Amended by the M2 adapter: key, rollup rows and precision, retention, details (amendments 2-5; the owner approved amendment 3's float32 rollups on 2026-10-20). Amended by the M4 rollup job: what the rows cannot hold yet (amendment 6). Amended by the M4 rankings: telemetry schema 2, the ranking projection (amendment 7) |
 | Date | 2026-10-20 |
 | Decides | Physical layout of Compact-profile telemetry in SQLite: tables, keys, partitions, PRAGMAs, batching, idempotency, rollups, retention |
 | Requirements | Blueprint 5.1, 5.3, 10.1-10.6, 27.2-27.5, Appendix E.8 and E.10; STORE-009, STORE-010, STORE-011, RET-001..RET-009, DASH-003, DASH-004, STATE-001..STATE-004, MVP-ACC-05 |
@@ -357,3 +357,40 @@ The M4 rollup job (`vakr.app.collector.rollup_job`) fills amendment 3's packed r
 Each would need new rollup slots, so new `vocab_code` rows (`RollupSlot.roll_icmp` codes 4 and up) and new `Metric` members. That is a telemetry migration, and the tripwire asks for read-compatibility with older releases first. The payload codec already decodes any of the 8 slots generically, so an older release could read rows with extra slots. Only the pinned vocabulary and the metric enum need the migration.
 
 **Where the computation runs.** Amendment 5 expected the computation inside the adapter. It is split instead. A read port, `RollupSource`, returns slim rows: six floats and the flags per interface sample, not domain objects. `vakr.app.collector.rollup_build` then computes with `vakr.logic.rollup`. Both backends therefore share one computation, and the `contract_rollup_source` suite compares their reads. At the MVP workload (100 devices, 1,600 interfaces) a bucket takes about 0.6 s: reads, computation, and one write transaction. Amendment 5 estimated about 1 s with full domain objects. E.10 bounds a pass at 672 buckets and 120 s.
+
+## Amendment 7: telemetry schema 2, the ranking projection (2026-10-21, M4 rankings)
+
+**Problem.** A ranking takes the nearest-rank p95 of every native sample in its window (E.17 #13). At MVP scale a 24-hour window reads about 2.3 million samples per collector, and its first computation took 4.6 s cold and 4.7 s at p95 (6 hours: 1.2 s), over the 2 s that 12.9 gives dashboard answers. E.28 decision 1 recorded the follow-up: a projection maintained beside the rollup job. Rollup p95 values cannot be combined into a window's p95, so the projection must keep every value.
+
+**Decision.** Migration `0002_ranking_projection` adds two tables and changes nothing else:
+
+* `rank_unit (width_s, start_us, built_us)`, `WITHOUT ROWID`: the projected units, a 15-minute bucket (`width_s` 900) or an hour (3600).
+* `rank_iface (collector_key, width_s, start_us, series_key, payload)`, keyed in that order: one exact **ranking partial** per collector, unit, and interface. The payload holds the sample, rate, and error counts, the integer error sums, every available `in_bps` and `out_bps` value in ascending order as float64, and the packet sum as exact float parts (`vakr.logic.stats.exact_parts`). It is a rowid table with the key as its index: an hour's payload (about 1 KB at 60 s polling) overflowed a `WITHOUT ROWID` cell on 4 KiB pages, which measured 431 MiB instead of 204 MiB and read 27-42% slower.
+
+The collector's projector (`vakr.app.collector.ranking_projector`) runs every 15 minutes with the staging move. It projects the complete buckets (E.10's rule) of the last 25 hours, newest first, at most 100 buckets and 60 s per pass, each in one `BEGIN IMMEDIATE` transaction that scans the bucket's native rows with the ranking's own statements and writes their partials. When an hour's four buckets are listed, the same transaction merges them into an hour unit. A ranking read lists the units inside its window, covers the window with hours first, then buckets, reads their partials (one key range per run), and scans the rest natively, all in one read transaction.
+
+**Exactness.** A listed unit always equals its native rows in any snapshot:
+
+* the projector reads and writes a bucket under the write lock;
+* the batch writer deletes the `rank_unit` rows of the bucket and the hour of every interface sample it stores, in the batch's transaction (a replay that stores nothing deletes nothing);
+* the retention pass deletes units before the native horizon or older than 25 hours, in its own transaction;
+* the staging move does not change which rows exist.
+
+Rates are kept as float64 and the p95 is still `vakr.logic.stats.p95` over all of them. The packet sum is the one value whose float addition depends on order, so the port now defines it as the correctly rounded sum (`math.fsum`), on every backend and every path. Plain addition and SQLite's `total()` could differ from it in the last bit; no rounded packet count changed in any test or benchmark (9,600 counts compared on the benchmark day). The contract suite `contract_ranking_projection` and `test_ranking_projection.py` check projected, partly projected, late-written, pruned, and forgotten projections against an independent computation. On the benchmark day, projected and native summaries were equal for all 16,000 interface rows of five windows (aligned and unaligned, 1 to 24 hours, both collectors).
+
+**Rollback story (E.14).** Self-update never copies `telemetry.db`, and a 0.2.x release refuses a journal row it does not know (MIG-004). This is the first telemetry migration after 0001, so its release carries the `manual-update-required` marker in its notes, and the tripwire test now requires that marker in the changelog section naming each later migration. Because the projection is derived data, stepping back needs no backup: with the services stopped, drop `rank_iface` and `rank_unit` and delete version 2 from `schema_migrations` (the CHANGELOG notes and [rollups](../operations/rollups.md#ranking-projection) give the commands). The collector also forgets and rebuilds the whole projection at every start, so its rows are always written by the release that reads them.
+
+**Measured** on the development host with `bench_history` (one MVP day, two collectors, 20 runs, nearest-rank p95; the newest 45 minutes left to native scans, the worst case between two projector passes):
+
+| Window | Before: cold / p95 (ms) | After: cold / p95 (ms) |
+|---|---:|---:|
+| 15 min | 151 / 151 | 135 / 148 |
+| 1 h | 244 / 308 | 227 / 242 |
+| 6 h | 1,066 / 1,186 | 310 / 327 |
+| 24 h | 4,598 / 4,727 | 737 / 836 |
+
+* **Projector cost:** 262 ms per bucket on average (p95 439 ms, both collectors, 3,200 partials, the hour merge included), so about 0.26 s per 15-minute pass and 1.05 s an hour. A rebuild after a start projects 97 buckets in 25 s. The batch writer's extra delete costs about 4 µs per batch.
+* **Disk:** 193 MiB of table and 10 MiB of index for 93 buckets and 23 hours of both collectors; about 220 MiB at the steady 25 hours, whatever `telemetry.native_retention_days` is, because the projection keeps 25 hours only. The 27.3 worst case grows from 40.1 GB to about 40.3 GB per node.
+* **Without a projection** (the first half-minute after a start, or a failing projector, which the `rankings` health check reports), every bucket is scanned natively, and exact packet sums read each sample's packet product: 6 hours take 1.65 s and 24 hours 6.2 s at p95, 30-40% slower than before.
+
+**Alternatives rejected.** Ranking from rollup p95 values is not the window's p95. Per-bucket histograms with exact counts at value boundaries locate the p95's bin but still need a native scan inside it. Speeding up the native scan alone cannot fit 2.3 million samples in 2 s on this host: the scan costs about 1.9 µs per sample in SQLite row decoding, text, and float parsing, and 2 s allows 0.87. A cache in the API process would lose exactness on late writes without a writer-side signal, and would be cold after every API restart. Bucket units alone (no hours) measured 1.3 s p95 for 24 hours; the hours bring it to 0.84 s. A separate `rankings.db` would leave an older release untouched, but a write across two WAL files is not atomic, so a late sample and its invalidation could disagree.

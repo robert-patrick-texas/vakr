@@ -1,4 +1,4 @@
-"""Tests for exact half-to-even statistics and the shared nearest-rank p95 (E.7, RET-004).
+"""Tests for half-to-even statistics, the shared nearest-rank p95, and exact parts (E.7, E.28).
 
 The rounding rule is part of the stored data contract: a Go collector and a
 rollup job must produce the same integers, so ties and near-ties are pinned
@@ -14,7 +14,8 @@ Example:
 
 from collections.abc import Callable
 from decimal import ROUND_HALF_EVEN, Decimal, localcontext
-from math import ceil
+from fractions import Fraction
+from math import ceil, fsum
 
 import pytest
 from hypothesis import given, settings
@@ -201,3 +202,49 @@ def test_nearest_rank_is_a_sample_with_enough_below(values: list[int], percent: 
     assert result in values
     assert sum(v <= result for v in values) >= ceil(percent * len(values) / 100)
     assert stats.mean_half_even(values) in range(min(values), max(values) + 1)
+
+
+FLOATS = st.lists(
+    st.floats(min_value=0.0, max_value=1e18, allow_nan=False, allow_infinity=False),
+    max_size=40,
+)
+
+
+@PROPERTY
+@given(FLOATS, FLOATS)
+def test_e28_exact_parts_keep_a_split_sum_exact(first: list[float], second: list[float]) -> None:
+    """E.28, DASH-004: parts sum exactly to their values, so a split sum stays correctly rounded.
+
+    Args:
+        first: One bucket's packet products.
+        second: The rest of the window's.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    parts = stats.exact_parts(first)
+    assert sum(map(Fraction, parts), Fraction(0)) == sum(map(Fraction, first), Fraction(0))
+    assert len(parts) <= max(1, len(first))
+    assert fsum(parts + stats.exact_parts(second)) == fsum(first + second)
+
+
+def test_e28_exact_parts_keep_what_float_addition_drops() -> None:
+    """E.28: ``1e16 + 1 + 1`` loses both ones in float addition; the parts keep them.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    values = [1e16, 1.0, 1.0]
+    assert (values[0] + values[1]) + values[2] == 1e16
+    assert fsum([*stats.exact_parts(values[:2]), values[2]]) == 1e16 + 2
+    assert stats.exact_parts([]) == []
+    assert fsum(stats.exact_parts([float("inf"), 1.0])) == float("inf")

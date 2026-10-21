@@ -19,6 +19,7 @@ Example:
     'MemoryHistoryQuery'
 """
 
+import math
 from collections import defaultdict
 from uuid import UUID
 
@@ -232,15 +233,16 @@ def _packets(counted: list[InterfaceObservation]) -> int | None:
         counted: Samples with both error deltas.
 
     Returns:
-        int | None: ``round(sum((in_pps + out_pps) x elapsed))``; ``None`` when
+        int | None: ``round(fsum((in_pps + out_pps) x elapsed))``; ``None`` when
         a sample lacks a packet rate or its elapsed time, or none counted.
 
     Raises:
         None
     """
-    total = 0.0
+    products: list[float] = []
     for o in counted:
         if o.in_pps is None or o.out_pps is None or o.sample_elapsed_us is None:
             return None
-        total += (o.in_pps + o.out_pps) * o.sample_elapsed_us
-    return round(total / _US) if counted else None
+        products.append((o.in_pps + o.out_pps) * o.sample_elapsed_us)
+    # fsum: the correctly rounded sum, whatever order or split the samples come in.
+    return round(math.fsum(products) / _US) if counted else None

@@ -13,7 +13,10 @@ that is how a peer's backfill or a late replay lands (ADR-021). ``INSERT OR
 IGNORE`` on ``(series_key, collector_key, ts_us, observation_uuid)`` makes
 a replayed observation a no-op wherever its first copy is now, because
 only the mover changes the boundary and it moves rows in the same
-transaction (STORE-009). Duplicates inside one batch count once.
+transaction (STORE-009). Duplicates inside one batch count once. A batch
+that stores interface samples also unlists, in the same transaction, the
+ranking-projection buckets they fall in, so a projected bucket always
+matches its samples (E.28).
 
 Dependencies:
     vakr.adapters.sqlite.telemetry.*: Codecs, keys, catalog, and the store.
@@ -39,6 +42,8 @@ from vakr.adapters.sqlite.telemetry.codec_rows import EncodedRow
 from vakr.adapters.sqlite.telemetry.keys import KeyAllocator
 from vakr.adapters.sqlite.telemetry.layout import all_columns, day_start, hot_table
 from vakr.adapters.sqlite.telemetry.partitions import BOUNDARY, ensure_day, state
+from vakr.adapters.sqlite.telemetry.ranking_projection import forget_buckets
+from vakr.adapters.sqlite.telemetry.rankings import FAMILY
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.adapters.sqlite.telemetry.tuning import MAX_BATCH_ROWS
 from vakr.domain.errors import ValidationError
@@ -168,11 +173,16 @@ def _insert(conn: sqlite3.Connection, keys: KeyAllocator, rows: list[EncodedRow]
         if day not in days:
             days[day] = ensure_day(conn, *day)
         groups[row.family, days[day]].append(keyed)
-    inserted = 0
+    inserted, samples = 0, 0
     for (family, table), part in groups.items():
         # Key order touches each B-tree page once: time first for staging,
         # series first for a day partition.
         hot = table.endswith("_hot")
         part.sort(key=(lambda r: (r[2], r[0], r[1], r[3])) if hot else (lambda r: r[:4]))
-        inserted += conn.executemany(insert_sql(table, family), part).rowcount
+        stored = conn.executemany(insert_sql(table, family), part).rowcount
+        samples += stored if family == FAMILY else 0
+        inserted += stored
+    if samples:
+        # A projected bucket must keep matching its samples (E.28); a replay changes nothing.
+        forget_buckets(conn, (row.ts_us for row in rows if row.family == FAMILY))
     return inserted

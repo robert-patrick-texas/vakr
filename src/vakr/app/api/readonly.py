@@ -177,10 +177,11 @@ class ReadOnlyTelemetry:
             Any: The wrapped attribute, read-only where it could write.
 
         Raises:
-            PermissionError: For the batch writer and ``maintain``.
+            PermissionError: For the batch writer, ``maintain``, and the ranking
+                projection, which only the collector builds (E.28).
             AttributeError: For anything the backend does not have.
         """
-        if name in ("writer", "maintain"):
+        if name in ("writer", "maintain", "ranking_projection"):
             raise PermissionError(WRITE_REFUSED)
         value = getattr(self._inner, name)
         if name == "rollups":

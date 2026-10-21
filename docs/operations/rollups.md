@@ -1,6 +1,6 @@
 # Rollups and native-data retention
 
-A collector keeps every one-minute observation for 30 days. For longer graphs (90 days, 400 days) it keeps **rollups**: one summary per 15 minutes for every interface and every device, built from those observations. This page explains what a rollup holds, when native data may be removed, how the rollup job catches up after an upgrade, and what the `rollups` health check means.
+A collector keeps every one-minute observation for 30 days. For longer graphs (90 days, 400 days) it keeps **rollups**: one summary per 15 minutes for every interface and every device, built from those observations. This page explains what a rollup holds, when native data may be removed, how the rollup job catches up after an upgrade, what the `rollups` health check means, and how the ranking projection keeps long rankings fast.
 
 The short version:
 
@@ -8,6 +8,7 @@ The short version:
 - **Native data is removed only after a rollup covers it.** If rollups fall behind, native data stays (the disk grows) and nothing is lost.
 - After the first upgrade to a release with rollups, the job works through the backlog in bounded steps of at most two minutes each hour. A few weeks of data takes a few hours.
 - `vakr check health` warns when rollups are more than 3 hours behind. It reports CRITICAL when native data older than its retention is still waiting for a rollup.
+- Every 15 minutes the collector also projects the newest complete quarter-hours for long rankings, so 24-hour rankings answer within 2 seconds with exact values ([ranking projection](#ranking-projection)).
 
 ## What a rollup holds
 
@@ -66,8 +67,45 @@ Performance data:
 
 A stopped collector does not raise the lag. The check compares rollups with the native data that exists, not with the clock.
 
+## Ranking projection
+
+Top-utilization and top-error rankings take the 95th percentile of **every** one-minute sample in their window, so a 24-hour ranking reads about 2.3 million samples per position. To answer within 2 seconds, the collector keeps a **ranking projection** for the last 25 hours: for every complete quarter-hour, and for every hour of four such quarter-hours, each interface's sample counts, error sums, packet sum, and all of its traffic rates. A ranking reads those whole hours and quarter-hours and reads only the rest of its window from native data, normally the newest 15 to 45 minutes. The values are exactly those a full native read gives; the projection only makes them faster. At the MVP workload a 24-hour ranking takes under 1 second and a 6-hour one about a third of a second ([measurements](../architecture/queries.md#rankings-and-the-2-s-budget)).
+
+- **When it runs.** Every 15 minutes, with the staging move. Each pass projects the complete quarter-hours (the rule above: ended more than 10 minutes ago, and before anything still waiting in the spool) of the last 25 hours, newest first. A pass does at most 100 quarter-hours and starts none after 60 seconds. At the MVP workload a quarter-hour takes about 0.3 seconds for both positions.
+- **After every collector start** the projection is rebuilt from native data: about 25 seconds at the MVP workload. Until then, long rankings read native data and take longer (about 6 seconds for 24 hours), with the same values. Restarting the collector is therefore also the way to rebuild the projection by hand.
+- **Late data.** When an observation arrives for a quarter-hour already projected, for example from a spool backlog, that quarter-hour and its hour are dropped from the projection in the same write and projected again by the next pass. Rankings never use a stale quarter-hour.
+- **Retention.** Each retention pass removes projected quarter-hours older than 25 hours or before the native horizon. The projection takes about 220 MiB at the MVP workload with two positions, whatever the native retention.
+
+| Event | Meaning |
+|---|---|
+| `telemetry.ranking_projection` | How many quarter-hours a pass projected, and how many complete ones of the last 25 hours are still read natively. |
+| `telemetry.ranking_projection_behind` | The pass stopped at its bounds; the next pass continues. |
+| `telemetry.projection_failed` | The pass failed. It runs again 15 minutes later; rankings stay exact. |
+
+### The `rankings` health check
+
+`vakr check health` and `vakr doctor` include a `rankings` check. It reads `telemetry.db` read-only.
+
+| Result | When | What to do |
+|---|---|---|
+| OK | At most 1 hour of complete native data of the last 25 hours is not projected, or there is no recent data. | Nothing. Normally at most half an hour is not projected. |
+| WARNING | More than 1 hour is not projected, so 6-hour and 24-hour rankings may take longer than 2 seconds. The values stay exact. | Expected for up to a minute after the collector starts. Otherwise check that `vakr-collector.service` runs, and look for `telemetry.projection_failed` in its journal. |
+
+The check is never CRITICAL, because no data is at risk. Performance data: `ranking_unprojected_s`, the complete native data of the last 25 hours that rankings read natively, in seconds.
+
+### Going back to a release without the projection
+
+The projection is telemetry schema 2. A release older than it refuses to open `telemetry.db` once schema 2 is there, and self-update cannot restore that file, so the release that adds schema 2 carries the `manual-update-required` marker: the update timer skips it, and you install it with `sudo vakr self-update`. If you must go back to an older release afterwards, remove schema 2 first. The projection holds only data derived from native observations, so nothing is lost:
+
+```console
+$ sudo systemctl stop vakr-collector vakr-api
+$ sudo -u vakr /opt/vakr/venv/bin/python -c 'import sqlite3; c = sqlite3.connect("/var/lib/vakr/telemetry.db"); c.executescript("BEGIN; DROP TABLE rank_iface; DROP TABLE rank_unit; DELETE FROM schema_migrations WHERE version = 2; COMMIT;")'
+```
+
+Then install the older release. Upgrading again applies schema 2 and rebuilds the projection.
+
 ## See also
 
 - [The databases](database.md): where the telemetry file lives and how it is laid out.
 - [The collector service](collector.md): the hourly maintenance pass.
-- [Appendix E.10](../../tool-blueprint.md#e10-rollups-and-retention) lists every default and rule on this page.
+- [Appendix E.10](../../tool-blueprint.md#e10-rollups-and-retention) lists every default and rule on this page; [Appendix E.28](../../tool-blueprint.md#e28-history-rankings-and-search-queries-m4) lists the ranking projection's.

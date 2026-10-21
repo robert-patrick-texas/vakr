@@ -54,7 +54,8 @@ NAME = "telemetry_db"
 DOC = "see docs/operations/database.md"
 FIXED_TABLES = (
     "dict_collector", "dict_device", "dict_interface", "vocab_code", "partition_template",
-    "partition_catalog", "telemetry_state", *(hot_table(f) for f in NATIVE_FAMILIES),
+    "partition_catalog", "telemetry_state", "rank_unit",
+    *(hot_table(f) for f in NATIVE_FAMILIES),
 )  # fmt: skip
 """Tables every telemetry database has, small enough to check every minute."""
 

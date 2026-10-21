@@ -145,7 +145,7 @@ def test_newer_schema_and_damage_are_critical(state: Path, monkeypatch: pytest.M
     """
     path = state / "telemetry.db"
     base = telemetry_family()
-    probe = synthetic(2, "probe", "CREATE TABLE probe (x INT);")
+    probe = synthetic(len(base.migrations) + 1, "probe", "CREATE TABLE probe (x INT);")
     later = SchemaFamily(base.name, base.application_id, (*base.migrations, probe))
     SqliteMigrationManager(path, later).migrate()
     assert check_telemetry_db().status is Status.CRITICAL

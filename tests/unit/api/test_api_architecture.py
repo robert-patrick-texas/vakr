@@ -125,7 +125,7 @@ def test_6_2_the_api_view_of_telemetry_cannot_write() -> None:
         None
     """
     view = ReadOnlyTelemetry(Fleet().telemetry())
-    for name in ("writer", "maintain"):
+    for name in ("writer", "maintain", "ranking_projection"):  # E.28: only the collector projects
         with pytest.raises(PermissionError, match="only the collector writes"):
             getattr(view, name)
     with pytest.raises(PermissionError):

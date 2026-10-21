@@ -12,6 +12,7 @@ Example:
     $ uv run pytest tests/unit/adapters/sqlite/telemetry/test_telemetry_schema.py
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -76,7 +77,7 @@ def _primary_key(path: Path, table: str) -> list[str]:
 
 
 def test_mig001_fresh_install_creates_the_fixed_schema(tmp_path: Path) -> None:
-    """MIG-001: migrate creates every fixed table, stamps the ID, and seeds the boundary.
+    """MIG-001: migrate creates every fixed table (0002: the projection), stamps the ID, seeds.
 
     Args:
         tmp_path: Directory for the file.
@@ -91,13 +92,14 @@ def test_mig001_fresh_install_creates_the_fixed_schema(tmp_path: Path) -> None:
     manager = telemetry_migrations(path)
     assert manager.status().state is SchemaState.MISSING
     applied = manager.migrate()
-    assert [a.name for a in applied] == ["initial"]
+    assert [a.name for a in applied] == ["initial", "ranking_projection"]
     assert manager.status().state is SchemaState.CURRENT
     assert raw(path, "PRAGMA application_id") == [(TELEMETRY_APPLICATION_ID,)]
     assert TELEMETRY_APPLICATION_ID != METADATA_APPLICATION_ID
     names = {r[0] for r in raw(path, "SELECT name FROM sqlite_schema WHERE type = 'table'")}
     fixed = {"dict_collector", "dict_device", "dict_interface", "vocab_code",
-             "partition_template", "partition_catalog", "telemetry_state"}  # fmt: skip
+             "partition_template", "partition_catalog", "telemetry_state",
+             "rank_unit", "rank_iface"}  # fmt: skip
     assert fixed | {f"{f}_hot" for f in NATIVE_FAMILIES} <= names
     assert raw(path, "SELECT value FROM telemetry_state WHERE name = 'staging_boundary_us'") == [
         (0,)
@@ -176,9 +178,9 @@ def test_mig004_store_refuses_a_newer_or_older_schema(tmp_path: Path) -> None:
     with pytest.raises(MigrationError, match="vakr db migrate"):
         SqliteTelemetryStore(path)
     base = telemetry_family()
-    later = SchemaFamily(base.name, base.application_id, (
-        *base.migrations, synthetic(2, "add_note", "ALTER TABLE vocab_code ADD COLUMN note TEXT;")
-    ))  # fmt: skip
+    note = synthetic(len(base.migrations) + 1, "add_note",
+                     "ALTER TABLE vocab_code ADD COLUMN note TEXT;")  # fmt: skip
+    later = SchemaFamily(base.name, base.application_id, (*base.migrations, note))
     SqliteMigrationManager(path, later).migrate()
     with pytest.raises(SchemaTooNewError, match="newer vakr release"):
         SqliteTelemetryStore(path)
@@ -191,10 +193,13 @@ def test_a_second_telemetry_migration_needs_a_rollback_story() -> None:
 
     A failed update restores ``metadata.db`` from its pre-update backup, but
     ``telemetry.db`` (about 40 GB per node) is never copied. Once a release
-    migrates it, an older release would refuse the newer schema (MIG-004).
-    Before adding migration 0002, give the telemetry file read-compatible
-    versioning (older releases open newer additive schemas) or ship that
-    release with the ``manual-update-required`` marker, then update this test.
+    migrates it, an older release refuses the newer schema (MIG-004). Until
+    the telemetry file has read-compatible versioning (older releases open
+    newer additive schemas), every telemetry migration after 0001 must ship
+    in a release whose notes carry the ``manual-update-required`` marker, so
+    the update timer skips it (UPD-005), and say how to step back. The
+    changelog section that names the migration file is those notes: this
+    test requires the marker there (ADR-021 amendment 7 for 0002).
 
     Args:
         None
@@ -206,6 +211,13 @@ def test_a_second_telemetry_migration_needs_a_rollback_story() -> None:
         None
     """
     from vakr.adapters.sqlite import telemetry
+    from vakr.lifecycle.update.policy import MANUAL_MARKER
 
     sql = sorted(p.name for p in (Path(telemetry.__file__).parent / "sql").glob("*.sql"))
-    assert sql == ["0001_initial.sql"], "see this test's docstring before adding migrations"
+    assert sql[0] == "0001_initial.sql"
+    changelog = (Path(__file__).parents[5] / "CHANGELOG.md").read_text(encoding="utf-8")
+    sections = re.split(r"^## ", changelog, flags=re.MULTILINE)[1:]
+    for name in sql[1:]:
+        notes = [s for s in sections if name in s]
+        assert notes, f"name {name} in the changelog section of the release that ships it"
+        assert MANUAL_MARKER in notes[0], f"the release shipping {name} needs {MANUAL_MARKER}"

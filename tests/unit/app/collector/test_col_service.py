@@ -44,6 +44,7 @@ from vakr.app.collector.identity import (
     resolve_identity,
 )
 from vakr.app.collector.preflight import PreflightError
+from vakr.app.collector.ranking_projector import RankingProjector
 from vakr.app.collector.rollup_job import RollupJob
 from vakr.app.collector.service import CollectorService
 from vakr.app.collector.timings import EX_PREFLIGHT, ServiceTimings
@@ -111,6 +112,10 @@ def test_empty_inventory_starts_idles_and_stops_cleanly(tmp_path: Path) -> None:
     # RET-004, ROLL-T04: the hourly pass runs the real rollup job before retention.
     assert isinstance(service.upkeep._rollups, RollupJob)
     assert service.upkeep.failures["retention"] == 0
+    # E.28: the ranking projector runs with the staging move and rebuilt the projection.
+    assert isinstance(service.upkeep._projection, RankingProjector)
+    assert service.upkeep.failures["projection"] == 0
+    assert service.upkeep._projection.last is not None
     store = SqliteTelemetryStore(paths.state_dir / TELEMETRY_FILE)
     latest = SqliteTelemetry(store).collector_health.latest(service.parts.collector.id)
     store.close()

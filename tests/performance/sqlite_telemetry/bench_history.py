@@ -2,19 +2,27 @@ r"""Time the M4 query services on a full MVP day in SQLite (MVP-ACC-05, 12.9, E.
 
 Loads ``--minutes`` of the MVP workload (default one day: 5.47 million rows,
 about five minutes) through the real adapter, plus 400 days of 15-minute
-rollups for one interface, then times each service call once cold and five
-times warm and prints a Markdown table. ``--reuse`` keeps an existing
-database in ``--data-dir`` instead of loading again. It is a ``python -m``
-script, not a test; ``test_history_budget`` is the small default-suite check.
+rollups for one interface, then times each service call once cold and
+``--runs`` times warm (five by default) and prints a Markdown table with the
+cold time, the warm median, and the nearest-rank p95 of every run.
+``--reuse`` keeps an existing database in ``--data-dir`` instead of loading
+again; ``--only top_`` times only the rankings. ``--project`` migrates the
+file and builds the ranking projection first, leaving ``--tail`` minutes
+(45, the worst case between two projector passes) to native scans;
+``--native`` migrates and forgets it, so every ranking scans natively
+(``bench_projection``, E.28). It is a ``python -m`` script, not a test;
+``test_history_budget`` is the small default-suite check.
 
 Dependencies:
-    tests.performance.sqlite_telemetry.history_load; vakr.query.
+    tests.performance.sqlite_telemetry.history_load, bench_projection; vakr.query.
 
 Safety:
     Writes only under ``--data-dir`` (default ``.claude/bench-data/history``, gitignored).
 
 Example:
     $ uv run python -m tests.performance.sqlite_telemetry.bench_history --minutes 1440
+    $ uv run python -m tests.performance.sqlite_telemetry.bench_history --reuse --project \
+        --runs 19 --only top_
 """
 
 import argparse
@@ -26,6 +34,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
+from tests.performance.sqlite_telemetry.bench_projection import build_projection
 from tests.performance.sqlite_telemetry.history_load import (
     build_topology,
     load_minutes,
@@ -43,6 +52,7 @@ from vakr.adapters.sqlite.telemetry import (
     sqlite_telemetry_factory,
 )
 from vakr.domain.ids import DeviceId, InterfaceId
+from vakr.logic.stats import p95
 from vakr.ports.clock import ManualClock
 from vakr.query import QuerySettings
 from vakr.query.catalog import CatalogQueries
@@ -54,7 +64,7 @@ from vakr.query.ranking_views import RankingRequest
 from vakr.query.rankings import RankingQueries
 
 
-def _time(call: Callable[[], Any], runs: int) -> tuple[float, float]:
+def _time(call: Callable[[], Any], runs: int) -> tuple[float, float, float]:
     """Run a call once cold and ``runs`` times warm.
 
     Args:
@@ -62,7 +72,8 @@ def _time(call: Callable[[], Any], runs: int) -> tuple[float, float]:
         runs: Warm repetitions.
 
     Returns:
-        tuple: Cold seconds and the warm median in seconds.
+        tuple: Cold seconds, the warm median, and the nearest-rank p95 of
+        every run (cold included), in seconds.
 
     Raises:
         None
@@ -75,7 +86,7 @@ def _time(call: Callable[[], Any], runs: int) -> tuple[float, float]:
         started = time.perf_counter()
         call()
         warm.append(time.perf_counter() - started)
-    return cold, statistics.median(warm)
+    return cold, statistics.median(warm), p95([cold, *warm])
 
 
 def _suite(path: Path, topo: Topology, minutes: int) -> dict[str, Callable[[], Any]]:
@@ -172,6 +183,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--data-dir", type=Path, default=Path(".claude/bench-data/history"))
     parser.add_argument("--reuse", action="store_true")
+    parser.add_argument("--only", default="", help="time only calls whose name starts with this")
+    parser.add_argument(
+        "--project",
+        action="store_true",
+        help="migrate and build the ranking projection first (E.28)",
+    )
+    parser.add_argument(
+        "--tail",
+        type=int,
+        default=45,
+        help="minutes of newest data left unprojected (with --project)",
+    )
+    parser.add_argument(
+        "--native",
+        action="store_true",
+        help="migrate and forget the ranking projection first (native scans)",
+    )
     args = parser.parse_args(argv)
     args.data_dir.mkdir(parents=True, exist_ok=True)
     saved = args.data_dir / "topology.json"
@@ -186,10 +214,17 @@ def main(argv: list[str] | None = None) -> int:
         rollup_days(telemetry(), InterfaceId(topo.interfaces[5][0]), topo.collectors[0], 400)
         store.close()
         print(f"loaded {rows} rows in {time.perf_counter() - started:.0f} s", file=sys.stderr)
-    print("| Call | Cold (ms) | Warm median (ms) |\n|---|---:|---:|")
+    clock = START + timedelta(minutes=args.minutes)
+    if args.project or args.native:
+        tail = timedelta(minutes=args.tail if args.project else 24 * 60 + 60)
+        print(build_projection(args.data_dir, clock, tail), flush=True)
+    print("| Call | Cold (ms) | Warm median (ms) | p95 (ms) |\n|---|---:|---:|---:|")
     for name, call in _suite(args.data_dir, topo, args.minutes).items():
-        cold, warm = _time(call, args.runs)
-        print(f"| {name} | {cold * 1000:.0f} | {warm * 1000:.0f} |", flush=True)
+        if not name.startswith(args.only):
+            continue
+        cold, warm, high = _time(call, args.runs)
+        print(f"| {name} | {cold * 1000:.0f} | {warm * 1000:.0f} | {high * 1000:.0f} |",
+              flush=True)  # fmt: skip
     return 0
 
 

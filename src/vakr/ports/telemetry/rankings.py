@@ -18,9 +18,13 @@ semantics every backend reproduces:
   .p95``, E.17 #13): the value at rank ``ceil(0.95 n)`` in ascending order.
 - **Error totals.** A sample counts when both error deltas are present.
   ``packets`` is the summed packet delta of the counted samples, each
-  ``(in_pps + out_pps) x elapsed``, rounded once at the end; it is ``None``
+  ``(in_pps + out_pps) x elapsed_us``, summed exactly (``math.fsum``: the
+  correctly rounded sum, whatever order or split the samples are read in,
+  E.28), divided by 10^6, and rounded once at the end; it is ``None``
   unless every counted sample has both packet rates and its elapsed time
   (E.17 #13), and ``None`` when no sample counted.
+- **Projection.** A backend may answer from precomputed per-bucket partials
+  (``vakr.ports.telemetry.ranking_projection``); the answer is the same.
 - **Order and bounds.** Rows are ordered by interface UUID text; at most
   ``limit`` rows are returned and ``truncated`` says whether more existed.
   Windows longer than ``MAX_RANKING_WINDOW`` are refused (SEC-019).

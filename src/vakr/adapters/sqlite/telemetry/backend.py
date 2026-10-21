@@ -23,6 +23,7 @@ from datetime import datetime
 
 from vakr.adapters.sqlite.telemetry.history import SqliteHistoryQuery
 from vakr.adapters.sqlite.telemetry.maintenance import MaintenanceReport, maintain
+from vakr.adapters.sqlite.telemetry.ranking_projection import SqliteRankingProjection
 from vakr.adapters.sqlite.telemetry.retention import SqliteRetentionManager
 from vakr.adapters.sqlite.telemetry.rollup_source import SqliteRollupSource
 from vakr.adapters.sqlite.telemetry.rollups import SqliteRollupRepository
@@ -56,6 +57,7 @@ class SqliteTelemetry:
         collector_health: Latest collector health.
         retention: Retention.
         history: Downsampled series and ranking summaries (M4, ``HistoryBackend``).
+        ranking_projection: Exact per-bucket ranking partials (E.28, ``ProjectionBackend``).
     """
 
     def __init__(self, store: SqliteTelemetryStore) -> None:
@@ -80,6 +82,7 @@ class SqliteTelemetry:
         self.collector_health = SqliteCollectorHealthRepository(store)
         self.retention = SqliteRetentionManager(store)
         self.history = SqliteHistoryQuery(store)
+        self.ranking_projection = SqliteRankingProjection(store)
 
     def maintain(self, now: datetime) -> MaintenanceReport:
         """Move staged rows older than ``now - MOVE_LAG`` and truncate the WAL.

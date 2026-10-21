@@ -2,8 +2,10 @@
 
 ``MemoryTelemetryStore`` holds everything one telemetry backend would: native
 observations keyed by observation UUID (the deduplication key, STORE-009),
-rollup buckets keyed by their identity, and the native horizon set by
-retention. The writer, rollup, and collector-health ports here operate on it.
+rollup buckets keyed by their identity, the native horizon set by
+retention, and which 15-minute buckets the ranking projection lists
+(E.28: storing an interface sample unlists its bucket). The writer,
+rollup, and collector-health ports here operate on it.
 
 Dependencies:
     threading: Serialises writes.
@@ -27,8 +29,14 @@ from uuid import UUID
 from vakr.domain.checks import require_int
 from vakr.domain.errors import ValidationError
 from vakr.domain.ids import BatchId, CollectorId
-from vakr.domain.observations import CollectorHealthObservation, Observation, observation_type
+from vakr.domain.observations import (
+    CollectorHealthObservation,
+    InterfaceObservation,
+    Observation,
+    observation_type,
+)
 from vakr.domain.projections import latest
+from vakr.domain.rollups import bucket_start
 from vakr.domain.series import MAX_SERIES_POINTS, Metric, TimeWindow
 from vakr.domain.state import RollupBucket
 from vakr.ports.telemetry.results import RetentionPolicy, TelemetryCapabilities, WriteResult
@@ -49,6 +57,7 @@ class MemoryTelemetryStore:
         observations: Observation UUID to observation.
         buckets: Bucket identity to bucket.
         horizon: Latest native cutoff applied, or ``None``.
+        projected: Starts of the buckets the ranking projection lists (E.28).
     """
 
     def __init__(
@@ -78,6 +87,7 @@ class MemoryTelemetryStore:
         self.observations: dict[UUID, Observation] = {}
         self.buckets: dict[BucketKey, RollupBucket] = {}
         self.horizon: datetime | None = None
+        self.projected: set[datetime] = set()
 
 
 class MemoryObservationWriter:
@@ -123,6 +133,8 @@ class MemoryObservationWriter:
                 if observation.observation_id not in self._store.observations:
                     self._store.observations[observation.observation_id] = observation
                     inserted += 1
+                    if isinstance(observation, InterfaceObservation):
+                        self._store.projected.discard(bucket_start(observation.timestamp))
         return WriteResult(batch_id, inserted, len(observations) - inserted)
 
 

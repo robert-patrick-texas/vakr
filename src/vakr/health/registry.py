@@ -31,6 +31,7 @@ from vakr.credentials.health import check_credentials
 from vakr.health.api_check import check_api
 from vakr.health.lifecycle_checks import check_tls_policy, check_trusted_cas, check_update
 from vakr.health.model import CheckResult, Status
+from vakr.health.ranking_check import check_rankings
 from vakr.health.rollup_check import check_rollups
 from vakr.health.spool_check import check_spool
 from vakr.version import UNKNOWN_VERSION, get_version
@@ -85,6 +86,7 @@ CHECKS: tuple[Check, ...] = (
     check_spool,
     check_telemetry_db,
     check_rollups,
+    check_rankings,
     check_api,
 )
 

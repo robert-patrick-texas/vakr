@@ -3733,7 +3733,7 @@ Rules adopted with the M4 rollup job (`vakr.app.collector.rollup_job`, RET-004 t
 | Incomplete buckets (RET-009) | Subject buckets with fewer samples than expected keep their counts and are counted in each pass's `telemetry.rollups` log line |
 | Health `rollups` | WARNING when the frontier is more than 3 h behind the end of the newest complete bucket that holds native data. CRITICAL when native data older than `telemetry.native_retention_days` still waits for a rollup |
 
-ADR-021 amendment 6 records what the existing rollup rows cannot hold without a schema change: probe totals, SNMP counts, and restart counts and times.
+ADR-021 amendment 6 records what the existing rollup rows cannot hold without a schema change: probe totals, SNMP counts, and restart counts and times. The ranking projector (E.28 decision 1) uses the same completeness rule for the quarter-hours it projects.
 
 ### E.11 Scheduler hashing
 
@@ -3775,7 +3775,7 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | Cached previous packages for rollback | 2 |
 | Pre-update backup | configuration plus `metadata.db`; 5 kept. `telemetry.db` is not copied: it reaches about 40 GB per node (27.3), and five copies would not fit the volume. |
 
-Because rollback cannot restore `telemetry.db`, a release that migrates the telemetry schema must leave it readable by the previous release (additive changes only, with read-compatible versioning) or carry the `manual-update-required` marker. A test fails if a second telemetry migration is added before either exists.
+Because rollback cannot restore `telemetry.db`, a release that migrates the telemetry schema must leave it readable by the previous release (additive changes only, with read-compatible versioning) or carry the `manual-update-required` marker. Telemetry schema 2 (the ranking projection, E.28 decision 1) takes the marker: a test fails unless the changelog section naming each telemetry migration after 0001 carries the marker, until read-compatible versioning exists.
 
 ### E.15 Interface description keywords (META-012)
 
@@ -4142,7 +4142,7 @@ Decisions taken with the M3 collector:
 
 ### E.28 History, rankings, and search queries (M4)
 
-These are the bounds and choices of the M4 read services in `vakr.query`: `HistoryQueries`, `RankingQueries`, `CatalogQueries`, and `OverviewQueries`. [Query services](docs/architecture/queries.md) explains them. All of them are constants in `vakr.query.history_limits` and `vakr.ports.telemetry.rankings`; none is an operator option.
+These are the bounds and choices of the M4 read services in `vakr.query`: `HistoryQueries`, `RankingQueries`, `CatalogQueries`, and `OverviewQueries`. [Query services](docs/architecture/queries.md) explains them. All of them are constants in `vakr.query.history_limits`, `vakr.ports.telemetry.rankings`, `vakr.ports.telemetry.ranking_projection`, and `vakr.app.collector.ranking_projector`; none is an operator option.
 
 | Setting or bound | Default | Allowed range |
 |---|---|---|
@@ -4157,6 +4157,11 @@ These are the bounds and choices of the M4 read services in `vakr.query`: `Histo
 | Rows per ranking | 10 by default | 1 to 100 |
 | Interfaces one ranking read returns | 20,000 | 1 to 20,000 |
 | Excluded interfaces listed per ranking | 100; the rest are counted | constant |
+| Ranking projection kept | The last 25 h: 100 quarter-hours and the hours they make up, never before the native horizon | constant |
+| Ranking projector pass | Every 15 min with the staging move; the complete quarter-hours of the last 25 h (E.10's rule), newest first; at most 100 and no new one after 60 s; the whole projection is rebuilt at each collector start | constant |
+| Native intervals one ranking scans | At most 97 (the head, the tail, and any quarter-hour not projected); about 45 minutes at worst between two passes | follows the window |
+| Ranking packet sums | Correctly rounded (`math.fsum`) on every backend and path | constant |
+| `rankings` health check | WARNING when more than 1 h of complete native data of the last 25 h is not projected; never CRITICAL | constant |
 | High-priority and WAN rows on the overview | 25 | constant |
 | Event rows per overview feed | 50; loss incidents from the last 24 h; at most 5,000 open identity reviews read | constant |
 | State timeline | The last 7 days of the request, at most 10,080 samples | constant |
@@ -4167,9 +4172,11 @@ These are the bounds and choices of the M4 read services in `vakr.query`: `Histo
 
 Decisions taken with the M4 query services:
 
-1. **Exact rankings, and the 24-hour window.** Rankings compute the nearest-rank p95 of every native sample in the window (E.17 #13). The store does the work: the SQLite adapter scans each day partition as one primary-key range per interface and returns the rates as exact 17-digit text, and Python ranks them with `vakr.logic.stats.p95`. At MVP scale on the development host this takes about 0.13 s for 15 minutes, 0.25 s for 1 hour, 1.2 s for 6 hours, and 4.2 s for 24 hours (one collector; [measurements](docs/architecture/queries.md#performance-129-mvp-acc-05)). A 24-hour window reads about 2.3 million samples per collector, so its first computation exceeds the 2 s of 12.9.
-   - **Contradiction recorded:** DASH-003 allows user-selected windows, and 12.9 gives dashboards 2 s. The choice: keep exact values. The 2 s budget is met for the default windows (15 minutes, DASH-003), and an aligned scan is reused, so a dashboard refresh does not repeat it.
-   - **Follow-up:** a ranking projection maintained alongside the rollup job would bring 24-hour rankings within budget. Ranking from rollup p95 values instead would not be the window's p95.
+1. **Exact rankings, and the 24-hour window.** Rankings compute the nearest-rank p95 of every native sample in the window (E.17 #13). A 24-hour window holds about 2.3 million samples per collector at MVP scale; scanned natively it took 4.7 s at p95 (6 hours: 1.2 s), over the 2 s of 12.9. Ranking from rollup p95 values would not be the window's p95, so the collector keeps a **ranking projection** (ADR-021 amendment 7, telemetry schema 2): for each complete quarter-hour of the last 25 hours, and for each hour of four such quarter-hours, every interface's exact partial per collector: its sample, rate, and error counts, its error sums, every available rate value (so the window's p95 is still taken over all of them), and its packet sum as exact float parts. A ranking reads the whole hours and quarter-hours inside its window from the projection and scans the rest natively (the head, the tail newer than the projection, and any quarter-hour not projected), in one snapshot. Storing a sample into a projected quarter-hour unlists it and its hour in the same transaction, and retention removes units with the native data they summarise, so the values are exactly a native scan's. Measured p95 at MVP scale with the worst-case 45 minutes left to native scans: 148 ms (15 minutes), 242 ms (1 hour), 327 ms (6 hours), 836 ms (24 hours), against 151, 308, 1,186, and 4,727 ms before ([measurements](docs/architecture/queries.md#performance-129-mvp-acc-05)).
+   - **Contradiction recorded, now resolved:** DASH-003 allows user-selected windows, and 12.9 gives dashboards 2 s. Every ranking window now meets 2 s with exact values. An aligned scan is still reused, so a dashboard refresh does not repeat it.
+   - **Packet sums.** The port's packet sum was "summed", which float addition makes depend on order and on how the window splits. It is now the correctly rounded sum (`math.fsum`) everywhere, so projected and native parts join exactly. No rounded packet count changed in any test or benchmark (9,600 compared on the benchmark day).
+   - **Costs.** The projector adds about 0.26 s per 15-minute pass at MVP scale (both positions; p95 0.44 s when it also merges an hour), and about 25 s to rebuild after a start. The projection holds about 220 MiB per node at any native retention, because it keeps 25 hours. Until it is built, or while the projector fails (the `rankings` check warns), rankings scan natively and read every sample's packet product for the exact sum: 1.65 s for 6 hours and 6.2 s for 24 hours.
+   - **Rollback.** Schema 2 is the first telemetry migration after 0001, so its release carries `manual-update-required` (E.14). The projection is derived data: stepping back drops its two tables and its journal row ([rollups](docs/operations/rollups.md#ranking-projection)).
 2. **Capacity over time.** Utilization graphs and rankings divide by today's capacity for the whole window, because capacity history is not kept.
 3. **Error rankings include logical interfaces.** E.17 #15 removes tunnels and other logical interfaces from utilization rankings, because their speed is nominal. Errors need no denominator, so those interfaces still rank by errors.
 4. **Packets for errors per million.** Interface samples store packet rates, not packet deltas. The packets of a sample are `(in_pps + out_pps) × elapsed`, summed over the counted samples and rounded once.

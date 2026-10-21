@@ -4,7 +4,8 @@ Retention follows Appendix E.10: with rollups, native observations expire
 only behind the rollup frontier and the cutoff is aligned down to a bucket
 boundary, so no rollup bucket ever overlaps native data that a series still
 shows (DB-006, ROLL-T04). Without rollups (a Lite-style backend) native data
-simply expires after the policy duration.
+simply expires after the policy duration. Each pass also unlists ranking
+projection buckets before the horizon or older than 25 hours (E.28).
 
 Dependencies:
     vakr.adapters.memory.telemetry_store, telemetry_query, telemetry_state,
@@ -23,6 +24,7 @@ Example:
 from datetime import datetime
 
 from vakr.adapters.memory.telemetry_history import MemoryHistoryQuery
+from vakr.adapters.memory.telemetry_projection import MemoryRankingProjection, prune_projection
 from vakr.adapters.memory.telemetry_query import MemoryObservationQuery
 from vakr.adapters.memory.telemetry_rollup_source import MemoryRollupSource
 from vakr.adapters.memory.telemetry_state import MemoryCurrentStateQuery
@@ -119,6 +121,7 @@ class MemoryRetentionManager:
             ]
             for key in old:
                 del store.buckets[key]
+            prune_projection(store, now)
         return RetentionReport(now, cutoff, rollup_cutoff, len(expired), len(old))
 
 
@@ -135,6 +138,7 @@ class MemoryTelemetry:
         collector_health: Latest collector health.
         retention: Retention.
         history: Downsampled series and ranking summaries (M4, ``HistoryBackend``).
+        ranking_projection: Projected-bucket bookkeeping (E.28, ``ProjectionBackend``).
     """
 
     def __init__(self, store: MemoryTelemetryStore) -> None:
@@ -158,3 +162,4 @@ class MemoryTelemetry:
         self.collector_health = MemoryCollectorHealthRepository(store)
         self.retention = MemoryRetentionManager(store)
         self.history = MemoryHistoryQuery(store)
+        self.ranking_projection = MemoryRankingProjection(store)

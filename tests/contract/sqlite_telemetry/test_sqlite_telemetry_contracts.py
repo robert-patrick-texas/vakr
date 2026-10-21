@@ -10,6 +10,7 @@ Example:
     $ uv run pytest tests/contract/sqlite_telemetry/test_sqlite_telemetry_contracts.py
 """
 
+from tests.contract.contract_ranking_projection import RankingProjectionContract
 from tests.contract.contract_rollup_source import RollupSourceContract
 from tests.contract.contract_telemetry_history import TelemetryHistoryContract
 from tests.contract.contract_telemetry_series import TelemetrySeriesContract
@@ -35,3 +36,7 @@ class TestSqliteRollupSource(RollupSourceContract):
 
 class TestSqliteTelemetryHistory(TelemetryHistoryContract):
     """10.6 downsampling, E.17 #13 ranking summaries, MPOS-008 on a SQLite telemetry file."""
+
+
+class TestSqliteRankingProjection(RankingProjectionContract):
+    """E.28, DASH-T01, DASH-T02, MPOS-008: exact rankings from stored partials in SQLite."""

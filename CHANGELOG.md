@@ -6,7 +6,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ### Added
 
-- The hourly 15-minute rollup job (RET-004 to RET-009): the collector now rolls up every complete quarter-hour before retention runs, so native data finally expires after 30 days (ROLL-T04). A 0.2.x backlog drains in bounded passes of at most 7 days and 2 minutes each. A new `rollups` check in `vakr check health` and `vakr doctor` warns when rollups fall behind. No database schema changes. See [rollups](docs/operations/rollups.md).
+- The hourly 15-minute rollup job (RET-004 to RET-009): the collector now rolls up every complete quarter-hour before retention runs, so native data finally expires after 30 days (ROLL-T04). A 0.2.x backlog drains in bounded passes of at most 7 days and 2 minutes each. A new `rollups` check in `vakr check health` and `vakr doctor` warns when rollups fall behind. The rollups themselves need no schema change. See [rollups](docs/operations/rollups.md).
 - Local accounts for the coming web UI and API (SEC-005, SEC-006): `sudo vakr setup` creates the first admin, and `sudo vakr user list|add|passwd|disable|enable|role|revoke-sessions` manages accounts. Passwords are asked for twice at a hidden prompt and never accepted as arguments. Every change is audited with the invoking operator. See [the users guide](docs/operations/users.md).
 - The authentication layer below HTTP (`vakr.auth`): Argon2id hashing with transparent rehash on login (SEC-009); opaque server-side sessions with idle and absolute expiry, rotation, and revocation (SEC-010); kiosk tokens for wall displays; CSRF tokens bound to sessions (SEC-011); per-account-and-address login throttling (SEC-012); and the Unix-socket peer-credential roles from Appendix E.12. The `vakr-api` service will use it.
 - New `[auth]` options: `session_idle_timeout` (30 min), `session_lifetime` (12 h), `kiosk_token_lifetime` (30 d), `login_throttle_after` (5), `login_throttle_max_delay` (30 s), `login_failure_reset` (15 min), and `password_min_length` (15). Their defaults apply without any edit.
@@ -18,12 +18,21 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - The OpenAPI document of API v1 is checked in as [`docs/api/openapi.json`](docs/api/openapi.json); `vakr api openapi` prints it and `make openapi` regenerates it (API-008).
 - A new `api` check in `vakr check health` and `vakr doctor` asks the running API over its socket. It is OK while the service is not installed or not running.
 - New `[api]` options: `listen_address` (`127.0.0.1`), `port` (8080), `socket_path` (`/run/vakr/api.sock`), `trusted_proxies` (none), and `max_body_bytes` (65536). Their defaults apply without any edit.
+- The ranking projection (E.28 decision 1, DASH-003, DASH-004): the collector keeps exact per-quarter-hour and per-hour ranking partials for the last 25 hours, so 6-hour and 24-hour top-utilization and top-error rankings answer within the 2 s of blueprint 12.9 with the same values as before. At the MVP workload the 24-hour ranking's p95 fell from 4.7 s to 0.84 s and the 6-hour one's from 1.2 s to 0.33 s. The projection is rebuilt from native data at every collector start and updated every 15 minutes; it takes about 220 MiB. Telemetry schema 2 adds its two tables. See [ranking projection](docs/operations/rollups.md#ranking-projection).
+- A new `rankings` check in `vakr check health` and `vakr doctor` warns when more than an hour of recent data is not projected (rankings then stay exact but slower). It is never CRITICAL.
 - New runtime dependencies `fastapi` (MIT) and `uvicorn` (BSD-3-Clause), with `starlette`, `pydantic`, `pydantic-core`, `h11`, `anyio`, `idna`, `click`, `annotated-types`, `typing-inspection`, `annotated-doc`, and `opentelemetry-api`; licenses are listed in the package's copyright file.
 
 ### Changed
 
 - `/run/vakr` is now mode 0751 (was 0750), so members of `vakr-admin` who are not in `vakr` can reach the API socket; `vakr-api` decides each connection's role itself. The package's tmpfiles entry applies it at installation and every boot.
 - The install and field-data guides find the newest release themselves instead of asking for a version. GitHub's "latest release" links skip pre-releases, so the guides read the same release list that self-update uses.
+- Ranking packet sums, behind errors per million packets, are now summed exactly (`math.fsum`), so the result never depends on the order or split in which samples are read (E.28). No measured count changed.
+- Until the collector has built the ranking projection after a start (about 25 s at the MVP workload), a 24-hour ranking reads every native sample and takes about 6 s, against 4.7 s in 0.2.x, because the exact packet sum reads each sample.
+
+### Notes for operators updating from 0.2.x
+
+- **This release is marked `manual-update-required`.** It migrates the telemetry schema (schema 2, `0002_ranking_projection.sql`: the ranking projection), and self-update never copies `telemetry.db`, so an automatic rollback could not restore it. The update timer skips this release; install it with `sudo vakr self-update`. The package's `vakr db migrate` applies schema 2 in milliseconds; the collector then builds the projection within its first minute.
+- To go back to 0.2.x after updating, stop `vakr-collector` and `vakr-api` and remove schema 2 before installing the older release, as [the rollups guide](docs/operations/rollups.md#going-back-to-a-release-without-the-projection) shows. The projection holds only derived data, so nothing is lost.
 
 ## 0.2.1 - 2026-10-20
 

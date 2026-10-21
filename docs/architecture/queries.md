@@ -89,7 +89,7 @@ All times in views are UTC, and `to_jsonable` writes them as ISO 8601 with `Z` (
 
 Ties break in natural device-then-interface order and then by UUID.
 
-On SQLite each day partition is scanned as primary-key ranges, one per interface, and the values come back as exact 17-digit text, which Python merges and ranks. A window function sorted the same rows about four times slower, and SQLite's `percentile_disc` is not nearest-rank.
+On SQLite a ranking first reads the **ranking projection** (E.28 decision 1, [ADR-021 amendment 7](../adr/ADR-021-compact-sqlite-telemetry.md#amendment-7-telemetry-schema-2-the-ranking-projection-2026-10-21-m4-rankings)). The collector keeps, for each complete quarter-hour of the last 25 hours and for each hour of four such quarter-hours, every interface's exact partial per collector: counts, error sums, every available rate value in ascending order, and the packet sum as exact float parts. The ranking covers its window with listed hours first, then quarter-hours, and reads their partials as one key range per run. It scans only the rest natively: the head before the first whole quarter-hour, the tail newer than the projection, and any quarter-hour that is not projected. A native scan reads each day partition as primary-key ranges, one per interface, and the values come back as exact 17-digit text. Python merges both and takes the p95 with `vakr.logic.stats.p95` over every value. Everything is read in one snapshot. Storing a sample into a projected quarter-hour unlists it and its hour in the same transaction, so the answer is exactly a native scan's. Packet sums use `math.fsum`, so they do not depend on how the window splits. A window function sorted the same rows about four times slower than the native scan, and SQLite's `percentile_disc` is not nearest-rank.
 
 ## Lists and search
 
@@ -118,7 +118,7 @@ The event feeds are `restart` (management-agent restarts detected within `status
 
 ## Performance (12.9, MVP-ACC-05)
 
-Measured with `uv run python -m tests.performance.sqlite_telemetry.bench_history` on the development host. The store held one full MVP day (100 devices, 1,600 interfaces, two collectors: 5.47 million rows), plus 400 days of 15-minute rollups for one interface. "Cold" is the first call in the process and "warm" is the median of five repeats.
+Measured with `uv run python -m tests.performance.sqlite_telemetry.bench_history` on the development host. The store held one full MVP day (100 devices, 1,600 interfaces, two collectors: 5.47 million rows), plus 400 days of 15-minute rollups for one interface. "Cold" is the first call in the process and "warm" is the median of five repeats. The ranking rows are from the run with the ranking projection built (`--project`, below).
 
 | Call | Cold (ms) | Warm median (ms) |
 |---|---:|---:|
@@ -128,15 +128,26 @@ Measured with `uv run python -m tests.performance.sqlite_telemetry.bench_history
 | Traffic graph, 400d (rollups, 12 h buckets) | 628 | 582 |
 | Latency, 1h, every probe | 10 | 9 |
 | Latency, 24h, median envelope | 52 | 50 |
-| Top utilization, 15m (new scan each call) | 133 | 118 |
-| Top utilization, 1h | 247 | 317 |
-| Top utilization, 6h | 1,188 | 1,056 |
-| Top utilization, 24h | 4,155 | 4,397 |
-| Top errors, 24h, after top utilization (scan reused) | 4,959 first pair | 53 |
+| Top utilization, 15m (new scan each call) | 135 | 125 |
+| Top utilization, 1h | 227 | 227 |
+| Top utilization, 6h | 310 | 301 |
+| Top utilization, 24h | 737 | 709 |
+| Top errors, 24h, after top utilization (scan reused) | 802 first pair | 56 |
 | Interface list, priority order, first page | 69 | 48 |
 | Interface list, by traffic (reads every device's current state) | 494 | 456 |
 | Search | 9 | 9 |
 
 The default suite runs a smaller check: `tests/performance/sqlite_telemetry/test_history_budget.py` asserts that the 400-day graph and the default 15-minute rankings over 1,600 interfaces each answer in under 2 s.
 
-The 24-hour ranking is exact under E.17 #13: the nearest-rank p95 of every one-minute sample. Computing it means reading about 2.3 million samples per collector, which takes longer than the 2 s dashboard budget on first computation. Section 12.9's budget applies to the default windows, and the default ranking window is 15 minutes (DASH-003). Repeated requests within the 5-minute alignment step reuse the scan. E.28 records this choice and the follow-up, a precomputed ranking projection.
+### Rankings and the 2 s budget
+
+Every ranking is exact under E.17 #13: the nearest-rank p95 of every one-minute sample in the window, about 2.3 million samples per collector for 24 hours. The ranking projection keeps the 6-hour and 24-hour windows within 12.9's 2 s. The table gives the nearest-rank p95 of 20 calls, each with a new service so no scan is reused (`bench_history --reuse --runs 19 --only top_`). "Before" scanned every sample natively. "After" is `--project`, which leaves the newest 45 minutes to native scans: the worst case between two 15-minute projector passes (10 minutes of settling, the quarter-hour in progress, and the wait for the next pass). "Native only" is `--native`, with the projection forgotten, as during the half-minute rebuild after a collector start.
+
+| Window | Before: cold / p95 (ms) | After: cold / p95 (ms) | Native only, after: p95 (ms) |
+|---|---:|---:|---:|
+| 15 min | 151 / 151 | 135 / 148 | 154 |
+| 1 h | 244 / 308 | 227 / 242 | 350 |
+| 6 h | 1,066 / 1,186 | 310 / 327 | 1,651 |
+| 24 h | 4,598 / 4,727 | 737 / 836 | 6,203 |
+
+Native-only scans are 30-40% slower than before because the exact packet sum reads each sample's packet product. Building the projection for the measured day took 25 s (97 quarter-hours, 262 ms each on average, p95 439 ms, both collectors), and the store then held 193 MiB of partials and a 10 MiB key index; about 220 MiB at the steady 25 hours. Repeated requests within the 5-minute alignment step still reuse the scan.

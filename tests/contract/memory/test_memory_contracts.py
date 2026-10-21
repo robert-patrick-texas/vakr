@@ -12,6 +12,7 @@ from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
+from tests.contract.contract_ranking_projection import RankingProjectionContract
 from tests.contract.contract_rollup_source import RollupSourceContract
 from tests.contract.contract_telemetry_history import TelemetryHistoryContract
 from tests.contract.contract_telemetry_series import TelemetrySeriesContract
@@ -57,3 +58,7 @@ class TestMemoryAuthSessions(AuthSessionsContract):
 
 class TestMemoryTelemetryHistory(TelemetryHistoryContract):
     """10.6 downsampling, E.17 #13 ranking summaries, MPOS-008 on the in-memory telemetry store."""
+
+
+class TestMemoryRankingProjection(RankingProjectionContract):
+    """E.28, DASH-T01, DASH-T02, MPOS-008: projected-bucket bookkeeping on the memory store."""

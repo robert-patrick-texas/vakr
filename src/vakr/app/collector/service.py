@@ -42,6 +42,7 @@ from vakr.app.collector.icmp_step import CollectorIcmpStep
 from vakr.app.collector.maintenance import RollupHook, TelemetryUpkeep
 from vakr.app.collector.pipeline import SpoolPump
 from vakr.app.collector.plans import PlanBook
+from vakr.app.collector.ranking_projector import collector_projector
 from vakr.app.collector.reload import reload_service
 from vakr.app.collector.replan import Replanner
 from vakr.app.collector.rollup_job import collector_job
@@ -116,7 +117,8 @@ class CollectorService:
         self.replanner.defaults = parts.scheduler.defaults
         self.discovery.on_plan = self.replanner.refresh_capacity
         job = rollups if rollups is not None else collector_job(parts, clock, self.ingester)
-        self.upkeep = TelemetryUpkeep(parts.telemetry, clock, self.timings, job)
+        projector = collector_projector(parts, clock, self.ingester)
+        self.upkeep = TelemetryUpkeep(parts.telemetry, clock, self.timings, job, projector)
         self.failed: str | None = None
         self.exit_code: int | None = None  # set by a hard stop; overrides 0 or 1
         self._stop, self.loops_stop = asyncio.Event(), asyncio.Event()

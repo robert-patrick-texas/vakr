@@ -4,20 +4,23 @@ The Compact collector is the only telemetry writer (6.2), so it also keeps
 the store in shape:
 
 * every 15 minutes, ``maintain(now)`` moves staged rows older than two
-  minutes into their day partitions and truncates the WAL (E.21);
+  minutes into their day partitions and truncates the WAL (E.21), and the
+  ranking projector (``ProjectionHook``) projects the newly complete
+  15-minute buckets that long rankings read (E.28);
 * every hour, the rollup job (``RollupHook``) rolls up every complete
   15-minute bucket, within its per-pass bounds, and then the retention
   pass expires native rows and rollups exactly by policy (E.10, E.21).
   Retention never expires native rows that no rollup covers (ROLL-T04),
   so it runs even when the rollup pass fails.
 
-``CollectorService`` builds the real job (``rollup_job.collector_job``);
-``NoRollups``, which computes nothing and so keeps every native row, is
-the default only for callers that pass no job. Each pass runs in a worker
-thread, one at a time, after the first pass at startup. A failed pass is
-logged and retried at the next interval; it never stops collection,
-because the spool keeps every observation until it is stored
-(invariant 8).
+``CollectorService`` builds the real jobs (``rollup_job.collector_job``,
+``ranking_projector.collector_projector``); ``NoRollups``, which computes
+nothing and so keeps every native row, is the default only for callers
+that pass no job, and without a projector rankings scan native data.
+Each pass runs in a worker thread, one at a time, after the first pass at
+startup. A failed pass is logged and retried at the next interval; it
+never stops collection, because the spool keeps every observation until
+it is stored (invariant 8).
 
 Dependencies:
     asyncio: The timer loop and worker threads.
@@ -42,6 +45,7 @@ from vakr.ports.clock import Clock
 from vakr.ports.telemetry import RetentionManager
 
 _LOG = logging.getLogger(__name__)
+_KINDS = ("move", "projection", "retention")
 
 
 class MaintainedTelemetry(Protocol):
@@ -95,8 +99,26 @@ class RollupHook(Protocol):
         ...
 
 
+class ProjectionHook(Protocol):
+    """The ranking projector: complete buckets for long rankings (E.28, 12.9)."""
+
+    def run(self, now: datetime) -> int:
+        """Project every complete bucket of the last 25 hours not yet projected.
+
+        Args:
+            now: Reference time (UTC).
+
+        Returns:
+            int: Buckets projected.
+
+        Raises:
+            StorageError: If the database is unavailable.
+        """
+        ...
+
+
 class NoRollups:
-    """A rollup hook that computes nothing, so retention keeps every native row."""
+    """A rollup or projection hook that computes nothing (every native row stays, rankings scan)."""
 
     def run(self, now: datetime | None) -> int:  # noqa: ARG002 - hook shape
         """Do nothing.
@@ -117,7 +139,7 @@ class TelemetryUpkeep:
     """Runs the staging move and the hourly rollup-and-retention passes.
 
     Attributes:
-        passes: Completed passes by kind (``move``, ``retention``).
+        passes: Completed passes by kind (``move``, ``projection``, ``retention``).
         failures: Failed passes by kind.
     """
 
@@ -127,6 +149,7 @@ class TelemetryUpkeep:
         clock: Clock,
         timings: ServiceTimings,
         rollups: RollupHook | None = None,
+        projection: ProjectionHook | None = None,
     ) -> None:
         """Bind the store.
 
@@ -135,6 +158,8 @@ class TelemetryUpkeep:
             clock: Monotonic and UTC time.
             timings: Cadences (E.21, E.27).
             rollups: The rollup job; ``NoRollups`` (keep all native data) by default.
+            projection: The ranking projector, run with the staging move;
+                none by default (rankings then scan native data).
 
         Returns:
             None
@@ -144,9 +169,10 @@ class TelemetryUpkeep:
         """
         self._telemetry, self._clock, self._timings = telemetry, clock, timings
         self._rollups = NoRollups() if rollups is None else rollups
+        self._projection = NoRollups() if projection is None else projection
         self._stop = asyncio.Event()
-        self.passes = {"move": 0, "retention": 0}
-        self.failures = {"move": 0, "retention": 0}
+        self.passes = dict.fromkeys(_KINDS, 0)
+        self.failures = dict.fromkeys(_KINDS, 0)
 
     async def run(self) -> None:
         """Run passes on their cadences until ``stop``; a pass in progress finishes.
@@ -161,10 +187,12 @@ class TelemetryUpkeep:
             None
         """
         clock, timings = self._clock, self._timings
-        due = {"move": clock.monotonic(), "retention": clock.monotonic()}
-        every = {"move": timings.maintenance_interval_s, "retention": timings.retention_interval_s}
+        due = dict.fromkeys(_KINDS, clock.monotonic())
+        every = {"move": timings.maintenance_interval_s,
+                 "projection": timings.maintenance_interval_s,
+                 "retention": timings.retention_interval_s}  # fmt: skip
         while not self._stop.is_set():
-            for kind in ("move", "retention"):
+            for kind in _KINDS:
                 if clock.monotonic() >= due[kind]:
                     await self._pass(kind)
                     due[kind] = clock.monotonic() + every[kind]
@@ -190,7 +218,7 @@ class TelemetryUpkeep:
         """Run one pass in a worker thread, logging rather than raising.
 
         Args:
-            kind: ``move`` or ``retention``.
+            kind: ``move``, ``projection``, or ``retention``.
 
         Returns:
             None
@@ -217,7 +245,7 @@ class TelemetryUpkeep:
         """Do one pass (blocking; worker thread only).
 
         Args:
-            kind: ``move`` or ``retention``.
+            kind: ``move``, ``projection``, or ``retention``.
             now: Reference time (UTC).
 
         Returns:
@@ -228,6 +256,9 @@ class TelemetryUpkeep:
         """
         if kind == "move":
             self._telemetry.maintain(now)
+            return
+        if kind == "projection":
+            self._projection.run(now)
             return
         try:
             self._rollups.run(now)

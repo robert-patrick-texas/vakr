@@ -36,7 +36,8 @@ TypeScript stays on the 6.x line: TypeScript 7 is out, but SvelteKit 3.1, svelte
 | `web/src/routes/` | One folder per page (`+page.svelte`); `+layout.svelte` holds the query client, the session gate, the navigation, and the live region. |
 | `web/src/lib/api/` | The generated types (`schema.d.ts`), short aliases (`types.ts`), the `openapi-fetch` client with the CSRF header and the 401 hook (`client.ts`), failures (`errors.ts`), and the session (`session.svelte.ts`). |
 | `web/src/lib/query/` | TanStack Query options per endpoint (`reads*.ts`) and the refresh and retry policy (`policy.ts`). |
-| `web/src/lib/state/` | Pure logic: UI-014 page states, URL filters, graph ranges, cursor paging. |
+| `web/src/lib/state/` | Pure logic: UI-014 page states, URL filters, graph ranges, cursor paging, kiosk options and the rotation schedule (`kiosk.ts`). |
+| `web/src/lib/kiosk/` | The kiosk dashboards (UI-013): what each reads (`boards.ts`), their components, and the full-screen notices. Shared components render links through `Link.svelte`, which is plain text under the kiosk layout. |
 | `web/src/lib/charts/` | The only code that imports uPlot or ECharts (ADR-035 #10): data shaping (`series.ts`, `latency.ts`), options, and the chart components. |
 | `web/src/lib/components/` | Tables (TanStack Table), status badges, readings, filters, panels. |
 | `web/scripts/` | Build helpers: the CSP manifest and size budget, the API type drift check, the licence check, and two Vite plugins. |

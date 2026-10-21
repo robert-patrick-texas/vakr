@@ -4,6 +4,46 @@
  */
 
 export interface paths {
+    "/api/v1/auth/kiosk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set up a kiosk display (sets the kiosk cookie)
+         * @description Exchange a kiosk token for the kiosk cookie.
+         */
+        post: operations["exchange_api_v1_auth_kiosk_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/kiosk/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Forget this kiosk display (clears the kiosk cookie)
+         * @description Clear the kiosk cookie of this browser.
+         */
+        post: operations["forget_api_v1_auth_kiosk_forget_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -562,6 +602,50 @@ export interface paths {
          */
         post: operations["identity_resolution_api_v1_interfaces__interface_uuid__identity_resolution_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kiosk-tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Kiosk tokens (admin)
+         * @description List kiosk token records by label (never the tokens).
+         */
+        get: operations["tokens_api_v1_kiosk_tokens_get"];
+        put?: never;
+        /**
+         * Create a kiosk token (admin; the token is answered once)
+         * @description Create a kiosk token for a display (SEC-018: audited with the administrator).
+         */
+        post: operations["create_api_v1_kiosk_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/kiosk-tokens/{kiosk_uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke a kiosk token (admin)
+         * @description Revoke a kiosk token; displays holding it are refused from their next request.
+         */
+        delete: operations["revoke_api_v1_kiosk_tokens__kiosk_uuid__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1706,6 +1790,101 @@ export interface components {
          */
         InterfaceSort: "priority" | "name" | "traffic" | "utilization";
         /**
+         * KioskCreate
+         * @description Body of ``POST /api/v1/kiosk-tokens``.
+         *
+         *     Attributes:
+         *         label: The display's name (E.12 label rule).
+         *         lifetime: Such as ``90d``; ``auth.kiosk_token_lifetime`` when omitted; 1 to 365 days.
+         */
+        KioskCreate: {
+            /** Label */
+            label: string;
+            /** Lifetime */
+            lifetime?: string | null;
+        };
+        /**
+         * KioskExchange
+         * @description Body of ``POST /api/v1/auth/kiosk``.
+         *
+         *     Attributes:
+         *         token: The kiosk token (``vkk_...``) an administrator handed over.
+         */
+        KioskExchange: {
+            /** Token */
+            token: string;
+        };
+        /**
+         * KioskIssued
+         * @description A new kiosk token: the record and, this once, the token.
+         *
+         *     Attributes:
+         *         kiosk: The record.
+         *         token: Paste it into the display at ``setup_path``; it is shown only now.
+         *         setup_path: The web UI page that takes it.
+         */
+        KioskIssued: {
+            kiosk: components["schemas"]["KioskTokenOut"];
+            /**
+             * Setup Path
+             * @default /kiosk/setup
+             */
+            setup_path: string;
+            /** Token */
+            token: string;
+        };
+        /**
+         * KioskTokenOut
+         * @description One kiosk token record, without the token (E.12).
+         *
+         *     Attributes:
+         *         id: Record UUID; ``DELETE /api/v1/kiosk-tokens/{id}`` revokes it.
+         *         label: The display's name.
+         *         created_by: The administrator who created it.
+         *         created_at: Creation time (UTC).
+         *         expires_at: Absolute expiry (UTC).
+         *         last_used_at: Last recorded use (UTC); ``null`` when no display used it yet.
+         *         live: False once it has expired (expired records are purged within minutes).
+         */
+        KioskTokenOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Live */
+            live: boolean;
+        };
+        /**
+         * KioskTokenPage
+         * @description One page of kiosk tokens, by label (API-005).
+         *
+         *     Attributes:
+         *         rows: The records.
+         *         page: Paging facts.
+         */
+        KioskTokenPage: {
+            page: components["schemas"]["PageInfo"];
+            /** Rows */
+            rows: components["schemas"]["KioskTokenOut"][];
+        };
+        /**
          * LabelOut
          * @description A tag or a group (META-005).
          *
@@ -2378,11 +2557,12 @@ export interface components {
          * @description Who the caller is (``GET /api/v1/auth/session`` and the login answer).
          *
          *     Attributes:
-         *         kind: ``user`` (session cookie), ``kiosk`` (bearer token), or ``local`` (socket).
+         *         kind: ``user`` (session cookie), ``kiosk`` (kiosk cookie or bearer token), or
+         *             ``local`` (socket).
          *         name: Username, ``kiosk:<label>``, or ``local:<account>``.
          *         role: ``admin`` or ``operator``.
          *         csrf_token: Send as ``X-CSRF-Token`` on every state-changing request (users only).
-         *         expires_at: Absolute expiry of the session (users only).
+         *         expires_at: Absolute expiry of the session, or of a kiosk display's token.
          *         idle_timeout_s: The session ends after this long without a request (users only).
          *         user_id: The account (users only).
          */
@@ -2733,6 +2913,129 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    exchange_api_v1_auth_kiosk_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KioskExchange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfo"];
+                };
+            };
+            /** @description not a live kiosk token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description plain HTTP from a non-loopback client */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description too many exchanges at once */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    forget_api_v1_auth_kiosk_forget_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;
@@ -4688,6 +4991,201 @@ export interface operations {
             };
             /** @description review not open */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    tokens_api_v1_kiosk_tokens_get: {
+        parameters: {
+            query?: {
+                /** @description Page size, 1 to 500. */
+                limit?: number;
+                /** @description `page.next_cursor` of the previous page. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KioskTokenPage"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    create_api_v1_kiosk_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KioskCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KioskIssued"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description the label is taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    revoke_api_v1_kiosk_tokens__kiosk_uuid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kiosk_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such kiosk token */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

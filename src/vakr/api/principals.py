@@ -6,9 +6,12 @@ Each request resolves to at most one principal, from exactly one source:
    and tokens are ignored there;
 2. over TCP, ``Authorization: Bearer vkk_...``: a kiosk display, always
    operator (E.12). Any other bearer value is refused;
-3. otherwise the session cookie named for the client's scheme
-   (``vakr.api.cookies``);
-4. otherwise anonymous.
+3. otherwise a valid session cookie named for the client's scheme
+   (``vakr.api.cookies``): a person;
+4. otherwise a valid kiosk cookie, set by ``POST /api/v1/auth/kiosk``: a
+   display, always operator. A browser with both is the person's: someone
+   signed in on that browser outranks the display it is (E.30 #17);
+5. otherwise anonymous.
 
 Handlers declare what they need with ``Viewer`` (``Permission.VIEW``) or
 ``Admin`` (``Permission.ADMINISTER``); the decision is ``vakr.auth.allows``
@@ -21,7 +24,9 @@ the browser says it is cross-site (``Sec-Fetch-Site``) or names another
 ``Origin`` than the ``Host`` it was sent to, and, when a session cookie
 authenticated it, unless ``X-CSRF-Token`` carries the session's token. The
 login itself has no session yet; JSON-only bodies and the origin checks
-protect it. Kiosk and socket callers send no cookie, so CSRF cannot apply.
+protect it, as they protect the kiosk exchange and ``forget``. Socket and
+bearer callers send no cookie, so CSRF cannot apply; a kiosk cookie is
+``SameSite=Strict`` and its operator role changes nothing.
 
 Dependencies:
     fastapi: Dependencies.
@@ -43,7 +48,7 @@ from urllib.parse import urlsplit
 from fastapi import Depends, Request
 
 from vakr.api.context import ApiContext, call, get_context
-from vakr.api.cookies import MAX_TOKEN_LENGTH, cookie_name
+from vakr.api.cookies import MAX_TOKEN_LENGTH, cookie_name, kiosk_cookie_name
 from vakr.api.errors import ApiError
 from vakr.api.keys import CLIENT_KEY, PEER_KEY
 from vakr.api.middleware import LOCAL_CLIENT
@@ -53,8 +58,8 @@ from vakr.credentials.secret import Secret
 
 CSRF_HEADER = "X-CSRF-Token"
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-CSRF_EXEMPT = frozenset({"/api/v1/auth/login"})
-"""State-changing routes without a session yet; the origin checks still apply."""
+CSRF_EXEMPT = frozenset({"/api/v1/auth/login", "/api/v1/auth/kiosk", "/api/v1/auth/kiosk/forget"})
+"""State-changing routes that need no session; the origin checks still apply."""
 _SAME_SITE = frozenset({"same-origin", "none"})
 UNAUTHENTICATED = {"WWW-Authenticate": 'Bearer realm="vakr"'}
 
@@ -106,6 +111,44 @@ def session_token(request: Request) -> Secret | None:
     return Secret(value) if 0 < len(value) <= MAX_TOKEN_LENGTH else None
 
 
+def kiosk_token(request: Request) -> Secret | None:
+    """Return the kiosk cookie for the client's scheme, if one was sent.
+
+    Args:
+        request: The request.
+
+    Returns:
+        Secret | None: The cookie value, or ``None`` (also for an oversized value).
+
+    Raises:
+        None
+    """
+    value = request.cookies.get(kiosk_cookie_name(client_view(request)), "")
+    return Secret(value) if 0 < len(value) <= MAX_TOKEN_LENGTH else None
+
+
+async def _cookie(
+    context: ApiContext, token: Secret | None, kind: PrincipalKind
+) -> Principal | None:
+    """Resolve a cookie to its principal, if it is valid and of the expected kind.
+
+    Args:
+        context: The services.
+        token: The cookie value, or ``None``.
+        kind: ``USER`` for the session cookie, ``KIOSK`` for the kiosk cookie.
+
+    Returns:
+        Principal | None: The caller, or ``None``.
+
+    Raises:
+        StorageError: If the metadata store cannot be read.
+    """
+    if token is None:
+        return None
+    principal = await call(context.auth.authenticate, token)
+    return principal if principal is not None and principal.kind is kind else None
+
+
 async def _bearer(context: ApiContext, header: str) -> Principal:
     """Resolve ``Authorization: Bearer`` to a kiosk principal.
 
@@ -151,11 +194,8 @@ async def current_principal(
     header = request.headers.get("authorization")
     if header:
         return await _bearer(context, header)
-    token = session_token(request)
-    if token is None:
-        return None
-    principal = await call(context.auth.authenticate, token)
-    return principal if principal is not None and principal.kind is PrincipalKind.USER else None
+    person = await _cookie(context, session_token(request), PrincipalKind.USER)
+    return person or await _cookie(context, kiosk_token(request), PrincipalKind.KIOSK)
 
 
 def require(permission: Permission) -> Callable[..., Awaitable[Principal]]:

@@ -15,6 +15,7 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 	import type { InterfaceListRow } from '#lib/api/types.ts';
 	import { deviceHref, interfaceHref } from '#lib/links.ts';
 	import DataTable from './DataTable.svelte';
+	import Link from './Link.svelte';
 	import ReadingText from './ReadingText.svelte';
 	import type { Column } from './table.ts';
 
@@ -51,10 +52,10 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 {#snippet indicators(r: InterfaceListRow)}
 	{#each r.ref.markers as m (m)}<span class="tag">{MARKER_WORDS[m] ?? m}</span>{/each}
 {/snippet}
-{#snippet device(r: InterfaceListRow)}<a href={deviceHref(r.ref.device_id)}>{r.ref.device}</a
+{#snippet device(r: InterfaceListRow)}<Link href={deviceHref(r.ref.device_id)}>{r.ref.device}</Link
 	>{/snippet}
 {#snippet name(r: InterfaceListRow)}
-	<a href={interfaceHref(r.ref.interface_id, keep)}>{r.ref.name}</a>
+	<Link href={interfaceHref(r.ref.interface_id, keep)}>{r.ref.name}</Link>
 	{#if r.ref.alias}<div class="muted small">{r.ref.alias}</div>{/if}
 	{#if r.ref.description && r.ref.description !== r.ref.name}<div class="muted small">
 			{r.ref.description}

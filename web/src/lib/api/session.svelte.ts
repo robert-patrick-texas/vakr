@@ -9,6 +9,10 @@
  * the layout sends the user to the sign-in page with the current location,
  * and the sign-in page says so instead of showing a bare form (UI-014).
  *
+ * A kiosk display signs in differently: `setUpDisplay` sends the kiosk token
+ * once, and the API answers with an `HttpOnly` kiosk cookie, so the token is
+ * never kept in page script (E.30 #17). `forgetDisplay` drops that cookie.
+ *
  * @example
  * ```ts
  * await loadSession();
@@ -112,6 +116,34 @@ export async function signOut(): Promise<void> {
 		await unwrapEmpty(api.POST('/api/v1/auth/logout'));
 	} finally {
 		end('signed-out');
+	}
+}
+
+/**
+ * Set this browser up as a kiosk display with a kiosk token; the API sets the kiosk cookie.
+ *
+ * @param token - The `vkk_...` token an admin handed over; sent once, never stored.
+ * @returns The display's identity and the token's expiry.
+ * @throws ApiFailure for a refused token (401), plain HTTP (403), or no answer.
+ */
+export async function setUpDisplay(token: string): Promise<SessionInfo> {
+	const info = await unwrap(api.POST('/api/v1/auth/kiosk', { body: { token } }));
+	session.info = info;
+	session.status = 'signed-in';
+	session.ended = null;
+	return info;
+}
+
+/**
+ * Make this browser forget its kiosk cookie; the token stays valid elsewhere.
+ *
+ * @throws ApiFailure when the API refuses or is unavailable; the local state is cleared anyway.
+ */
+export async function forgetDisplay(): Promise<void> {
+	try {
+		await unwrapEmpty(api.POST('/api/v1/auth/kiosk/forget'));
+	} finally {
+		if (session.info?.kind === 'kiosk') end('signed-out');
 	}
 }
 

@@ -1,4 +1,4 @@
-"""The session cookie: its name and flags, by the scheme the browser used (SEC-010, 15.4).
+"""The session and kiosk cookies: names and flags, by the scheme the browser used (SEC-010, 15.4).
 
 A signed-in browser holds one opaque session token in a cookie:
 
@@ -22,6 +22,13 @@ A signed-in browser holds one opaque session token in a cookie:
 Each scheme reads only its own cookie name, so a plain-HTTP cookie can
 never stand in for the secure one.
 
+A kiosk display holds its kiosk token in a second cookie, set by ``POST
+/api/v1/auth/kiosk`` (E.30 #17): ``__Host-vakr_kiosk`` with ``Secure`` over
+HTTPS, ``vakr_kiosk`` over loopback HTTP, ``HttpOnly``, ``Path=/``, and
+``Max-Age`` equal to the token's remaining life. It is ``SameSite=Strict``:
+nobody follows a link into a wall display, so the cookie never needs to
+travel with a request another site started.
+
 Dependencies:
     starlette.responses: ``set_cookie``.
     vakr.api.proxy: The client view.
@@ -44,6 +51,8 @@ from vakr.credentials.secret import Secret
 
 SECURE_COOKIE = "__Host-vakr_session"
 PLAIN_COOKIE = "vakr_session"
+SECURE_KIOSK_COOKIE = "__Host-vakr_kiosk"
+PLAIN_KIOSK_COOKIE = "vakr_kiosk"
 MAX_TOKEN_LENGTH = 128
 """Longest cookie or bearer value considered; real tokens are 47 characters."""
 
@@ -117,3 +126,59 @@ def clear_session_cookie(response: Response, view: ClientView) -> None:
     """
     response.delete_cookie(cookie_name(view), path="/", secure=view.scheme == "https",
                            httponly=True, samesite="lax")  # fmt: skip
+
+
+def kiosk_cookie_name(view: ClientView) -> str:
+    """Return the kiosk cookie name for the client's scheme.
+
+    Args:
+        view: The client after trusted-proxy handling.
+
+    Returns:
+        str: ``__Host-vakr_kiosk`` over HTTPS, else ``vakr_kiosk``.
+
+    Raises:
+        None
+    """
+    return SECURE_KIOSK_COOKIE if view.scheme == "https" else PLAIN_KIOSK_COOKIE
+
+
+def set_kiosk_cookie(
+    response: Response, token: Secret, view: ClientView, expires_at: datetime, now: datetime
+) -> None:
+    """Attach the kiosk cookie to a response.
+
+    Args:
+        response: The exchange response.
+        token: The kiosk token the display presented.
+        view: The client.
+        expires_at: The token's absolute expiry (UTC).
+        now: Current time (UTC).
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    max_age = max(int((expires_at - now).total_seconds()), 0)
+    response.set_cookie(kiosk_cookie_name(view), token.reveal(), max_age=max_age, path="/",
+                        secure=view.scheme == "https", httponly=True,
+                        samesite="strict")  # fmt: skip
+
+
+def clear_kiosk_cookie(response: Response, view: ClientView) -> None:
+    """Tell the browser to drop the kiosk cookie.
+
+    Args:
+        response: The response.
+        view: The client.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    response.delete_cookie(kiosk_cookie_name(view), path="/", secure=view.scheme == "https",
+                           httponly=True, samesite="strict")  # fmt: skip

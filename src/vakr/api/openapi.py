@@ -33,6 +33,8 @@ ANONYMOUS_PATHS = frozenset({
     "/api/v1/health/live",
     "/api/v1/health/ready",
     "/api/v1/auth/login",
+    "/api/v1/auth/kiosk",
+    "/api/v1/auth/kiosk/forget",
 })  # fmt: skip
 """Endpoints any caller may use; every other one needs a role."""
 SECURITY_SCHEMES = {
@@ -47,6 +49,13 @@ SECURITY_SCHEMES = {
         "type": "http",
         "scheme": "bearer",
         "description": "A kiosk token (vkk_...) created by an admin: operator role, read-only.",
+    },
+    "kioskCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-vakr_kiosk",
+        "description": "Set by POST /api/v1/auth/kiosk over HTTPS (vakr_kiosk over loopback "
+        "HTTP) for a kiosk display: operator role, read-only. A session cookie wins over it.",
     },
 }
 
@@ -68,7 +77,7 @@ def describe_security(
         None
     """
     document.setdefault("components", {})["securitySchemes"] = SECURITY_SCHEMES
-    document["security"] = [{"sessionCookie": []}, {"kioskToken": []}]
+    document["security"] = [{"sessionCookie": []}, {"kioskToken": []}, {"kioskCookie": []}]
     open_paths = set(anonymous)
     for path, operations in document.get("paths", {}).items():
         for operation in operations.values():

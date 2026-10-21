@@ -77,7 +77,7 @@ There are two roles ([users](users.md)). Every endpoint checks the caller's role
 |---|---|---|
 | Anyone | nothing | Only `health/live`, `health/ready`, and `auth/login` |
 | A signed-in user | the session cookie from `POST /api/v1/auth/login` | The account's role |
-| A kiosk display | `Authorization: Bearer vkk_...` | operator, always |
+| A kiosk display | the kiosk cookie from `POST /api/v1/auth/kiosk`, or `Authorization: Bearer vkk_...` | operator, always |
 | A process on the node | the Unix socket | By account: root and members of `vakr-admin` are admin, members of `vakr-view` and `vakr` are operator, anyone else is refused on every endpoint |
 
 Operators read everything the API offers. Admins can also change things; in this release that is the identity-review decision. An anonymous request to a protected endpoint gets 401, and a role that lacks the permission gets 403. Both use the error envelope below.
@@ -166,7 +166,12 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/version` | operator | `{"version": "<release>", "api": "v1"}` |
 | `POST /api/v1/auth/login` | anyone | The session (`kind`, `name`, `role`, `csrf_token`, `expires_at`, `idle_timeout_s`); sets the cookie |
 | `POST /api/v1/auth/logout` | a session | 204; clears the cookie |
-| `GET /api/v1/auth/session` | any caller | Who you are, your role, and for users the CSRF token and expiry |
+| `GET /api/v1/auth/session` | any caller | Who you are, your role, and for users the CSRF token and expiry; for a kiosk display the token's expiry |
+| `POST /api/v1/auth/kiosk` | anyone | Sets a kiosk display up: `{"token": "vkk_..."}` as JSON, exchanged for an `HttpOnly`, `SameSite=Strict` kiosk cookie (`__Host-vakr_kiosk` over HTTPS). HTTPS only beyond loopback; a refused token is 401 `kiosk_refused` after 1 s. A session cookie in the same browser wins over the kiosk cookie |
+| `POST /api/v1/auth/kiosk/forget` | anyone | 204; clears this browser's kiosk cookie (the token stays valid elsewhere) |
+| `GET /api/v1/kiosk-tokens` | admin | Kiosk token records by label (label, creator, expiry, last use, `live`), never the tokens; paged |
+| `POST /api/v1/kiosk-tokens` | admin | `{"label": "noc-wall", "lifetime": "90d"}` (lifetime optional, 1 to 365 days): 201 with the record and the token, which no other answer ever holds; 409 for a taken label |
+| `DELETE /api/v1/kiosk-tokens/{kiosk_uuid}` | admin | 204; revokes the token, and every display holding it is refused from its next request |
 | `GET /api/v1/overview` | operator | The overview dashboard: device counts, health, high-priority and WAN rows, top utilization and errors, event feeds, filter choices (`window`) |
 | `GET /api/v1/devices` | operator | The device list in Attention, Active, Offline order, with counts and health; `search`, `bucket` (repeatable), `freshness` (repeatable: `fresh`, `stale`, `never`), `collector` (devices that position has evidence for), `sort` (`status`, `name`, `site`, `age`), `include_retired`, and `site`, `tag`, `group`, `provider`, `admin_state` to browse by grouping; paged |
 | `GET /api/v1/devices/{device_uuid}` | operator | The device screen: facts, every position's verdict, warnings, the interface table |
@@ -203,7 +208,7 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 
 ## Not in this release
 
-These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), rediscovery requests, inventory imports, policies, dashboards and their publication, events, asynchronous operations and exports (`/operations`, `/exports/{operation_uuid}`), the server-sent event stream, kiosk-token management, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`. The API already accepts kiosk tokens, but no command or endpoint creates them yet; creating them arrives with kiosk dashboards, after this release.
+These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), rediscovery requests, inventory imports, policies, dashboards and their publication, events, asynchronous operations and exports (`/operations`, `/exports/{operation_uuid}`), the server-sent event stream, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`.
 
 ## OpenAPI document
 
@@ -271,7 +276,7 @@ $ curl -s -b jar -H "X-CSRF-Token: $token" -X POST https://vakr.example.net/api/
 
 The password goes in on standard input, so it does not appear in the process list or shell history.
 
-A kiosk display, once kiosk tokens can be created, reads with its token:
+A program that is not a browser reads with a kiosk token ([kiosk displays](kiosk.md)) as a bearer token:
 
 ```console
 $ curl -s -H "Authorization: Bearer $KIOSK_TOKEN" https://vakr.example.net/api/v1/overview

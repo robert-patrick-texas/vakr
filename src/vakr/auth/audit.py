@@ -44,6 +44,7 @@ ACTIONS = {
     "user.revoke_sessions": "user",
     "kiosk.create": "kiosk",
     "kiosk.revoke": "kiosk",
+    "kiosk.setup": "kiosk",
 }
 """Audited action codes and the object type each acts on."""
 _MAX_SUMMARY = 500

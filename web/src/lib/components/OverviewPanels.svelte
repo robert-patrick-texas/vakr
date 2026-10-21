@@ -5,7 +5,9 @@ The overview's device summary, recent events, and quick filters (12.2 items 1, 7
 Device counts link to the filtered device list; every state shows its icon
 and words. Event feeds that vakr cannot produce yet say so instead of
 looking empty. Quick filters open the device or interface list for one
-provider, site, tag, or group, and the WAN view (UI-009).
+provider, site, tag, or group, and the WAN view (UI-009). On a kiosk
+display the links are plain text and the quick filters, which only
+navigate, are left out (UI-013).
 
 Example: `<OverviewPanels overview={data} />`
 -->
@@ -13,6 +15,8 @@ Example: `<OverviewPanels overview={data} />`
 	import type { OverviewAnswer } from '#lib/query/reads.ts';
 	import { formatInstant } from '#lib/format/time.ts';
 	import { devicesHref, interfacesHref, deviceHref } from '#lib/links.ts';
+	import { inKiosk } from '#lib/state/kiosk-context.ts';
+	import Link from './Link.svelte';
 	import StatusBadge from './StatusBadge.svelte';
 
 	interface Props {
@@ -22,6 +26,7 @@ Example: `<OverviewPanels overview={data} />`
 
 	const { overview, zone }: Props = $props();
 	const d = $derived(overview.devices);
+	const kiosk = inKiosk();
 	const FEEDS: Record<string, string> = {
 		restart: 'Recent restarts',
 		rediscovery: 'Rediscovery',
@@ -33,12 +38,14 @@ Example: `<OverviewPanels overview={data} />`
 <section class="card" aria-labelledby="summary-h">
 	<h2 id="summary-h">Device state</h2>
 	<p class="row">
-		<a href={devicesHref({ bucket: ['attention'] })}
-			>Attention: <strong>{d.counts.attention}</strong></a
+		<Link href={devicesHref({ bucket: ['attention'] })}
+			>Attention: <strong>{d.counts.attention}</strong></Link
 		>
-		<a href={devicesHref({ bucket: ['active'] })}>Active: <strong>{d.counts.active}</strong></a>
-		<a href={devicesHref({ bucket: ['offline'] })}
-			>Offline/Retired: <strong>{d.counts.offline}</strong></a
+		<Link href={devicesHref({ bucket: ['active'] })}
+			>Active: <strong>{d.counts.active}</strong></Link
+		>
+		<Link href={devicesHref({ bucket: ['offline'] })}
+			>Offline/Retired: <strong>{d.counts.offline}</strong></Link
 		>
 		<span class="muted">of {d.total}{d.truncated ? ' (truncated)' : ''}</span>
 	</p>
@@ -51,9 +58,9 @@ Example: `<OverviewPanels overview={data} />`
 		{/each}
 	</ul>
 	<p class="muted">
-		Evidence: <a href={devicesHref({ freshness: ['fresh'] })}>{d.fresh} fresh</a>,
-		<a href={devicesHref({ freshness: ['stale'] })}>{d.stale} stale</a>,
-		<a href={devicesHref({ freshness: ['never'] })}>{d.never} never observed</a>.
+		Evidence: <Link href={devicesHref({ freshness: ['fresh'] })}>{d.fresh} fresh</Link>,
+		<Link href={devicesHref({ freshness: ['stale'] })}>{d.stale} stale</Link>,
+		<Link href={devicesHref({ freshness: ['never'] })}>{d.never} never observed</Link>.
 	</p>
 </section>
 
@@ -70,10 +77,11 @@ Example: `<OverviewPanels overview={data} />`
 				{#each feed.rows as e, i (i)}
 					<li>
 						{formatInstant(e.at, zone)}
-						{#if e.device_id}<a href={deviceHref(e.device_id)}>{e.subject}</a
+						{#if e.device_id}<Link href={deviceHref(e.device_id)}>{e.subject}</Link
 							>{:else}{e.subject}{/if}:
 						{e.text}
-						{#if feed.kind === 'identity_review'}<a href="/identity-reviews">review</a>{/if}
+						{#if feed.kind === 'identity_review' && !kiosk}<a href="/identity-reviews">review</a
+							>{/if}
 					</li>
 				{/each}
 			</ul>
@@ -81,30 +89,32 @@ Example: `<OverviewPanels overview={data} />`
 	{/each}
 </section>
 
-<section class="card" aria-labelledby="filters-h">
-	<h2 id="filters-h">Quick filters</h2>
-	<p>
-		<a href="/wan">WAN circuits ({overview.filters.wan_circuits})</a> ·
-		<a href="/high-priority">High-priority interfaces</a>
-	</p>
-	{#if overview.filters.providers.length > 0}
-		<h3>Providers</h3>
-		<p class="row">
-			{#each overview.filters.providers as p (p)}<a href={interfacesHref({ provider: p })}>{p}</a
-				>{/each}
+{#if !kiosk}
+	<section class="card" aria-labelledby="filters-h">
+		<h2 id="filters-h">Quick filters</h2>
+		<p>
+			<a href="/wan">WAN circuits ({overview.filters.wan_circuits})</a> ·
+			<a href="/high-priority">High-priority interfaces</a>
 		</p>
-	{/if}
-	{#each [['Sites', 'site', overview.filters.sites], ['Tags', 'tag', overview.filters.tags], ['Groups', 'group', overview.filters.groups]] as const as [title, key, list] (key)}
-		{#if list.length > 0}
-			<h3>{title}</h3>
+		{#if overview.filters.providers.length > 0}
+			<h3>Providers</h3>
 			<p class="row">
-				{#each list as item (String(item[0]))}
-					<a href={devicesHref({ [key]: String(item[0]) })}>{String(item[1])}</a>
-				{/each}
+				{#each overview.filters.providers as p (p)}<a href={interfacesHref({ provider: p })}>{p}</a
+					>{/each}
 			</p>
 		{/if}
-	{/each}
-</section>
+		{#each [['Sites', 'site', overview.filters.sites], ['Tags', 'tag', overview.filters.tags], ['Groups', 'group', overview.filters.groups]] as const as [title, key, list] (key)}
+			{#if list.length > 0}
+				<h3>{title}</h3>
+				<p class="row">
+					{#each list as item (String(item[0]))}
+						<a href={devicesHref({ [key]: String(item[0]) })}>{String(item[1])}</a>
+					{/each}
+				</p>
+			{/if}
+		{/each}
+	</section>
+{/if}
 
 <style>
 	.plain {

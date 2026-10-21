@@ -85,11 +85,12 @@ class SessionInfo:
     """Who the caller is (``GET /api/v1/auth/session`` and the login answer).
 
     Attributes:
-        kind: ``user`` (session cookie), ``kiosk`` (bearer token), or ``local`` (socket).
+        kind: ``user`` (session cookie), ``kiosk`` (kiosk cookie or bearer token), or
+            ``local`` (socket).
         name: Username, ``kiosk:<label>``, or ``local:<account>``.
         role: ``admin`` or ``operator``.
         csrf_token: Send as ``X-CSRF-Token`` on every state-changing request (users only).
-        expires_at: Absolute expiry of the session (users only).
+        expires_at: Absolute expiry of the session, or of a kiosk display's token.
         idle_timeout_s: The session ends after this long without a request (users only).
         user_id: The account (users only).
     """

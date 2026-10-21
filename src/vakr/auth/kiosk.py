@@ -7,6 +7,10 @@ operator role only (view, never change), has no idle expiry, and expires
 absolutely after 30 days by default. Use is recorded at most once per
 touch interval.
 
+Labels and per-token lifetimes follow ``vakr.auth.kiosk_rules``. A
+display's browser exchanges its token once for a kiosk cookie
+(``exchange``, audited), then presents the cookie with every request.
+
 Dependencies:
     vakr.auth.audit, principal, settings, tokens: Records and token helpers.
     vakr.ports: The metadata unit of work and the clock.
@@ -22,8 +26,10 @@ Example:
 
 import logging
 from dataclasses import dataclass
+from datetime import timedelta
 
 from vakr.auth.audit import record
+from vakr.auth.kiosk_rules import check_label, check_lifetime
 from vakr.auth.principal import Principal, PrincipalKind
 from vakr.auth.settings import AuthSettings
 from vakr.auth.tokens import KIOSK_PREFIX, new_token, token_digest, token_kind
@@ -31,6 +37,7 @@ from vakr.credentials.secret import Secret
 from vakr.domain.errors import StorageError, ValidationError
 from vakr.domain.ids import KioskTokenId, new_id
 from vakr.domain.sessions import KioskToken
+from vakr.domain.users import clean_source
 from vakr.ports.clock import Clock
 from vakr.ports.metadata.unit_of_work import MetadataUnitOfWorkFactory
 
@@ -73,31 +80,40 @@ class KioskService:
         self._clock = clock
         self._settings = settings
 
-    def create(self, label: str, *, actor: str, request_id: str | None = None) -> IssuedKiosk:
+    def create(
+        self,
+        label: str,
+        *,
+        actor: str,
+        request_id: str | None = None,
+        lifetime: timedelta | None = None,
+    ) -> IssuedKiosk:
         """Create a kiosk token, with audit (SEC-018).
 
         Args:
-            label: Unique name for the display, such as ``noc-wall``.
+            label: Unique name for the display, such as ``noc-wall`` (``check_label``).
             actor: The administrator.
             request_id: API request ID, if any.
+            lifetime: How long it lives; ``auth.kiosk_token_lifetime`` when ``None``.
 
         Returns:
             IssuedKiosk: The record and the token to hand over once.
 
         Raises:
-            ValidationError: If the label is invalid or the token limit is reached.
+            ValidationError: If the label or lifetime is invalid or the token limit is reached.
             DuplicateError: If the label is taken.
             StorageError: If it cannot be written.
         """
+        life = check_lifetime(lifetime) if lifetime is not None else self._settings.kiosk_lifetime
         now = self._clock.now_utc()
         token = new_token(KIOSK_PREFIX)
         kiosk = KioskToken(
             new_id(KioskTokenId),
-            label.strip(),
+            check_label(label),
             token_digest(token) or b"",
             actor,
             now,
-            now + self._settings.kiosk_lifetime,
+            now + life,
         )
         with self._uow() as uow:
             if uow.kiosk_tokens.count() >= self._settings.max_kiosk_tokens:
@@ -157,6 +173,66 @@ class KioskService:
         """
         with self._uow() as uow:
             return uow.kiosk_tokens.list_all(limit=self._settings.max_kiosk_tokens)
+
+    def exchange(
+        self, token: Secret, *, source: str, request_id: str | None = None
+    ) -> tuple[Principal, KioskToken] | None:
+        """Accept a token a display presents once to be set up, with audit (SEC-018).
+
+        Args:
+            token: The presented token.
+            source: Client address, for the audit record.
+            request_id: API request ID, if any.
+
+        Returns:
+            tuple | None: The display's principal and its record, or ``None``
+            for an unknown, expired, or revoked token (nothing is recorded:
+            there is no token to name).
+
+        Raises:
+            StorageError: If the record cannot be read or the audit written.
+        """
+        principal = self.validate(token)
+        if principal is None or principal.kiosk_id is None:
+            return None
+        with self._uow() as uow:
+            kiosk = uow.kiosk_tokens.get(principal.kiosk_id)
+            if kiosk is None:
+                return None  # revoked between the two reads
+            record(uow, "kiosk.setup", kiosk.id, f"display set up with kiosk token {kiosk.label} "
+                   f"from {clean_source(source)}", at=self._clock.now_utc(), actor=principal.name,
+                   request_id=request_id)  # fmt: skip
+            uow.commit()
+        return principal, kiosk
+
+    def get(self, token_id: KioskTokenId) -> KioskToken | None:
+        """Return one kiosk token record (never the token itself).
+
+        Args:
+            token_id: The record's UUID.
+
+        Returns:
+            KioskToken | None: The record, or ``None``.
+
+        Raises:
+            StorageError: If it cannot be read.
+        """
+        with self._uow() as uow:
+            return uow.kiosk_tokens.get(token_id)
+
+    def find(self, label: str) -> KioskToken | None:
+        """Return the kiosk token with exactly this label.
+
+        Args:
+            label: The label.
+
+        Returns:
+            KioskToken | None: The record, or ``None``.
+
+        Raises:
+            StorageError: If they cannot be read.
+        """
+        return next((t for t in self.tokens() if t.label == label), None)
 
     def revoke(self, token_id: KioskTokenId, *, actor: str, request_id: str | None = None) -> bool:
         """Revoke a kiosk token, with audit.

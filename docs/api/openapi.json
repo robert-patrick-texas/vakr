@@ -1759,6 +1759,152 @@
         "title": "InterfaceSort",
         "type": "string"
       },
+      "KioskCreate": {
+        "additionalProperties": false,
+        "description": "Body of ``POST /api/v1/kiosk-tokens``.\n\nAttributes:\n    label: The display's name (E.12 label rule).\n    lifetime: Such as ``90d``; ``auth.kiosk_token_lifetime`` when omitted; 1 to 365 days.",
+        "properties": {
+          "label": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "lifetime": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lifetime"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "KioskCreate",
+        "type": "object"
+      },
+      "KioskExchange": {
+        "additionalProperties": false,
+        "description": "Body of ``POST /api/v1/auth/kiosk``.\n\nAttributes:\n    token: The kiosk token (``vkk_...``) an administrator handed over.",
+        "properties": {
+          "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "KioskExchange",
+        "type": "object"
+      },
+      "KioskIssued": {
+        "description": "A new kiosk token: the record and, this once, the token.\n\nAttributes:\n    kiosk: The record.\n    token: Paste it into the display at ``setup_path``; it is shown only now.\n    setup_path: The web UI page that takes it.",
+        "properties": {
+          "kiosk": {
+            "$ref": "#/components/schemas/KioskTokenOut"
+          },
+          "setup_path": {
+            "default": "/kiosk/setup",
+            "title": "Setup Path",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kiosk",
+          "token"
+        ],
+        "title": "KioskIssued",
+        "type": "object"
+      },
+      "KioskTokenOut": {
+        "description": "One kiosk token record, without the token (E.12).\n\nAttributes:\n    id: Record UUID; ``DELETE /api/v1/kiosk-tokens/{id}`` revokes it.\n    label: The display's name.\n    created_by: The administrator who created it.\n    created_at: Creation time (UTC).\n    expires_at: Absolute expiry (UTC).\n    last_used_at: Last recorded use (UTC); ``null`` when no display used it yet.\n    live: False once it has expired (expired records are purged within minutes).",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "live": {
+            "title": "Live",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "created_by",
+          "created_at",
+          "expires_at",
+          "last_used_at",
+          "live"
+        ],
+        "title": "KioskTokenOut",
+        "type": "object"
+      },
+      "KioskTokenPage": {
+        "description": "One page of kiosk tokens, by label (API-005).\n\nAttributes:\n    rows: The records.\n    page: Paging facts.",
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/KioskTokenOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "page"
+        ],
+        "title": "KioskTokenPage",
+        "type": "object"
+      },
       "LabelOut": {
         "description": "A tag or a group (META-005).\n\nAttributes:\n    id: UUID.\n    name: Display name.\n    description: Free text.",
         "properties": {
@@ -2896,7 +3042,7 @@
         "type": "object"
       },
       "SessionInfo": {
-        "description": "Who the caller is (``GET /api/v1/auth/session`` and the login answer).\n\nAttributes:\n    kind: ``user`` (session cookie), ``kiosk`` (bearer token), or ``local`` (socket).\n    name: Username, ``kiosk:<label>``, or ``local:<account>``.\n    role: ``admin`` or ``operator``.\n    csrf_token: Send as ``X-CSRF-Token`` on every state-changing request (users only).\n    expires_at: Absolute expiry of the session (users only).\n    idle_timeout_s: The session ends after this long without a request (users only).\n    user_id: The account (users only).",
+        "description": "Who the caller is (``GET /api/v1/auth/session`` and the login answer).\n\nAttributes:\n    kind: ``user`` (session cookie), ``kiosk`` (kiosk cookie or bearer token), or\n        ``local`` (socket).\n    name: Username, ``kiosk:<label>``, or ``local:<account>``.\n    role: ``admin`` or ``operator``.\n    csrf_token: Send as ``X-CSRF-Token`` on every state-changing request (users only).\n    expires_at: Absolute expiry of the session, or of a kiosk display's token.\n    idle_timeout_s: The session ends after this long without a request (users only).\n    user_id: The account (users only).",
         "properties": {
           "csrf_token": {
             "anyOf": [
@@ -3533,6 +3679,12 @@
       }
     },
     "securitySchemes": {
+      "kioskCookie": {
+        "description": "Set by POST /api/v1/auth/kiosk over HTTPS (vakr_kiosk over loopback HTTP) for a kiosk display: operator role, read-only. A session cookie wins over it.",
+        "in": "cookie",
+        "name": "__Host-vakr_kiosk",
+        "type": "apiKey"
+      },
       "kioskToken": {
         "description": "A kiosk token (vkk_...) created by an admin: operator role, read-only.",
         "scheme": "bearer",
@@ -3547,12 +3699,151 @@
     }
   },
   "info": {
-    "description": "JSON API of vakr, the network performance and reachability monitor. Browsers authenticate with the session cookie from `POST /api/v1/auth/login` and send `X-CSRF-Token` (from `GET /api/v1/auth/session`) on every state-changing request. Kiosk displays send `Authorization: Bearer vkk_...` (operator, read-only). On the monitoring node, the Unix socket `/run/vakr/api.sock` authorizes by the connecting account (root and vakr-admin: admin; vakr-view and vakr: operator). Errors use one envelope: `code`, `message`, `request_id`, `fields`. Lists page with `limit` and `cursor` and answer `page.next_cursor`. Times are UTC ISO 8601 with `Z`; a missing value is `null`, never 0.",
+    "description": "JSON API of vakr, the network performance and reachability monitor. Browsers authenticate with the session cookie from `POST /api/v1/auth/login` and send `X-CSRF-Token` (from `GET /api/v1/auth/session`) on every state-changing request. Kiosk displays exchange their token once at `POST /api/v1/auth/kiosk` for an `HttpOnly` kiosk cookie, or send `Authorization: Bearer vkk_...` (operator, read-only). On the monitoring node, the Unix socket `/run/vakr/api.sock` authorizes by the connecting account (root and vakr-admin: admin; vakr-view and vakr: operator). Errors use one envelope: `code`, `message`, `request_id`, `fields`. Lists page with `limit` and `cursor` and answer `page.next_cursor`. Times are UTC ISO 8601 with `Z`; a missing value is `null`, never 0.",
     "title": "vakr API",
     "version": "1"
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/kiosk": {
+      "post": {
+        "description": "Exchange a kiosk token for the kiosk cookie.",
+        "operationId": "exchange_api_v1_auth_kiosk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KioskExchange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not a live kiosk token"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "plain HTTP from a non-loopback client"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "too many exchanges at once"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "security": [],
+        "summary": "Set up a kiosk display (sets the kiosk cookie)",
+        "tags": [
+          "kiosk"
+        ]
+      }
+    },
+    "/api/v1/auth/kiosk/forget": {
+      "post": {
+        "description": "Clear the kiosk cookie of this browser.",
+        "operationId": "forget_api_v1_auth_kiosk_forget_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "security": [],
+        "summary": "Forget this kiosk display (clears the kiosk cookie)",
+        "tags": [
+          "kiosk"
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "description": "Decide one login attempt and answer it.",
@@ -7411,6 +7702,260 @@
         ]
       }
     },
+    "/api/v1/kiosk-tokens": {
+      "get": {
+        "description": "List kiosk token records by label (never the tokens).",
+        "operationId": "tokens_api_v1_kiosk_tokens_get",
+        "parameters": [
+          {
+            "description": "Page size, 1 to 500.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Page size, 1 to 500.",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`page.next_cursor` of the previous page.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`page.next_cursor` of the previous page.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KioskTokenPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Kiosk tokens (admin)",
+        "tags": [
+          "kiosk"
+        ]
+      },
+      "post": {
+        "description": "Create a kiosk token for a display (SEC-018: audited with the administrator).",
+        "operationId": "create_api_v1_kiosk_tokens_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KioskCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KioskIssued"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "the label is taken"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Create a kiosk token (admin; the token is answered once)",
+        "tags": [
+          "kiosk"
+        ]
+      }
+    },
+    "/api/v1/kiosk-tokens/{kiosk_uuid}": {
+      "delete": {
+        "description": "Revoke a kiosk token; displays holding it are refused from their next request.",
+        "operationId": "revoke_api_v1_kiosk_tokens__kiosk_uuid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Kiosk Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such kiosk token"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Revoke a kiosk token (admin)",
+        "tags": [
+          "kiosk"
+        ]
+      }
+    },
     "/api/v1/overview": {
       "get": {
         "description": "Return the overview dashboard.",
@@ -8558,6 +9103,9 @@
     },
     {
       "kioskToken": []
+    },
+    {
+      "kioskCookie": []
     }
   ],
   "tags": [
@@ -8568,6 +9116,10 @@
     {
       "description": "Sign-in, sign-out, and the current session.",
       "name": "auth"
+    },
+    {
+      "description": "Kiosk display setup and kiosk tokens (admin).",
+      "name": "kiosk"
     },
     {
       "description": "Device list, device screen, reachability history.",

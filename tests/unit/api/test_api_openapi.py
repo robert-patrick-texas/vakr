@@ -62,7 +62,8 @@ def test_api008_document_describes_versions_security_and_errors() -> None:
     document = json.loads(TEXT())
     assert document["info"]["version"] == "1"
     assert get_version() not in json.dumps(document["info"])
-    assert set(document["components"]["securitySchemes"]) == {"sessionCookie", "kioskToken"}
+    schemes = set(document["components"]["securitySchemes"])
+    assert schemes == {"sessionCookie", "kioskToken", "kioskCookie"}
     assert all(p.startswith("/api/v1/") for p in document["paths"])
     for path, operations in document["paths"].items():
         for operation in operations.values():

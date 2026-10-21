@@ -113,7 +113,7 @@ def not_on_socket(request: Request) -> None:
 
 
 def session_info(context: ApiContext, principal: Principal) -> SessionInfo:
-    """Describe a principal, with CSRF token and expiry for a signed-in user (blocking).
+    """Describe a principal: CSRF token and expiry for a user, expiry for a kiosk (blocking).
 
     Args:
         context: The services.
@@ -126,6 +126,10 @@ def session_info(context: ApiContext, principal: Principal) -> SessionInfo:
         StorageError: If the sessions cannot be read.
     """
     base = SessionInfo(principal.kind.value, principal.name, principal.role.value)
+    if principal.kind is PrincipalKind.KIOSK and principal.kiosk_id is not None:
+        kiosk = context.auth.kiosk.get(principal.kiosk_id)  # the display shows when it expires
+        return SessionInfo(base.kind, base.name, base.role, expires_at=kiosk.expires_at
+                           if kiosk is not None else None)  # fmt: skip
     if principal.kind is not PrincipalKind.USER or principal.session_id is None:
         return base
     expires = None

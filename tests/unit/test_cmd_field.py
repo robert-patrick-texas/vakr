@@ -14,6 +14,7 @@ Example:
 
 import json
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -149,3 +150,27 @@ def test_field_without_subcommand_prints_usage(capsys: pytest.CaptureFixture[str
     """
     assert main(["field"]) == 2
     assert "collect" in capsys.readouterr().err
+
+
+def test_e12_the_field_kit_never_runs_a_command_that_could_show_a_secret() -> None:
+    """E.12, FIELD-002, CRED-002: the kit's vakr commands touch no tokens, accounts, or credentials.
+
+    ``vakr kiosk create`` prints a kiosk token, and ``vakr user`` and ``vakr
+    credentials`` handle accounts and SNMP secrets, so none of them may ever
+    become a field-kit diagnostic; the kit never copies a database either.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    config = Path(__file__).parents[2] / "tools/fieldkit/fieldkit.toml"
+    commands = tomllib.loads(config.read_text(encoding="utf-8"))["fieldkit"]["app"]["commands"]
+    assert commands, "the app profile lists its commands"
+    for argv in commands:
+        assert argv[0] not in {"kiosk", "user", "credentials", "setup", "db"}, argv
+        assert not any(".db" in a or "secrets" in a for a in argv), argv

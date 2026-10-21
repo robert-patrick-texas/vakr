@@ -62,6 +62,9 @@ def account_name(uid: int) -> str:
 LOGINS_ACTIVE = 8
 LOGINS_WAITING = 32
 """Password logins checked at once, and waiting beyond them; more are refused (E.30)."""
+KIOSK_ACTIVE = 4
+KIOSK_WAITING = 16
+"""Kiosk token exchanges checked at once, and waiting beyond them (E.30 #17)."""
 
 
 class LoginGate:
@@ -129,6 +132,8 @@ class ApiContext:
         telemetry: ``ok``, or why the telemetry store is not available.
         sleep: Waits before answering a failed login (``asyncio.sleep``; tests record it).
         logins: Bounds password logins in progress (``LoginGate``).
+        kiosk_exchanges: Bounds kiosk token exchanges in progress, apart from
+            logins so neither can crowd out the other.
     """
 
     auth: AuthServices
@@ -141,6 +146,9 @@ class ApiContext:
     telemetry: str = "ok"
     sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
     logins: LoginGate = field(default_factory=LoginGate)
+    kiosk_exchanges: LoginGate = field(
+        default_factory=lambda: LoginGate(KIOSK_ACTIVE, KIOSK_WAITING)
+    )
 
 
 def get_context(request: Request) -> ApiContext:

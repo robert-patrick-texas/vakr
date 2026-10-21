@@ -111,14 +111,14 @@ The options `auth.login_throttle_after` (5), `auth.login_throttle_max_delay` (30
 
 ## Kiosk displays
 
-A NOC wall screen cannot type a password every 30 minutes. An admin creates a **kiosk token** for it instead, labelled for the display, and enters it into the display's browser once. A kiosk token:
+A NOC wall screen cannot type a password every 30 minutes. An admin creates a **kiosk token** for it instead (`sudo vakr kiosk create LABEL`, or **Admin** → **Kiosk tokens** in the web UI), and pastes it into the display's browser once at `/kiosk/setup`. A kiosk token:
 
 - has the **operator** role only, so it can view and never change anything;
-- has no idle expiry, and expires 30 days after creation (`auth.kiosk_token_lifetime`);
-- is shown once at creation and stored only as a digest;
-- can be revoked at any time, with immediate effect.
+- has no idle expiry, and expires 30 days after creation (`auth.kiosk_token_lifetime`), or after its own `--lifetime` of 1 to 365 days;
+- is shown once at creation and stored only as a digest; the display keeps it in a cookie page script cannot read;
+- can be revoked at any time with `sudo vakr kiosk revoke LABEL`, with immediate effect.
 
-At most 100 kiosk tokens can exist. The API accepts them as `Authorization: Bearer vkk_...`; creating and revoking them arrives with kiosk dashboards, after this release.
+At most 100 kiosk tokens can exist. Setting displays up, rotating dashboards, and replacing tokens are in [kiosk displays](kiosk.md).
 
 ## Where the secrets live
 
@@ -162,5 +162,6 @@ Every sign-in, failed sign-in, sign-out, and account change is recorded in the a
 | `auth.logout` | A user signs out. |
 | `user.create`, `user.password`, `user.enable`, `user.disable`, `user.role`, `user.revoke_sessions` | An admin changes an account. |
 | `kiosk.create`, `kiosk.revoke` | An admin creates or revokes a kiosk token. |
+| `kiosk.setup` | A display exchanged its kiosk token for the kiosk cookie; the actor is `kiosk:<label>`, with the client address. |
 
 Changes made with `vakr setup` or `vakr user` name the operator who ran the command: `cli:alice (sudo)` when Alice used `sudo`, or `cli:<login>` otherwise. Attempts refused while throttled are not recorded individually, so a password-guessing flood cannot fill the audit log.

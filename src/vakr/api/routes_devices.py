@@ -8,6 +8,8 @@
   describe every matching device.
 - ``GET /api/v1/devices/{device_uuid}``: the device screen: facts, warnings,
   every position's verdict, and the interface table (TUI-004..006, UI-003).
+- ``GET /api/v1/device-lookup?key=``: the same screen for an exact display
+  name, else a UUID, as ``vakr status DEVICE`` asks (E.29 #10, E.30 #15).
 - ``GET /api/v1/devices/{device_uuid}/interfaces``: the device's interfaces,
   sticky, WAN, and high-priority first, paged, optionally of one interest
   class (UI-006, UI-016, UI-017).
@@ -33,7 +35,7 @@ Example:
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from vakr.api.context import ApiContext, call, get_context
@@ -70,10 +72,16 @@ from vakr.query import (
     InterfaceSort,
 )
 from vakr.query.latency_views import LatencyView
+from vakr.query.source import MAX_DEVICE_KEY_LENGTH
 
 router = APIRouter(tags=["devices"])
 Context = Annotated[ApiContext, Depends(get_context)]
 NOT_FOUND: Responses = {404: {"model": ErrorEnvelope, "description": "no such device"}}
+DeviceKey = Annotated[
+    str,
+    Query(min_length=1, max_length=MAX_DEVICE_KEY_LENGTH,
+          description="Exact display name, else device UUID (vakr status DEVICE)."),
+]  # fmt: skip
 
 
 def device_exists(context: ApiContext, device_id: DeviceId) -> bool:
@@ -171,6 +179,35 @@ async def device(device_uuid: UUID, _: Viewer, context: Context) -> JSONResponse
     view = await call(context.overview.device_detail, str(device_uuid))
     if view is None:
         raise missing(device_uuid)
+    return view_response(view)
+
+
+@router.get(
+    "/device-lookup",
+    response_model=DeviceDetailView,
+    responses=NOT_FOUND,
+    summary="Device screen by exact name or UUID",
+)
+async def device_lookup(key: DeviceKey, _: Viewer, context: Context) -> JSONResponse:
+    """Return the device screen of the device named ``key``, else with that UUID.
+
+    The local status views take a name or a UUID; the lookup is the
+    in-process one, so both data paths find the same device (E.29 #10).
+
+    Args:
+        key: Display name (compared exactly) or device UUID.
+        _: The caller.
+        context: The services.
+
+    Returns:
+        JSONResponse: ``DeviceDetailView``.
+
+    Raises:
+        ApiError: 404 when nothing matches; the key is not repeated back.
+    """
+    view = await call(context.overview.device_detail, key)
+    if view is None:
+        raise ApiError(404, "not_found", "no device has this name or UUID")
     return view_response(view)
 
 

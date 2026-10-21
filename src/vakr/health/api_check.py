@@ -17,7 +17,8 @@ reports its components directly.
   ``vakr``), or an unexpected answer.
 
 Dependencies:
-    http.client, socket: An HTTP/1.1 request over a Unix socket, standard library only.
+    http.client: An HTTP/1.1 request over a Unix socket, standard library only.
+    vakr.client.transport: ``UnixHTTPConnection``, shared with ``vakr status`` and ``vakr tui``.
     vakr.api.settings: The socket path (no web framework is imported).
 
 Safety:
@@ -31,10 +32,10 @@ Example:
 
 import http.client
 import json
-import socket
 import time
 
-from vakr.api.settings import api_settings_from_config
+from vakr.api.settings import socket_path_of
+from vakr.client.transport import UnixHTTPConnection
 from vakr.config.loader import ConfigError, EffectiveConfig, load_effective_config
 from vakr.health.model import CheckResult, PerfDatum, Status
 from vakr.paths import InstallPaths
@@ -44,47 +45,6 @@ TIMEOUT_S = 2.0
 READY_PATH = "/api/v1/health/ready"
 MAX_ANSWER = 65536
 """Bytes of the readiness answer read at most."""
-
-
-class UnixHTTPConnection(http.client.HTTPConnection):
-    """``HTTPConnection`` to a Unix socket instead of a TCP port."""
-
-    def __init__(self, path: str, timeout: float) -> None:
-        """Prepare a connection.
-
-        Args:
-            path: The socket file.
-            timeout: Seconds for connect and each read.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        super().__init__("localhost", timeout=timeout)
-        self.socket_path = path
-
-    def connect(self) -> None:
-        """Connect to the socket.
-
-        Args:
-            None
-
-        Returns:
-            None
-
-        Raises:
-            OSError: If the socket refuses, is missing, or times out.
-        """
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
-        try:
-            sock.connect(self.socket_path)
-        except OSError:
-            sock.close()
-            raise
-        self.sock = sock
 
 
 def probe(path: str, timeout: float = TIMEOUT_S) -> tuple[int, dict[str, object], float]:
@@ -129,9 +89,9 @@ def _socket_path(paths: InstallPaths) -> str:
     """
     try:
         config = load_effective_config(paths.config_dir, strict=False)
-        return str(api_settings_from_config(config, paths).socket_path)
     except ConfigError, OSError, ValueError:
-        return str(api_settings_from_config(EffectiveConfig({}), paths).socket_path)
+        config = EffectiveConfig({})
+    return str(socket_path_of(config, paths))
 
 
 def judge(status: int, body: dict[str, object], elapsed: float) -> CheckResult:

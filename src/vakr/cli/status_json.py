@@ -8,7 +8,8 @@ and the text table can never disagree:
 - enums become their stable lowercase values; times become ISO 8601 UTC
   with ``Z``; UUIDs become strings;
 - the top level carries ``"schema": "vakr.status/1"``, ``"generated_at"``,
-  ``"exit_code"``, and either ``"devices"`` or ``"device"``.
+  ``"exit_code"``, ``"source"`` (``"api"`` or ``"local"``, E.29 #10), and
+  either ``"devices"`` or ``"device"``.
 
 A change that removes or renames a key is a new schema number.
 
@@ -64,12 +65,13 @@ def plain(value: Any) -> Any:
     return value
 
 
-def list_document(view: DeviceListView, exit_code: int) -> str:
+def list_document(view: DeviceListView, exit_code: int, source: str = "local") -> str:
     """Render the device list as JSON.
 
     Args:
         view: The device list.
         exit_code: The command's exit status, repeated for scripts.
+        source: ``"api"`` or ``"local"``: where the view came from.
 
     Returns:
         str: The JSON document, indented, one trailing newline.
@@ -82,18 +84,20 @@ def list_document(view: DeviceListView, exit_code: int) -> str:
         "schema": SCHEMA,
         "generated_at": body.pop("generated_at"),
         "exit_code": exit_code,
+        "source": source,
         "devices": body.pop("rows"),
         **body,
     }
     return json.dumps(doc, indent=2, ensure_ascii=False) + "\n"
 
 
-def detail_document(view: DeviceDetailView, exit_code: int) -> str:
+def detail_document(view: DeviceDetailView, exit_code: int, source: str = "local") -> str:
     """Render one device as JSON; ``facts`` become ``{"label", ...reading}`` objects.
 
     Args:
         view: The device detail.
         exit_code: The command's exit status.
+        source: ``"api"`` or ``"local"``: where the view came from.
 
     Returns:
         str: The JSON document.
@@ -107,6 +111,7 @@ def detail_document(view: DeviceDetailView, exit_code: int) -> str:
         "schema": SCHEMA,
         "generated_at": body.pop("generated_at"),
         "exit_code": exit_code,
+        "source": source,
         "device": body.pop("row"),
         **body,
     }

@@ -2,7 +2,7 @@
 
 The API and the web UI read telemetry and inventory through four framework-free services in `vakr.query`. They use only the metadata and telemetry ports, so they work on every backend that passes the contract suites, and they return immutable view models that convert to JSON with `vakr.query.to_jsonable`. The API can return those views as they are. The services are synchronous; an async caller wraps each call in `asyncio.to_thread`. Create each service once per process and share it, because the inventory index and the ranking scans are cached inside the service.
 
-Defaults and bounds are listed in blueprint [Appendix E.28](../../tool-blueprint.md#e28-history-rankings-and-search-queries-m4). The current-state service `StatusQueries`, used by `vakr status` and `vakr tui`, is described in [status and TUI](../operations/status-and-tui.md).
+Defaults and bounds are listed in blueprint [Appendix E.28](../../tool-blueprint.md#e28-history-rankings-and-search-queries-m4). The current-state service `StatusQueries` is described in [status and TUI](../operations/status-and-tui.md). `vakr status` and `vakr tui` get its views from `vakr-api` over the local socket, decoded with `from_jsonable` (the inverse of `to_jsonable`), or in-process when the API is not running; both satisfy `vakr.query.StatusSource` (Appendix E.29 #10).
 
 | Service | Methods | Returns |
 |---|---|---|

@@ -10,7 +10,8 @@ Keys: ``Escape`` back to the list, ``r`` refresh, ``?`` help, ``q`` quit.
 
 Dependencies:
     textual: Screen and widgets.
-    vakr.query: ``StatusQueries`` and the detail view (TUI-007).
+    vakr.query: ``StatusSource`` and the detail view (TUI-007).
+    vakr.tui.reading: One read at a time, in a worker thread.
 
 Safety:
     Read-only. Reads run in a worker thread, never on the event loop.
@@ -21,7 +22,6 @@ Example:
     '— (needs at least two replies)'
 """
 
-import asyncio
 from typing import ClassVar
 
 from rich.markup import escape
@@ -31,10 +31,10 @@ from textual.events import Resize
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Static
 
-from vakr.domain.errors import StorageError
-from vakr.query import DeviceDetailView, Reading, StatusQueries
+from vakr.query import DeviceDetailView, Reading, StatusSource
 from vakr.query.labels import health_line
 from vakr.tui.columns import COLOR_STYLES, INTERFACE_COLUMNS
+from vakr.tui.reading import READ_ERRORS, Reader, SupersededError, failure_text
 from vakr.tui.tables import fill
 
 
@@ -101,11 +101,11 @@ class DeviceScreen(Screen[None]):
         Binding("r", "refresh", "Refresh"),
     ]
 
-    def __init__(self, queries: StatusQueries, key: str, refresh_s: float) -> None:
+    def __init__(self, source: StatusSource, key: str, refresh_s: float) -> None:
         """Prepare the screen for one device.
 
         Args:
-            queries: The read service.
+            source: Where the views come from.
             key: Device UUID (or exact name).
             refresh_s: Seconds between automatic refreshes.
 
@@ -116,7 +116,8 @@ class DeviceScreen(Screen[None]):
             None
         """
         super().__init__()
-        self._queries = queries
+        self._source = source
+        self._reader = Reader()
         self._key = key
         self._refresh_s = refresh_s
         self._view: DeviceDetailView | None = None
@@ -182,9 +183,11 @@ class DeviceScreen(Screen[None]):
         """
         footer = self.query_one("#device-footer", Static)
         try:
-            view = await asyncio.to_thread(self._queries.device_detail, self._key)
-        except StorageError as exc:
-            footer.update(f"[bold yellow]STALE: inventory unreadable: {escape(str(exc))}[/]")
+            view = await self._reader.read(self._source.device_detail, self._key)
+        except SupersededError:
+            return
+        except READ_ERRORS as exc:
+            footer.update(f"[bold yellow]STALE: {escape(failure_text(exc))}[/]")
             return
         if view is None:
             footer.update("[bold yellow]this device is no longer in inventory[/]")

@@ -27,7 +27,7 @@ from vakr.adapters.sqlite.telemetry import (
     sqlite_telemetry_factory,
     telemetry_migrations,
 )
-from vakr.cli import cmd_status
+from vakr.cli import status_source
 from vakr.cli.main import main
 from vakr.domain.enums import IcmpState, UptimeContinuity
 from vakr.domain.ids import BatchId, PollId, new_id
@@ -336,7 +336,7 @@ def test_usage_errors_and_service_user_failure(
     """
     seed(state)
     assert run(capsys, "--limit", "0")[0] == 2
-    monkeypatch.setattr(cmd_status, "drop_to_service_user", lambda: "cannot switch")
+    monkeypatch.setattr(status_source, "drop_to_service_user", lambda: "cannot switch")
     code, _, err = run(capsys)
     assert (code, "cannot switch" in err) == (3, True)
     assert utc_iso(None) is None

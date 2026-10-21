@@ -12,7 +12,9 @@ The M4 read services behind the API and web UI are ``HistoryQueries``
 utilization and top errors), ``CatalogQueries`` (global interface list,
 WAN and high-priority views, global search), and ``OverviewQueries`` (the
 overview dashboard and grouped device browsing). Their views serialise with
-``to_jsonable``; ``docs/architecture/queries.md`` describes them.
+``to_jsonable`` and come back with ``from_jsonable``, which is how
+``vakr status`` and ``vakr tui`` read them from ``vakr-api`` (``StatusSource``);
+``docs/architecture/queries.md`` describes them.
 
 Modules:
     service: ``StatusQueries``, the facade.
@@ -28,6 +30,7 @@ Modules:
     catalog, catalog_*, search: Cross-device lists and search (12.1, 12.5).
     overview, overview_*: The overview dashboard (12.2).
     export, jsonable, units, zone: Export, JSON, SI units, display zone.
+    from_json, from_json_leaves, source: Views back from JSON; ``StatusSource`` (E.29 #10).
 
 Dependencies:
     vakr.ports, vakr.logic, vakr.domain: Data access, rules, and vocabulary.
@@ -49,6 +52,7 @@ from vakr.query.catalog_order import InterfaceListRequest, InterfaceSort
 from vakr.query.catalog_scope import InterfaceScope
 from vakr.query.detail_views import DeviceDetailView, InterfaceRow
 from vakr.query.export import ExportFormat, export_view
+from vakr.query.from_json import ContractError, from_jsonable
 from vakr.query.history import HistoryQueries
 from vakr.query.history_limits import RangePreset, RankingWindow
 from vakr.query.history_requests import GraphKind, GraphRequest, SourceChoice, TimeRange
@@ -59,6 +63,7 @@ from vakr.query.ranking_views import RankingRequest
 from vakr.query.rankings import RankingQueries
 from vakr.query.service import StatusQueries
 from vakr.query.settings import QueryLimits, QuerySettings, settings_from_config
+from vakr.query.source import SourceUnavailableError, StatusSource
 from vakr.query.views import (
     DASH,
     BucketCounts,
@@ -76,6 +81,7 @@ __all__ = [
     "BucketCounts",
     "CatalogQueries",
     "CollectorHealthView",
+    "ContractError",
     "DeviceDetailView",
     "DeviceListRequest",
     "DeviceListView",
@@ -103,10 +109,13 @@ __all__ = [
     "RankingWindow",
     "Reading",
     "SourceChoice",
+    "SourceUnavailableError",
     "StatusQueries",
+    "StatusSource",
     "StatusView",
     "TimeRange",
     "export_view",
+    "from_jsonable",
     "settings_from_config",
     "to_jsonable",
 ]

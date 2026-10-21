@@ -10,6 +10,8 @@ row ID (API-002).
 ``encode_cursor`` / ``decode_cursor`` give every backend the same cursor
 format (URL-safe base64 of a canonical JSON array) so pages from different
 adapters look alike; a backend may use another opaque format if it must.
+``offset_cursor`` / ``offset_of`` are the one exception to keyset cursors:
+lists ordered by live status carry a position (API-T02, E.30 #7).
 
 Dependencies:
     base64, binascii: URL-safe cursor text.
@@ -136,3 +138,47 @@ def decode_cursor(cursor: str, arity: int) -> CursorKey:
     if not valid or not all(isinstance(p, (str, int)) and not isinstance(p, bool) for p in key):
         raise ValidationError("cursor is not a valid page cursor", field="cursor")
     return tuple(key)
+
+
+MAX_OFFSET = 1_000_000
+"""Largest position an offset cursor may name; far beyond any bounded list (E.29)."""
+_OFFSET_TAG = "o"
+
+
+def offset_cursor(offset: int | None) -> str | None:
+    """Encode a position in a freshly computed order as an opaque cursor (E.30 #7).
+
+    Device and interface lists are ordered by live status or traffic, which
+    no keyset can follow, so their cursor carries the position instead. The
+    API and its local clients (``vakr status``, ``vakr tui``) share this codec.
+
+    Args:
+        offset: Index of the next page's first row, or ``None`` at the end.
+
+    Returns:
+        str | None: The cursor, or ``None``.
+
+    Raises:
+        None
+    """
+    return None if offset is None else encode_cursor((_OFFSET_TAG, offset))
+
+
+def offset_of(cursor: str | None) -> int:
+    """Decode a cursor made by ``offset_cursor``.
+
+    Args:
+        cursor: The cursor, or ``None`` for the first page.
+
+    Returns:
+        int: The position.
+
+    Raises:
+        ValidationError: If the cursor is not one of these.
+    """
+    if cursor is None:
+        return 0
+    tag, offset = decode_cursor(cursor, 2)
+    if tag != _OFFSET_TAG or not isinstance(offset, int) or not 0 <= offset <= MAX_OFFSET:
+        raise ValidationError("cursor is not a valid page cursor", field="cursor")
+    return offset

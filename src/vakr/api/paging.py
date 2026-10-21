@@ -16,7 +16,8 @@ between two page requests can move across the page boundary. Under a fixed
 snapshot the traversal has no duplicates and no gaps (API-T02).
 
 Dependencies:
-    vakr.domain.paging: Cursor encoding and bounds.
+    vakr.domain.paging: Cursor encoding and bounds; the offset codec lives
+        there so the local clients share it without importing the API.
 
 Safety:
     Cursors are validated before use; a tampered one is a 422, never a query.
@@ -30,13 +31,13 @@ Example:
 
 from dataclasses import dataclass
 
-from vakr.domain.errors import ValidationError
 from vakr.domain.paging import (
     DEFAULT_PAGE_LIMIT,
     MAX_CURSOR_LENGTH,
+    MAX_OFFSET,
     MAX_PAGE_LIMIT,
-    decode_cursor,
-    encode_cursor,
+    offset_cursor,
+    offset_of,
 )
 
 __all__ = [
@@ -48,10 +49,6 @@ __all__ = [
     "offset_cursor",
     "offset_of",
 ]
-
-MAX_OFFSET = 1_000_000
-"""Largest position a cursor may name; far beyond any bounded list (E.29)."""
-_OFFSET_TAG = "o"
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,38 +64,3 @@ class PageInfo:
     limit: int
     total: int | None
     next_cursor: str | None
-
-
-def offset_cursor(offset: int | None) -> str | None:
-    """Encode a list position as an opaque cursor.
-
-    Args:
-        offset: Index of the next page's first row, or ``None`` at the end.
-
-    Returns:
-        str | None: The cursor, or ``None``.
-
-    Raises:
-        None
-    """
-    return None if offset is None else encode_cursor((_OFFSET_TAG, offset))
-
-
-def offset_of(cursor: str | None) -> int:
-    """Decode a cursor made by ``offset_cursor``.
-
-    Args:
-        cursor: The cursor, or ``None`` for the first page.
-
-    Returns:
-        int: The position.
-
-    Raises:
-        ValidationError: If the cursor is not one of these.
-    """
-    if cursor is None:
-        return 0
-    tag, offset = decode_cursor(cursor, 2)
-    if tag != _OFFSET_TAG or not isinstance(offset, int) or not 0 <= offset <= MAX_OFFSET:
-        raise ValidationError("cursor is not a valid page cursor", field="cursor")
-    return offset

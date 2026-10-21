@@ -131,6 +131,28 @@ def api_settings_from_config(config: EffectiveConfig, paths: InstallPaths) -> Ap
     )
 
 
+def socket_path_of(config: EffectiveConfig, paths: InstallPaths) -> Path:
+    """Return where the API's socket is, for its local clients (13.1, E.29 #10).
+
+    Only ``api.socket_path`` is read, so a problem in another ``[api]``
+    option never sends ``vakr status``, ``vakr tui``, or the health check to
+    the wrong place. A relative path, which the service refuses to start
+    with, gives the default.
+
+    Args:
+        config: Effective configuration, possibly with problems elsewhere.
+        paths: Install layout.
+
+    Returns:
+        Path: ``api.socket_path``, else ``<run dir>/api.sock``.
+
+    Raises:
+        None
+    """
+    text = str(_get(config, "api.socket_path") or "")
+    return Path(text) if text and Path(text).is_absolute() else paths.run_dir / SOCKET_NAME
+
+
 def api_problems(config: EffectiveConfig) -> list[str]:
     """Return ``[api]`` problems for ``vakr config validate`` and the startup check.
 

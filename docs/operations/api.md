@@ -7,7 +7,7 @@ It listens in two places:
 | Listener | Default | Who uses it | How callers are identified |
 |---|---|---|---|
 | TCP, plain HTTP | `127.0.0.1:8080` | A reverse proxy on the same host, which terminates TLS ([web access](web-access.md)) | Session cookie from a sign-in, or a kiosk token |
-| Unix socket | `/run/vakr/api.sock` | `vakr check health` today, `vakr tui` and the CLI later, and scripts on the node | The connecting account (`SO_PEERCRED`) |
+| Unix socket | `/run/vakr/api.sock` | `vakr status`, `vakr tui`, `vakr check health`, and scripts on the node | The connecting account (`SO_PEERCRED`) |
 
 - [Starting and stopping](#starting-and-stopping)
 - [Startup checks](#startup-checks)
@@ -90,6 +90,8 @@ The socket file is mode 0666 inside `/run/vakr` (mode 0751), so any account on t
 
 No cookie, token, or CSRF header is used on the socket, and the sign-in endpoints answer 400 `local_socket` there.
 
+`vakr status` and `vakr tui` read through the socket whenever it exists, and say so (`data: vakr-api socket`). With no socket file they read the databases directly; with a socket nothing answers on, they stop with exit status 3 rather than fall back ([status and TUI](status-and-tui.md#where-the-data-comes-from)). While `vakr-api` is stopped, `--local` reads the databases on purpose.
+
 ```console
 $ sudo curl -s --unix-socket /run/vakr/api.sock http://localhost/api/v1/auth/session
 {"kind":"local","name":"local:root","role":"admin","csrf_token":null,...}
@@ -168,6 +170,7 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/overview` | operator | The overview dashboard: device counts, health, high-priority and WAN rows, top utilization and errors, event feeds, filter choices (`window`) |
 | `GET /api/v1/devices` | operator | The device list in Attention, Active, Offline order, with counts and health; `search`, `bucket` (repeatable), `freshness` (repeatable: `fresh`, `stale`, `never`), `collector` (devices that position has evidence for), `sort` (`status`, `name`, `site`, `age`), `include_retired`, and `site`, `tag`, `group`, `provider`, `admin_state` to browse by grouping; paged |
 | `GET /api/v1/devices/{device_uuid}` | operator | The device screen: facts, every position's verdict, warnings, the interface table |
+| `GET /api/v1/device-lookup?key=` | operator | The same device screen for an exact display name, else a device UUID, as `vakr status DEVICE` takes it; `key` is 1 to 1,024 characters; 404 `not_found` when nothing matches |
 | `GET /api/v1/devices/{device_uuid}/interfaces` | operator | The device's interfaces, sticky, WAN, and high-priority first; `search`, `sort`, `interest` (`primary` or `secondary`), `collector`; paged |
 | `GET /api/v1/devices/{device_uuid}/history/reachability` | operator | Latency, loss, jitter, and the per-probe smoke, one set per position (graph parameters below) |
 | `GET /api/v1/interfaces` | operator | Every interface; `search`, `site`, `tag`, `group`, `provider`, `wan`, `interest`, `lifecycle`, `include_retired`, `sort` (`priority`, `name`, `traffic`, `utilization`), `collector`; paged |

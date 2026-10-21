@@ -1,8 +1,32 @@
 # Current state: `vakr status` and `vakr tui`
 
-Two read-only views show what vakr knows right now about every device. `vakr status` prints a table, or JSON for scripts. `vakr tui` is a full-screen terminal UI for technical staff working over `ssh`. Both read the local databases in `/var/lib/vakr` through the same query service, so they always agree with each other. Neither changes anything on the node.
+Two read-only views show what vakr knows right now about every device. `vakr status` prints a table, or JSON for scripts. `vakr tui` is a full-screen terminal UI for technical staff working over `ssh`. Both get the same views from the same place, so they always agree with each other. Neither changes anything on the node.
 
-Run them on the monitoring node. As root, `sudo vakr status` first switches to the `vakr` service user, just as `vakr db` does. Running them as the `vakr` user works too. Neither command ever creates a database: on a node where `metadata.db` does not exist yet, both say **no data yet** and exit with status 3.
+Run them on the monitoring node. Neither command ever creates a database: on a node where `metadata.db` does not exist yet, both say **no data yet** and exit with status 3.
+
+## Where the data comes from
+
+When [`vakr-api`](api.md) is running, both commands ask it over its local socket, `/run/vakr/api.sock` (`api.socket_path`). When it is not, they read the databases in `/var/lib/vakr` themselves. The answers are the same either way. Only the line that says where they came from differs.
+
+| Situation | What the commands do | They say |
+|---|---|---|
+| `vakr-api` is running | Ask it over the socket. | `data: vakr-api socket` |
+| No socket file: `vakr-api` is not enabled or was stopped | Read the databases directly. The package installs `vakr-api` disabled, so this is normal until you enable it. | `data: local databases (vakr-api is not running)` |
+| `--local` given | Read the databases directly, whatever the API is doing. | `data: local databases (--local)` |
+| The socket exists but nothing answers, it times out, or the answer is unusable | Stop with exit status 3. They do **not** fall back to the databases, so a crashed API is never hidden behind local reads. | `nothing answers on /run/vakr/api.sock: vakr-api stopped uncleanly or is still starting; check systemctl status vakr-api and vakr doctor, or add --local to read the databases directly` |
+
+**Who may use the socket.** `vakr-api` serves root and members of the `vakr-admin` and `vakr` groups, by the account that connects; no password is involved ([users](users.md#local-tui-and-cli-access)). Any other account is refused, and both commands say how to get in:
+
+```console
+$ vakr status
+vakr status: this account may not use the vakr-api socket /run/vakr/api.sock: only root and members of vakr-admin or vakr may; add the account to the vakr group (sudo usermod -aG vakr NAME, then log in again), run the command with sudo, or add --local
+```
+
+After `sudo usermod -aG vakr alice`, Alice must log out and in again before the new group counts.
+
+**Reading the databases directly** (`--local`, or no API) needs read access to `/var/lib/vakr`. As root, `sudo vakr status --local` first switches to the `vakr` service user, just as `vakr db` does. Running as the `vakr` user works too. The SQLite stores have no read-only connection mode, so this path opens its connections read-write. It only ever reads, without taking a write lock, and never creates a missing file.
+
+**Limits** (Appendix E.29). Connecting to the socket may take 2 seconds, and a whole request and answer 30 seconds. An answer may be at most 16 MiB. There are no retries: `vakr status` answers or fails promptly, as a monitoring check should, and the TUI simply tries again at its next refresh.
 
 ## What a status means
 
@@ -40,9 +64,10 @@ The list puts **Attention** at the top, **Active** in the middle, and **Offline*
 ```text
 vakr status [DEVICE] [--json] [--bucket attention|active|offline ...] [--search TEXT]
             [--sort status|name|site|age] [--include-retired] [--limit N] [--offset N]
+            [--local]
 ```
 
-Without `DEVICE`, it prints a summary line (counts per bucket), a health line (databases and each collector's latest report), and the device table. With `DEVICE`, which is the exact display name or the device UUID, it prints the device's summary, its quality warnings, its interface table in sticky, WAN, and primary order, and the reason for every "—".
+Without `DEVICE`, it prints a summary line (counts per bucket), a health line (databases and each collector's latest report), the `data:` line, and the device table. With `DEVICE`, which is the exact display name or the device UUID, it prints the device's summary, its quality warnings, its interface table in sticky, WAN, and primary order, and the reason for every "—".
 
 `--search` matches part of the name, poll address, site, tags, collector, or status label, ignoring case: `--search down` finds the red devices. `--bucket` can be repeated. A page holds 100 devices by default and 500 at most.
 
@@ -54,14 +79,16 @@ The exit codes follow the Nagios plugin convention, so a monitoring system can r
 |---|---|
 | 0 | Every listed device is Active or Offline. Nothing needs attention. |
 | 1 | At least one listed device is in Attention (red or amber). |
-| 3 | vakr cannot say: no data yet, an unreadable or unmigrated database, telemetry unavailable, an empty inventory, or no such device. |
+| 3 | vakr cannot say: no data yet, an unreadable or unmigrated database, telemetry unavailable, an empty inventory, no such device, or a `vakr-api` that does not answer or refuses the account. |
 | 2 | A usage error, such as `--limit 0`. Nagios CRITICAL is not used. |
 
 The exit code covers the devices listed, so `vakr status --bucket attention` exits 1 exactly when something needs attention. A search that matches nothing exits 0.
 
+A monitoring agent that runs the check under its own account, such as NRPE as `nagios`, needs that account in the `vakr` group (`sudo usermod -aG vakr nagios`, then restart the agent). Otherwise the socket refuses it and the check reports UNKNOWN (3) with the reason.
+
 ### JSON
 
-`--json` prints the same view as a JSON document with `"schema": "vakr.status/1"`, `generated_at` (ISO 8601 UTC with `Z`), `exit_code`, `health`, `counts`, and `devices` (or `device`, `facts`, `warnings`, and `interfaces` for one device). Every displayed value is an object:
+`--json` prints the same view as a JSON document with `"schema": "vakr.status/1"`, `generated_at` (ISO 8601 UTC with `Z`), `exit_code`, `source` (`"api"` or `"local"`), `health`, `counts`, and `devices` (or `device`, `facts`, `warnings`, and `interfaces` for one device). Every displayed value is an object:
 
 ```json
 {"text": "—", "value": null, "reason": "no probe answered", "stale": false}
@@ -72,10 +99,12 @@ A missing value is `"value": null` with a `reason`, never `0`. Enum values (`att
 ## `vakr tui`
 
 ```text
-vakr tui [--refresh SECONDS]
+vakr tui [--local] [--refresh SECONDS]
 ```
 
-The TUI opens on the device list and reads current state again every `tui.refresh_interval`: 10 seconds by default, or between 2 seconds and 10 minutes with `--refresh`. Each refresh runs in the background, so the screen never freezes on a slow disk, and the cursor stays on the same device across refreshes.
+The TUI opens on the device list and reads current state again every `tui.refresh_interval`: 10 seconds by default, or between 2 seconds and 10 minutes with `--refresh`. Each refresh runs in the background, so the screen never freezes on a slow disk or a slow API, and the cursor stays on the same device across refreshes. A screen has at most one read in flight: typing a search asks for a refresh per key, and the ones that have not started yet are dropped in favour of the newest.
+
+Before it opens, the TUI checks that `vakr-api` answers on the socket, and it exits with status 3 and the message above if it does not. If the API goes away while the TUI is open, the rows already shown stay, and the line under the table says **STALE** in bold, why, and when the rows were read.
 
 | Key | Action |
 |---|---|
@@ -91,7 +120,7 @@ The TUI opens on the device list and reads current state again every `tui.refres
 | ↑ ↓ PageUp PageDown | Move |
 | `q` | Quit |
 
-The header shows the release, the current time in the display timezone (`time.timezone`, or the host's timezone when that is empty), the health of the databases and collectors, and the refresh interval. The line under the table shows the bucket counts, the filter, the sort, and the page.
+The header shows the release and where the data comes from (`data: vakr-api socket`, or why the databases are read directly), the current time in the display timezone (`time.timezone`, or the host's timezone when that is empty), the health of the databases and collectors, how long the last read took, and the refresh interval. The line under the table shows the bucket counts, the filter, the sort, and the page.
 
 The device screen shows a compact summary first: status, poll address, site, tags, and collector; ICMP probes, latency, and jitter; SNMP and `sysUpTime`; the last poll and the data's age; and any quality warnings. With two collectors, each position's own verdict is listed as well. Below the summary is the interface table: name, flags, alias, admin/oper state, in/out rate, utilization, packet rates, errors since the previous sample, capacity and its source, and sample age. Sticky interfaces come first, then WAN circuits, then primary (high-priority) interfaces, then the rest in natural name order.
 
@@ -99,8 +128,7 @@ The TUI is fully usable in a 120×30 terminal. In a narrower one, the least impo
 
 ### Not in this release
 
-- `--api-url` is accepted and refused: `vakr-api` now serves the [API](api.md), but the TUI does not use it yet. `--profile` (blueprint 13.1) waits for that switch as well.
+- `--api-url` and `--profile` (blueprint 13.1) are accepted and refused. A TUI on another host would need API credentials or tokens for a person, which vakr does not offer yet. Run `vakr tui` on the monitoring node, over `ssh`.
 - Interface detail with a sparkline history (blueprint 13.3) is a later addition.
 - `sysDescr`, `sysObjectID`, `sysName`, `sysLocation`, and `sysContact` are not stored in inventory yet. The device screen says so; `vakr snmp discover` shows them for one device.
 - State-change times are not recorded yet, so within a bucket and severity the list falls back to natural name order.
-- The SQLite stores have no read-only connection mode, so both commands open their connections read-write. They only ever read, without taking a write lock, and they never create a missing file.

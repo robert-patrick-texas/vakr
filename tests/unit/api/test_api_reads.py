@@ -261,6 +261,32 @@ def test_views_detail_search_and_catalog_answer() -> None:
     assert client.get(f"/api/v1/devices/{uuid.uuid4()}/interfaces").status_code == 404
 
 
+def test_e30_15_device_lookup_by_exact_name_else_uuid() -> None:
+    """E.30 #15, E.29 #10: ``device-lookup`` finds what ``vakr status DEVICE`` finds locally.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    kit = ApiKit.create()
+    device = kit.fleet.device("core1")
+    client = kit.socket_client(Role.OPERATOR)
+    by_name = client.get("/api/v1/device-lookup", params={"key": "core1"})
+    by_id = client.get("/api/v1/device-lookup", params={"key": str(device.id)})
+    assert by_name.json() == by_id.json() == client.get(f"/api/v1/devices/{device.id}").json()
+    missing = client.get("/api/v1/device-lookup", params={"key": "CORE1"})
+    assert (missing.status_code, missing.json()["code"]) == (404, "not_found")
+    assert "CORE1" not in missing.json()["message"]  # the key is not echoed back
+    for key in ("", "x" * 1025):
+        answer = client.get("/api/v1/device-lookup", params={"key": key})
+        assert (answer.status_code, answer.json()["code"]) == (422, "invalid_request")
+
+
 def test_api012_exports_are_attachments_with_bounds(monkeypatch: pytest.MonkeyPatch) -> None:
     """API-012, API-T09: CSV and JSON files with UTC times and zone; too large is a 422.
 

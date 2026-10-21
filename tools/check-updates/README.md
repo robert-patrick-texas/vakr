@@ -9,11 +9,13 @@ check-updates answers one question before a release: *what is out of date, and w
 | Python | `.python-version` (minor series), `requires-python` floor, the interpreter `uv python find` selects | python.org release API |
 | Go | `go version`, the `go` directive of every `go.mod` (minor series) | `go.dev/dl/?mode=json` |
 | Go modules | the direct requirements of every `go.mod` | `go list -m -u -json all` (the Go module proxy) |
+| Node.js | a version file such as `.node-version` (as written, usually the major line), the `engines.node` floor of `package.json` (major line), `node --version` | the newest LTS release in `nodejs.org/dist/index.json`; the newest Current release is named for information |
 | PyPI packages | `uv.lock`, for every direct dependency, optional extra, and dependency-group member in `pyproject.toml` | PyPI JSON API |
 | The whole lockfile | `uv lock --upgrade --dry-run`, which also covers transitive packages | the resolver |
+| npm packages | `package-lock.json`, for every `dependencies` and `devDependencies` entry of `package.json` | the registry's `latest` dist-tag |
 | GitHub Actions | `uses:` lines in workflows: tag pins (`@v7`) and commit pins with a `# vX.Y.Z` comment | GitHub releases |
 | Tools and other pins | a command's output (`uv --version`), a regex over a file (a Makefile pin, PEP 723 inline metadata), or a literal | PyPI, GitHub releases, or npm |
-| Vendored front-end assets | a literal version in the config | npm or GitHub releases |
+| Vendored front-end files | a literal version in the config, for files copied into the repository by hand | npm or GitHub releases |
 
 Pre-releases (`a`, `b`, `rc`, `dev`, and SemVer suffixes such as `-beta.1`), drafts, yanked files, and non-CPython entries on python.org are never treated as the latest release.
 
@@ -69,8 +71,8 @@ A version is compared at the precision it is written with. `3.15` in `.python-ve
 Everything project-specific lives in `check-updates.toml`. Paths are relative to `--root`. A section that is absent is not checked, and unknown sections or keys are rejected, so a typo cannot make an item silently disappear.
 
 ```toml
-assets = [                                  # vendored front-end files; must precede tables
-    { name = "echarts", version = "6.0.0", npm = "echarts" },
+assets = [                                  # hand-vendored front-end files; must precede tables
+    { name = "htmx", version = "2.0.7", github = "bigskysoftware/htmx" },
 ]
 
 [settings]
@@ -88,6 +90,12 @@ binary = ["go", "version"]
 go_mod = ["**/go.mod"]                      # .git, .venv, vendor, node_modules are skipped
 modules = true                              # also report each go.mod's direct requirements
 
+[node]
+version_file = "web/.node-version"           # compared as written: `24` is current while 24.x is the newest LTS
+engines = "web/package.json"                # floor of engines.node, by major line
+binary = ["node", "--version"]
+releases_url = "https://nodejs.org/dist/index.json"
+
 [pypi]
 pyproject = "pyproject.toml"
 lockfile = "uv.lock"
@@ -97,6 +105,12 @@ extra = ["certifi"]                         # more locked names to report
 [lockfile]
 lockfile = "uv.lock"
 command = ["uv", "lock", "--upgrade", "--dry-run"]
+
+[npm]
+package_json = "web/package.json"
+lockfile = "web/package-lock.json"         # lockfileVersion 1 to 3
+direct_dependencies = true                  # every dependencies and devDependencies entry
+extra = ["zrender"]                         # more locked top-level names to report
 
 [actions]
 workflows = [".github/workflows/*.yml", ".github/workflows/*.yaml"]
@@ -153,6 +167,9 @@ uvx ruff@0.17.1 check tools/check-updates && uvx ruff@0.17.1 format --check tool
 - GitHub lookups read the newest `per_page` releases (default 10) and pick the highest stable tag among them.
 - PyPI rows show the newest release on PyPI, even when the project's version constraints forbid it. The lockfile row shows what the resolver would actually choose.
 - Go module rows cover direct requirements only, and their status is Go's own: a requirement is behind when `go list -m -u` reports an `Update`.
+- npm rows show the registry's `latest` release, even when a peer dependency of another package forbids it (TypeScript 7 while the Svelte tools accept 6). There is no whole-lockfile npm row; transitive packages follow from the direct ones, or are named in `extra`.
+- Node rows are judged against LTS releases only. A new major line counts once nodejs.org promotes it to LTS, usually in October of its release year. `.node-version` aliases such as `lts/*` cannot be compared and show as `unknown`.
+- `[node]` and `[npm]` reject unknown keys; the older sections check only their section names.
 
 ## License
 

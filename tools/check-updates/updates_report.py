@@ -40,8 +40,8 @@ class Result:
 
     Attributes:
         item: What was checked, such as ``ruff`` or ``actions/checkout``.
-        category: Source family: ``python``, ``go``, ``tool``, ``pypi``,
-            ``lockfile``, ``action``, or ``asset``.
+        category: Source family: ``python``, ``go``, ``node``, ``tool``,
+            ``pypi``, ``lockfile``, ``npm``, ``action``, or ``asset``.
         current: Version in use; empty when unknown or not pinned.
         latest: Latest stable upstream version; empty when unavailable.
         status: ``current``, ``update available``, or ``unknown``.

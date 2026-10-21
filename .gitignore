@@ -13,6 +13,15 @@ build/
 # Go
 /bin/
 
+# Web UI (web/): dependencies, SvelteKit output, the build, and test output
+web/node_modules/
+web/.svelte-kit/
+web/build/
+web/test-results/
+web/playwright-report/
+web/blob-report/
+web/playwright/.cache/
+
 # Generated documentation site (built by tools/md2html in CI)
 _site/
 

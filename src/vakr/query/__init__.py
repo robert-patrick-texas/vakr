@@ -53,7 +53,7 @@ from vakr.query.history import HistoryQueries
 from vakr.query.history_limits import RangePreset, RankingWindow
 from vakr.query.history_requests import GraphKind, GraphRequest, SourceChoice, TimeRange
 from vakr.query.jsonable import to_jsonable
-from vakr.query.listing import DeviceListRequest, DeviceSort
+from vakr.query.listing import DeviceListRequest, DeviceSort, FreshnessFilter
 from vakr.query.overview import DeviceScope, OverviewQueries
 from vakr.query.ranking_views import RankingRequest
 from vakr.query.rankings import RankingQueries
@@ -83,6 +83,7 @@ __all__ = [
     "DeviceScope",
     "DeviceSort",
     "ExportFormat",
+    "FreshnessFilter",
     "GraphKind",
     "GraphRequest",
     "HealthView",

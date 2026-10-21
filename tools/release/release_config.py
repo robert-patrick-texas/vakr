@@ -44,6 +44,8 @@ _STRINGS = (
     "prerelease",
 )
 _LISTS = ("build_command", "artifacts", "optional_artifacts")
+_OPTIONAL = ("build_tools", "node_version_file")
+"""Keys that may be absent: build-host tools to require, and a Node pin to match."""
 
 EXAMPLE: dict[str, Any] = {
     **{key: key for key in _STRINGS},
@@ -83,6 +85,10 @@ class ReleaseConfig:
         optional_artifacts: Artifact patterns that may match nothing.
         output_dir: Release staging directory pattern, with placeholders.
         prerelease: One of ``PRERELEASE_RULES``.
+        build_tools: Programs the build host must have, each asked for
+            ``--version`` in preflight (ADR-035: ``node``, ``npm``).
+        node_version_file: File whose version (a major such as ``24``)
+            the installed ``node`` must match; ``None`` skips the check.
     """
 
     root: Path
@@ -101,6 +107,8 @@ class ReleaseConfig:
     optional_artifacts: tuple[str, ...]
     output_dir: str
     prerelease: str
+    build_tools: tuple[str, ...] = ()
+    node_version_file: Path | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any], root: Path) -> ReleaseConfig:
@@ -117,7 +125,7 @@ class ReleaseConfig:
             ConfigError: On unknown, missing, or mistyped keys, an unknown
                 prerelease rule, or a malformed ``repo``.
         """
-        unknown = sorted(set(data) - set(_STRINGS) - set(_LISTS))
+        unknown = sorted(set(data) - set(_STRINGS) - set(_LISTS) - set(_OPTIONAL))
         if unknown:
             raise ConfigError(f"unknown release config keys: {', '.join(unknown)}")
         text = {key: _string(data, key) for key in _STRINGS}
@@ -128,6 +136,8 @@ class ReleaseConfig:
             raise ConfigError("repo must be OWNER/NAME")
         if not lists["build_command"] or not lists["artifacts"]:
             raise ConfigError("build_command and artifacts must not be empty")
+        tools = _string_list(data, "build_tools") if "build_tools" in data else ()
+        pin = _string(data, "node_version_file") if data.get("node_version_file") else None
         return cls(
             root=root,
             repo=text["repo"],
@@ -145,6 +155,8 @@ class ReleaseConfig:
             optional_artifacts=lists["optional_artifacts"],
             output_dir=text["output_dir"],
             prerelease=text["prerelease"],
+            build_tools=tools,
+            node_version_file=_resolve(root, pin) if pin else None,
         )
 
     def placeholders(self, version: ReleaseVersion) -> dict[str, str]:

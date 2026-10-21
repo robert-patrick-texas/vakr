@@ -29,8 +29,15 @@ from typing import Any
 
 from updates_sources import SOURCES
 
-SECTIONS = frozenset({"settings", "python", "go", "pypi", "lockfile", "actions", "tools", "assets"})
+SECTIONS = frozenset(
+    {"settings", "python", "go", "node", "pypi", "lockfile", "npm", "actions", "tools", "assets"}
+)
 _ENTRY_KEYS = frozenset({"name", "command", "file", "version", "regex", "per_page", *SOURCES})
+# Keys of the front-end sections (ADR-035 #18); a misspelt key must not hide a row.
+_TABLE_KEYS = {
+    "node": frozenset({"releases_url", "version_file", "engines", "binary"}),
+    "npm": frozenset({"package_json", "lockfile", "direct_dependencies", "extra"}),
+}
 
 
 class ConfigError(Exception):
@@ -73,6 +80,31 @@ def _validate_entry(entry: Any, where: str, needs_version: bool) -> None:
         raise ConfigError(f"{where}: invalid regex: {exc}") from None
 
 
+def _validate_table(table: Any, name: str, where: str) -> None:
+    """Check the keys and value types of a ``[node]`` or ``[npm]`` table.
+
+    Args:
+        table: Parsed TOML value of the section.
+        name: Section name, a key of ``_TABLE_KEYS``.
+        where: Location for error messages (the file name).
+
+    Returns:
+        None
+
+    Raises:
+        ConfigError: If the section is not a table, names an unknown key,
+            or has a list that is not a list of strings.
+    """
+    if not isinstance(table, dict):
+        raise ConfigError(f"{where}: [{name}] must be a table")
+    if unknown := sorted(set(table) - _TABLE_KEYS[name]):
+        raise ConfigError(f"{where}: [{name}] unknown key(s) {', '.join(unknown)}")
+    for key in ("binary", "extra"):
+        value = table.get(key, [])
+        if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+            raise ConfigError(f"{where}: [{name}] '{key}' must be a list of strings")
+
+
 def load_config(path: Path) -> dict[str, Any]:
     """Read and validate ``check-updates.toml``.
 
@@ -84,7 +116,7 @@ def load_config(path: Path) -> dict[str, Any]:
 
     Raises:
         ConfigError: If the file cannot be read or parsed, names an unknown
-            section, or has an invalid tool or asset entry.
+            section, or has an invalid tool, asset, ``[node]``, or ``[npm]`` entry.
     """
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -98,4 +130,7 @@ def load_config(path: Path) -> dict[str, Any]:
             raise ConfigError(f"{path.name}: '{kind}' must be a list of tables")
         for index, entry in enumerate(entries):
             _validate_entry(entry, f"{path.name}: {kind}[{index}]", kind == "assets")
+    for name in _TABLE_KEYS:
+        if name in data:
+            _validate_table(data[name], name, path.name)
     return data

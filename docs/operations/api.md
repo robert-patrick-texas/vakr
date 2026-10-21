@@ -1,6 +1,6 @@
 # The API service
 
-`vakr-api.service` serves vakr's JSON API, version 1. The coming web UI, `vakr tui`, the CLI, and your own integrations all read monitoring state through it. It reads telemetry, which only the [collector](collector.md) writes, and it writes metadata: sign-in sessions, audit records, and administrator decisions.
+`vakr-api.service` serves vakr's JSON API, version 1. The [web UI](web-ui.md), `vakr tui`, the CLI, and your own integrations all read monitoring state through it. The same service serves the web UI's pages at every path outside `/api/`. It reads telemetry, which only the [collector](collector.md) writes, and it writes metadata: sign-in sessions, audit records, and administrator decisions.
 
 It listens in two places:
 
@@ -150,7 +150,7 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 
   Every answer, error or not, carries `X-Request-ID`. A trusted proxy may send its own `X-Request-ID` (1 to 64 letters, digits, `.`, `_`, `-`), and vakr then uses it.
 - **Lists** take `limit` (1 to 500, default 100) and `cursor`, and answer `page`: `{"limit", "total", "next_cursor"}`. Pass `next_cursor` back as `cursor` and change nothing else; it is `null` on the last page (API-005). Cursors are opaque and at most 1,024 characters. Sites, tags, groups, collectors, identity history, and reviews use the store's keyset cursors, so a record added while you page never repeats or skips a row. Device and interface lists are ordered by live status or traffic, so their cursor is a position in a freshly computed order: a device whose status changes between two page requests can move across the page boundary.
-- **Headers** on every answer: `Content-Security-Policy` (same origin only, `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy: same-origin`, a restrictive `Permissions-Policy`, and `Cache-Control: no-store`.
+- **Headers** on every answer: `Content-Security-Policy` (same origin only, `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy: same-origin`, a restrictive `Permissions-Policy`, and, under `/api/`, `Cache-Control: no-store`. The web UI's pages add the SHA-256 hash of their bootstrap script to `script-src` and are `Cache-Control: no-cache`; its hashed files are cacheable for a year ([web UI](web-ui.md), Appendix E.31).
 
 ## Endpoints
 
@@ -166,9 +166,9 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `POST /api/v1/auth/logout` | a session | 204; clears the cookie |
 | `GET /api/v1/auth/session` | any caller | Who you are, your role, and for users the CSRF token and expiry |
 | `GET /api/v1/overview` | operator | The overview dashboard: device counts, health, high-priority and WAN rows, top utilization and errors, event feeds, filter choices (`window`) |
-| `GET /api/v1/devices` | operator | The device list in Attention, Active, Offline order, with counts and health; `search`, `bucket` (repeatable), `sort` (`status`, `name`, `site`, `age`), `include_retired`, and `site`, `tag`, `group`, `provider`, `admin_state` to browse by grouping; paged |
+| `GET /api/v1/devices` | operator | The device list in Attention, Active, Offline order, with counts and health; `search`, `bucket` (repeatable), `freshness` (repeatable: `fresh`, `stale`, `never`), `collector` (devices that position has evidence for), `sort` (`status`, `name`, `site`, `age`), `include_retired`, and `site`, `tag`, `group`, `provider`, `admin_state` to browse by grouping; paged |
 | `GET /api/v1/devices/{device_uuid}` | operator | The device screen: facts, every position's verdict, warnings, the interface table |
-| `GET /api/v1/devices/{device_uuid}/interfaces` | operator | The device's interfaces, sticky, WAN, and high-priority first; `search`, `sort`, `collector`; paged |
+| `GET /api/v1/devices/{device_uuid}/interfaces` | operator | The device's interfaces, sticky, WAN, and high-priority first; `search`, `sort`, `interest` (`primary` or `secondary`), `collector`; paged |
 | `GET /api/v1/devices/{device_uuid}/history/reachability` | operator | Latency, loss, jitter, and the per-probe smoke, one set per position (graph parameters below) |
 | `GET /api/v1/interfaces` | operator | Every interface; `search`, `site`, `tag`, `group`, `provider`, `wan`, `interest`, `lifecycle`, `include_retired`, `sort` (`priority`, `name`, `traffic`, `utilization`), `collector`; paged |
 | `GET /api/v1/interfaces/{interface_uuid}` | operator | Identity and annotations (names, `ifIndex`, speeds, addresses, lifecycle, provider, circuit, contracted rate) plus current values from one position |
@@ -200,7 +200,7 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 
 ## Not in this release
 
-These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), rediscovery requests, inventory imports, policies, dashboards and their publication, events, asynchronous operations and exports (`/operations`, `/exports/{operation_uuid}`), the server-sent event stream, kiosk-token management, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`. The API already accepts kiosk tokens, but no command or endpoint creates them yet; that arrives with the web UI.
+These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), rediscovery requests, inventory imports, policies, dashboards and their publication, events, asynchronous operations and exports (`/operations`, `/exports/{operation_uuid}`), the server-sent event stream, kiosk-token management, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`. The API already accepts kiosk tokens, but no command or endpoint creates them yet; creating them arrives with kiosk dashboards, after this release.
 
 ## OpenAPI document
 

@@ -8,13 +8,11 @@ the envelope of ``vakr.api.errors``. Interactive documentation pages are
 off: they load scripts from a CDN (UI-012). The OpenAPI document is served
 at ``/api/v1/openapi.json`` and checked in as ``docs/api/openapi.json``.
 
-**The web front end attaches at ``web``.** Whether it becomes
-server-rendered pages (Jinja and HTMX) or a single-page app built to
-static files is not decided yet. Either is a function that receives the
-app and adds its routes or a ``StaticFiles`` mount outside ``/api/``, for
-example ``web=lambda app: app.mount("/", StaticFiles(directory=..., html=True))``.
-It inherits the security headers and must not change state on GET; every
-state change goes through the JSON API, which enforces CSRF.
+**The web front end attaches at ``web``.** It is the static SvelteKit
+build of ADR-035, attached by ``vakr.api.web.web_mount``: a function that
+receives the app and adds its routes outside ``/api/``. It inherits the
+security headers and must not change state on GET; every state change
+goes through the JSON API, which enforces CSRF.
 
 Dependencies:
     fastapi: The application.

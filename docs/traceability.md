@@ -10,7 +10,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 |---|---|---|---|---|---|
 | VER-001 | In progress | `VERSION`, `pyproject.toml` (hatch dynamic version), `src/vakr/version.py`, `packaging/build-deb.sh`, `tools/release/release.py`, `tools/fieldkit/build_pyz.py` | `tests/unit/test_cli.py::test_version_flag_prints_installed_version`, `packaging/container/install-test.sh` | Blueprint 28.2 | ADR-029. Not yet wired: Go `-ldflags` and documentation footers. |
 | VER-002 | Implemented | `tools/release/release_version.py`, `src/vakr/lifecycle/update/versions.py` | `tools/release/test_release_version.py`, `tests/unit/lifecycle/test_update_versions.py` | `docs/development/release.md` | Results are cross-checked against `dpkg --compare-versions` and `packaging.version`. |
-| VER-003 | Implemented | `tools/check-version/check_version.py` | `make version` in CI | Blueprint 28.2 | `src/vakr/defaults/options.toml` is allowlisted because its `since` values name releases. |
+| VER-003 | Implemented | `tools/check-version/check_version.py` | `make version` in CI | Blueprint 28.2 | `src/vakr/defaults/options.toml` is allowlisted because its `since` values name releases; `web/package-lock.json` like `uv.lock`. `web/package.json` has the fixed placeholder `0.0.0`; the web UI reads the release from `GET /api/v1/version`. |
 | VER-004 | In progress | `tools/release/release_publish.py` | `tools/release/test_release_publish.py` | `docs/development/release.md` | Release notes are taken from the matching `CHANGELOG.md` section. |
 | PKG-001 | Implemented | `packaging/nfpm.yaml`, `packaging/build-deb.sh`, `packaging/container/build.sh`, `packaging/Dockerfile` | `make package-test`, `packaging/tests/test_package_spec.py`, CI `Package` job | `docs/development/release.md`, `packaging/README.md` | ADR-025. The spec is already RPM-ready. |
 | PKG-002 | Implemented | `packaging/nfpm.yaml`, `packaging/container/build.sh` | `install-test.sh`, `test_package_spec.py::test_nfpm_places_only_integration_points_outside_opt` | `docs/operations/install.md` | `/usr/share/doc/vakr/{copyright,changelog.gz}` and the lintian overrides are required by Debian policy. |
@@ -105,7 +105,7 @@ Code lives in `src/vakr/logic/` and tests in `tests/unit/logic/`. Rules and the 
 | LIFE-001/003/004/006 | In progress | `lifecycle_model.py`, `lifecycle.py` | `test_logic_lifecycle.py` (LIFE-T01) | `quality-states.md` | E.17 #12. The scheduler and persistence still need to use it. |
 | MPOS-007 | In progress | `status.py` (`composite_status`) | `test_logic_status.py::test_composite` | `quality-states.md` | E.17 #7. The UI is pending. |
 | OBS-003 | In progress | `icmp.py`, `status_table.py` (row 3) | `test_collector_context`, `test_e2_rows` | `quality-states.md` | |
-| UI-005 | In progress | `status.py` (`device_sort_key`) | `test_device_list_order` | `quality-states.md` | WEB-T01 covers the logic only. |
+| UI-005 | Implemented | `status.py` (`device_sort_key`) | `test_device_list_order`, WEB-T01 `web/e2e/devices.spec.ts` | `quality-states.md` | The web page is in [Web UI (M4)](#web-ui-m4). |
 | DASH-003/004/005 | In progress | `ranking.py`, `ranking_errors.py`, `stats.py` | `test_logic_ranking.py` (DASH-T01..T03) | `quality-states.md` | E.17 #13. The M4 query is `vakr.query.rankings` (see the M4 query section); the UI is pending. |
 | RET-004 | In progress | `stats.py` (`p95`) | `test_logic_stats.py::test_nearest_rank` | `quality-states.md` | Rollups must import `p95` from here. |
 | QG-006 | In progress | `vakr.logic` | `--cov-branch` 100% | | Not yet enforced as a CI gate. |
@@ -406,7 +406,7 @@ The read services for the API and web UI are in `src/vakr/query/`: `history.py` 
 | MPOS-008, MPOS-T04 (query) | Implemented | `history_context.choose_collectors`, `latency.py`, `rankings.py` | `test_mpos008_one_series_per_position_never_merged`, `test_mpos008_latency_is_per_position_with_probe_smoke`, `test_mpos008_rankings_use_one_collector`, contract `test_mpos008_collectors_are_never_merged` | `queries.md` | One series per position; rankings use one collector. |
 | DASH-003/004/005, E.17 #13 (query) | Implemented | `query/rankings.py`, `ranking_rows.py`, `HistoryQuery.window_summaries` | `test_rankings.py` (DASH-T01..T03), contract `test_e17_13_nearest_rank_p95_and_error_sums` | `queries.md`, E.28 #1 | 24-hour first computation exceeds 12.9's 2 s (recorded contradiction, E.28 #1). |
 | E.17 #15 (query) | Implemented | `graph_build.py`, `ranking_rows.py` via `interface_capacity` | `test_e17_15_utilization_needs_a_link_and_lines_show_capacity`, `test_dash_t03_e17_15_exclusions_carry_the_reason`, `test_e17_15_capacity_override_lets_a_tunnel_rank` | `queries.md` | |
-| UI-008, DASH-001, DASH-002, DASH-006 | Implemented (query) | `catalog.py` (`high_priority`, `wan_circuits`), `catalog_scope.InterfaceScope`, `overview.py` | `test_ui017_primary_and_wan_first_then_natural_names`, `test_dash002_wan_circuits_carry_circuit_metadata`, `test_ui008_scope_filters_and_request_bounds` | `queries.md` | Web pages are pending. |
+| UI-008, DASH-001, DASH-002, DASH-006 | Implemented (query) | `catalog.py` (`high_priority`, `wan_circuits`), `catalog_scope.InterfaceScope`, `overview.py` | `test_ui017_primary_and_wan_first_then_natural_names`, `test_dash002_wan_circuits_carry_circuit_metadata`, `test_ui008_scope_filters_and_request_bounds` | `queries.md` | Web pages: [Web UI (M4)](#web-ui-m4). |
 | UI-009 | Implemented (query) | `overview.DeviceScope`, `OverviewQueries.browse` | `test_ui009_browse_devices_by_group` | `queries.md` | |
 | UI-017 | Implemented (query) | `catalog_order.py` (priority order), `search.py` (hits carry interface UUIDs) | `test_ui017_primary_and_wan_first_then_natural_names`, `test_12_1_search_kinds_and_sec019_plain_text` | `queries.md` | |
 | API-005, API-T02 (lists) | Implemented | `catalog_order.InterfaceListRequest`, `ordered` | `test_api005_paging_is_stable_and_bounded` | `queries.md` | Offset paging with `total` and `next_offset`. |
@@ -441,7 +441,7 @@ The HTTP layer is `src/vakr/api/` (FastAPI app, routes, middleware, auth over HT
 | SEC-018 (API) | Implemented | `vakr.auth` audit via `routes_auth`; identity decisions via `discovery.reconcile.admin` | `test_api_auth.py::test_sec018_login_audit_names_the_client_and_the_request`, `test_api_identity.py` | `api.md` | Login, failure, logout with client address and request ID; identity decisions name the admin or `local:<account>`. |
 | SEC-019 (API) | Implemented | `params.py` bounds, `middleware` body limit, h11 head limit, uvicorn concurrency | `test_api_errors.py::test_api_t03_validation_errors_name_the_field`, `test_api_headers.py::test_sec019_request_bodies_are_bounded` | E.30 | Pages, cursors, search text, ranges, points, bodies, connections. |
 | SEC-003 (API) | Implemented | Envelope, access log, `Secret` handling | `test_api_errors.py::test_sec003_no_password_or_token_in_any_answer_or_log` | `api.md` | Responses, headers, and logs searched for each password, session, and kiosk token. |
-| 15.4, WEB-T10 (headers) | Implemented | `api/middleware_parts.SECURITY_HEADERS` | `test_api_headers.py::test_web_t10_security_headers_on_every_kind_of_answer` | `api.md` | CSP `frame-ancestors 'none'`, nosniff, DENY, no-referrer, COOP/CORP, `Cache-Control: no-store`. HTML auto-escaping applies when a web layer arrives. |
+| 15.4, WEB-T10 (headers) | Implemented | `api/middleware_parts.SECURITY_HEADERS` | `test_api_headers.py::test_web_t10_security_headers_on_every_kind_of_answer` | `api.md` | CSP `frame-ancestors 'none'`, nosniff, DENY, no-referrer, COOP/CORP, `Cache-Control: no-store`. Pages: [Web UI (M4)](#web-ui-m4); Svelte escapes text and ESLint forbids raw HTML. |
 | E.12 local socket roles (server) | Implemented | `api/peer.py` (`PeerProtocol`), `app/api/listeners.py`, `middleware_parts.refuse_peer` | `test_api_socket.py` (real socket: roles, refusal, TCP never carries peer credentials) | `api.md#the-local-socket`, E.30 #2 | `/run/vakr` 0751, socket 0666; refused accounts get 403 on every endpoint. |
 | SVC-004, OPS-001 (API) | Implemented | `routes_health.py`, `health/api_check.py` (`check_api` in `vakr check health`/`doctor`) | `test_api_health_check.py`, `test_api_reads.py::test_ui014_*` | `api.md#health-and-monitoring-the-api` | The API never runs `check_api` itself. |
 | SVC-001, SVC-005, SVC-009, 16.3, 16.4 (API) | Implemented | `app/api/build.py`, `entry.py`, `server.py`, `packaging/systemd/vakr-api.service` | `test_api_server.py`, `packaging/tests/test_units.py::test_api_unit_joins_the_target_hardened_and_disabled`, `systemd-test.sh` | `api.md` | `Type=notify`, exit 78 without restart, clean stop removes the socket. |
@@ -451,6 +451,44 @@ The HTTP layer is `src/vakr/api/` (FastAPI app, routes, middleware, auth over HT
 | UI-014, UI-015 (API) | Implemented | `routes_health`, views with `available: false` | `test_api_reads.py::test_ui014_views_answer_200_when_telemetry_is_unavailable` | `api.md` | Telemetry trouble is 200 and never "Down". |
 | IFID-007 (API) | Implemented | `api/routes_identity.py` | `test_api_identity.py` | `api.md` | `map` / `new` with CSRF, 409 when refused, audit and identity history name the admin. |
 | PKG-002, PKG-003, PKG-005 (API unit) | Implemented | `nfpm.yaml`, `prerm`, `tmpfiles.d/vakr.conf` (`/run/vakr` 0751), `lintian/vakr` (approved wantedby-target pattern) | `test_package_spec.py`, `test_units.py`, `install-test.sh`, `systemd-test.sh` | `install.md` | Shipped disabled; stopped on remove; restarted with `vakr.target` on upgrade. |
+
+## Web UI (M4)
+
+The web UI is the static SvelteKit app in `web/` (ADR-035): pages in `web/src/routes/`, the typed client and session in `web/src/lib/api/`, TanStack Query options in `web/src/lib/query/`, page-state and URL logic in `web/src/lib/state/`, uPlot and ECharts only in `web/src/lib/charts/`, and tables (TanStack Table) and panels in `web/src/lib/components/`. `vakr-api` serves the build through `src/vakr/api/web.py` and `web_files.py`. Unit tests are `web/src/**/*.test.ts` and `web/scripts/*.test.js` (Vitest); end-to-end tests are `web/e2e/*.spec.ts` (Playwright in Chromium) against a real `vakr api serve` on seeded SQLite databases (`tests/e2e/`). See [web UI](operations/web-ui.md), [developing the web UI](development/web.md), and Appendix E.31.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| UI-001 | Partial | `routes/devices`, `routes/interfaces`, `routes/sites`, `routes/collectors`, `routes/dashboards` | `navigation.spec.ts`, `devices.spec.ts`, `device-detail.spec.ts`, `interface-detail.spec.ts` | `web-ui.md` | Device and interface lists and detail, graphs, reachability, tag/group/site navigation, collector health, built-in dashboards. Admin rediscovery and own dashboards are not in API v1 (27.4). |
+| UI-002 | Implemented | `routes/interfaces/[id]`, `components/InterfaceFacts.svelte`, `GraphPanel.svelte` | WEB-T04, WEB-T06 in `interface-detail.spec.ts` | `web-ui.md` | Identity, description, current values, traffic, utilization, packets, errors, speeds and capacity, addresses, MAC, identity history. |
+| UI-003 | Implemented | `routes/devices/[id]`, `ReachabilitySection.svelte` | WEB-T02 `device-detail.spec.ts` | `web-ui.md` | `sys*` strings are not stored yet (E.29 gap); the page shows the API's reason. |
+| UI-004 | Deferred | | | `web-ui.md#not-in-this-release` | Dashboards CRUD and pinning are out of the M4 web task. |
+| UI-005 | Implemented | `components/DeviceTable.svelte`, `DeviceFilters.svelte`, `state/filters.ts`, `api/params_devices.py` | WEB-T01 `devices.spec.ts`, `test_api_device_filters.py`, `params.test.ts` | `web-ui.md` | Attention, Active, Offline/Retired; sorting and filters, including the new freshness and collector filters (E.31 #6). |
+| UI-006 | Implemented | `components/InterfaceTable.svelte`, `DeviceInterfaces.svelte` | WEB-T03 `device-detail.spec.ts`, `interface-detail.spec.ts` | `web-ui.md` | API priority order; E.31 #7 records the UI-006/UI-017 choice. |
+| UI-007 | Deferred | | | `web-ui.md#not-in-this-release` | Public dashboards (27.4). |
+| UI-008 | Implemented | `routes/+page.svelte`, `OverviewPanels.svelte`, `RankingTables.svelte`, `routes/rankings`, `routes/high-priority`, `routes/wan` | `navigation.spec.ts` (overview panels, rankings, high priority, WAN) | `web-ui.md` | High priority, top utilization, top errors, provider (quick filters), WAN, site view (browse by site). |
+| UI-009 | Implemented | `routes/sites`, `routes/devices` (browse banner), `state/filters.ts` | `devices.spec.ts` (browse by site) | `web-ui.md` | Device, site, tag, group, provider, admin state, collector, freshness. |
+| UI-010 | Implemented | `charts/series.ts`, `uplot-options.ts`, `GraphDetails.svelte` | WEB-T04, WEB-T06, `series.test.ts` | `web-ui.md#graphs` | Gaps are `null`, never 0; markers with letters and words; units, zone, and resolution disclosed. |
+| UI-011 | Implemented (automated part) | `app.css`, `StatusBadge.svelte`, `DataTable.svelte`, `UPlotCanvas.svelte`, `announce.svelte.ts` | WEB-T08, WEB-T09 `a11y.spec.ts` (axe, keyboard, non-colour state) | `web-ui.md#keyboard-and-screen-readers` | A manual screen-reader walk-through is still to do before MVP acceptance. |
+| UI-012 | Implemented | `api/web.py`, `web_files.py`, `scripts/csp-manifest.js`, `check-licenses.js`, `packaging/copyright` | WEB-T10 `security.spec.ts`, `test_api_web.py` | `development/web.md` | No CDN; pinned, locally served, licence-checked. No SBOM exists yet (E.31 #13). |
+| UI-013 | Partial | `query/policy.ts` | `states.spec.ts` (focus kept across a refresh) | `web-ui.md#refresh` | Auto-refresh without flashing; kiosk mode arrives with kiosk dashboards (E.31 #8). |
+| UI-014 | Implemented | `state/page-state.ts`, `components/PageStatus.svelte`, `routes/+layout.svelte` | WEB-T07 `states.spec.ts`, `page-state.test.ts`, `auth.spec.ts` (ended session) | `web-ui.md#what-the-page-states-mean` | Loading, empty, stale, partial, permission denied, backend unavailable, signed out. |
+| UI-015 | Implemented | `page-state.ts` (`healthNotes`, stale notes) | WEB-T07 | `web-ui.md` | Stale and partial notes; telemetry trouble is Unknown, never Down. |
+| UI-016 | Implemented | `components/InterfaceGraphCard.svelte`, `DeviceInterfaces.svelte` | WEB-T11 `device-detail.spec.ts` | `web-ui.md` | 12 cards per page, priority order, graphs only when visible, 120 points (E.31 #11). |
+| UI-017 | Implemented | `DeviceInterfaces.svelte`, `routes/search`, `routes_devices.device_interfaces` (`interest`) | `device-detail.spec.ts`, `navigation.spec.ts` (two interactions from search), `test_api_device_filters.py` | `web-ui.md` | Primary interfaces in full; others searchable, paged, on demand. |
+| WEB-T01 | Pass | | `devices.spec.ts` | | |
+| WEB-T02 | Pass | | `device-detail.spec.ts` | | |
+| WEB-T03 | Pass | | `device-detail.spec.ts`, `interface-detail.spec.ts` | | |
+| WEB-T04 | Pass | | `interface-detail.spec.ts`, `series.test.ts` | | |
+| WEB-T05 | Pass | | `device-detail.spec.ts`, `latency.test.ts` | | Smoke and loss checked against the API's own answer. |
+| WEB-T06 | Pass | | `interface-detail.spec.ts`, `params.test.ts` | | |
+| WEB-T07 | Pass | | `states.spec.ts` (normal and no-telemetry servers) | | |
+| WEB-T08 | Pass (automated) | | `a11y.spec.ts` | | axe WCAG 2.0–2.2 A/AA in light and dark themes plus a keyboard path; the manual part is open. |
+| WEB-T09 | Pass (automated) | | `a11y.spec.ts` | | |
+| WEB-T10 | Pass | | `security.spec.ts`, `test_api_web.py`, `test_api_web_process.py`, `systemd-test.sh` | | No foreign request, no CSP violation, hashed CSP, immutable caching. |
+| WEB-T11 | Pass | | `device-detail.spec.ts` | | |
+| 15.4 (web pages) | Implemented | `api/web.py`, `eslint.config.js` (`svelte/no-at-html-tags`, `vakr/no-inline-style`) | `test_api_web.py`, `security.spec.ts` | `web-access.md` | Pages never change state on GET (405 for other methods). |
+| 12.3 filters (API) | Implemented | `query/listing.py` (`FreshnessFilter`), `api/params_devices.py` | `test_api_device_filters.py` | `api.md` | E.31 #6. |
+| ADR-035 #16–#18 (supply chain) | Implemented | `web/package-lock.json`, `web/.node-version`, `web/.npmrc`, `Makefile` (`web-audit`), `web/scripts/check-licenses.js`, `tools/check-updates/updates_npm.py`, `updates_node.py` | `build-scripts.test.js`, `tools/check-updates/test_updates_npm.py`, `test_updates_node.py`, CI `audit` job | `development/web.md` | `npm ci --ignore-scripts` everywhere. |
 
 ## Field data
 
@@ -473,7 +511,7 @@ The HTTP layer is `src/vakr/api/` (FastAPI app, routes, middleware, auth over HT
 |---|---|---|---|---|---|
 | OPS-001 | In progress | `src/vakr/health/`, `src/vakr/cli/cmd_check.py`, `src/vakr/config/health.py` | `tests/unit/test_cli.py`, `test_selfupdate_cli.py::test_check_update_health`, `tests/unit/config/test_cli_config.py::test_check_config_statuses` | Blueprint 8.22 | Current checks: version, python, config, update, trusted CAs, TLS policy. The list grows with each subsystem. |
 | SVC-007 | In progress | `src/vakr/cli/cmd_doctor.py` (`--network`) | `tests/unit/test_cli.py` | Blueprint 8.22 | |
-| TOOLS-001 | Implemented | `tools/check-updates/`, `make updates` | `tools/check-updates/test_*.py` | `tools/check-updates/README.md`, `docs/development/updates.md` | |
+| TOOLS-001 | Implemented | `tools/check-updates/` (`updates_npm.py`, `updates_node.py` for the web UI), `make updates` | `tools/check-updates/test_*.py` | `tools/check-updates/README.md`, `docs/development/updates.md` | npm packages against the registry's `latest`; Node against the newest LTS (ADR-035 #18). |
 | TOOLS-002 | Implemented | `docs/development/updates.md`, `.github/dependabot.yml` | Process step | `docs/development/updates.md` | Deferred updates are recorded in `CHANGELOG.md`. |
 | TOOLS-003 | In progress | `tools/check-updates/updates_checks.py` | `test_check_updates.py` | `docs/development/updates.md` | |
 | DOCPUB-001 | Implemented | `tools/md2html/`, `.github/workflows/pages.yml` | `tools/md2html/test_md2html.py` | `tools/md2html/README.md` | |
@@ -487,4 +525,4 @@ The HTTP layer is `src/vakr/api/` (FastAPI app, routes, middleware, auth over HT
 | QG-005 | Implemented | `pyproject.toml` (ruff C901 ≤ 10, PLR0915 ≤ 50) | CI `gates` job | | |
 | QG-006 | In progress | `Makefile` (`--cov-fail-under=90`) | CI `gates` job | | Per-module 95% branch-coverage targets come with M2 logic. |
 | QG-007 | Implemented | `.github/workflows/ci.yml` (gitleaks) | CI `secrets` job | | |
-| QG-008 | In progress | `Makefile` (`audit`), CI `audit` job | CI `audit` job | `docs/development/updates.md` | Vulnerability scan only; license and SBOM checks are still to come. |
+| QG-008 | In progress | `Makefile` (`audit`, `web-audit`), CI `audit` job, `web/scripts/check-licenses.js` | CI `audit` job, `make web-check` | `docs/development/updates.md`, `docs/development/web.md` | pip-audit and npm audit (high or critical fail); a licence allowlist for npm packages. Python licence and SBOM checks are still to come. |

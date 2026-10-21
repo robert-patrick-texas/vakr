@@ -4,8 +4,10 @@
 
 Several rows depend on the same upstream release: the ``.python-version``
 pin, the ``requires-python`` floor, and the interpreter uv selects all
-compare with the latest CPython; the installed nfpm and a pinned nfpm
-compare with the same GitHub release. ``Upstream`` fetches each source at
+compare with the latest CPython; the ``.node-version`` pin, the
+``engines.node`` floor, and the installed Node all read one nodejs.org
+index; the installed nfpm and a pinned nfpm compare with the same GitHub
+release. ``Upstream`` fetches each source at
 most once per run, even when checks run concurrently, and caches failures
 too, so an unreachable API costs one timeout rather than one per row.
 
@@ -27,6 +29,7 @@ Example:
 
 import threading
 from collections.abc import Callable
+from typing import Any, cast
 from urllib.parse import quote
 
 from updates_fetch import Fetcher, FetchError
@@ -44,6 +47,7 @@ PYTHON_RELEASES_URL = (
     "https://www.python.org/api/v2/downloads/release/?is_published=true&pre_release=false"
 )
 GO_RELEASES_URL = "https://go.dev/dl/?mode=json"
+NODE_RELEASES_URL = "https://nodejs.org/dist/index.json"
 # Upstream JSON shapes change without notice; these mean "unexpected document".
 _SHAPE_ERRORS = (KeyError, TypeError, AttributeError, ValueError)
 
@@ -59,6 +63,7 @@ class Upstream:
         fetcher: Fetcher,
         python_url: str = PYTHON_RELEASES_URL,
         go_url: str = GO_RELEASES_URL,
+        node_url: str = NODE_RELEASES_URL,
     ) -> None:
         """Bind the fetcher and the configurable release-list URLs.
 
@@ -66,6 +71,7 @@ class Upstream:
             fetcher: Network access, real or fake.
             python_url: python.org release API URL.
             go_url: go.dev download list URL.
+            node_url: nodejs.org release index URL.
 
         Returns:
             None
@@ -76,19 +82,20 @@ class Upstream:
         self.fetcher = fetcher
         self.python_url = python_url
         self.go_url = go_url
+        self.node_url = node_url
         self._guard = threading.Lock()
         self._locks: dict[str, threading.Lock] = {}
-        self._cache: dict[str, Latest | FetchError] = {}
+        self._cache: dict[str, object] = {}
 
-    def _memo(self, key: str, compute: Callable[[], Latest]) -> Latest:
+    def _memo[T](self, key: str, compute: Callable[[], T]) -> T:
         """Return the cached result for ``key``, computing it at most once.
 
         Args:
             key: Cache key such as ``"pypi:ruff"``.
-            compute: Fetches and parses the release when not cached.
+            compute: Fetches and parses the release (or document) when not cached.
 
         Returns:
-            Latest: The cached or freshly computed release.
+            T: The cached or freshly computed value.
 
         Raises:
             FetchError: The cached or new failure, so a dead endpoint is
@@ -107,7 +114,7 @@ class Upstream:
             found = self._cache[key]
         if isinstance(found, FetchError):
             raise found
-        return found
+        return cast(T, found)
 
     def python(self) -> Latest:
         """Return the latest stable CPython release.
@@ -137,6 +144,24 @@ class Upstream:
         """
         return self._memo("go", lambda: go_latest(self.fetcher.get_json(self.go_url)))
 
+    def node(self, parse: Callable[[Any], Latest], key: str) -> Latest:
+        """Return a Node release chosen by ``parse`` from the nodejs.org index.
+
+        The index is fetched once per run however many rows read it.
+
+        Args:
+            parse: Picks one release from the decoded index (LTS or Current).
+            key: Cache key for that choice, such as ``"node:lts"``.
+
+        Returns:
+            Latest: Release and notes URL.
+
+        Raises:
+            FetchError: If nodejs.org cannot be reached or parsed.
+        """
+        index = self._memo("node:index", lambda: self.fetcher.get_json(self.node_url))
+        return self._memo(key, lambda: parse(index))
+
     def lookup(self, source: str, name: str, per_page: int = 10) -> Latest:
         """Return the latest release of ``name`` from ``source``.
 
@@ -163,6 +188,7 @@ class Upstream:
                 f"github:{name}", lambda: github_latest(self.fetcher.github_json(path), name)
             )
         if source == "npm":
-            url = f"https://registry.npmjs.org/{safe}/latest"
+            # A scoped name's slash is encoded, as the registry documents: @scope%2fname.
+            url = f"https://registry.npmjs.org/{quote(name, safe='@')}/latest"
             return self._memo(f"npm:{name}", lambda: npm_latest(self.fetcher.get_json(url), name))
         raise ValueError(f"unsupported source {source!r}; use one of {', '.join(SOURCES)}")

@@ -28,6 +28,12 @@ allowed_signers = "packaging/release-signers"
 
 # Builds the artifacts in a clean container. Runs with VERSION_OVERRIDE removed.
 build_command = ["make", "deb"]
+# Programs the release host must have; preflight runs `<tool> --version` for
+# each. The web UI is built and checked with Node and npm (ADR-035).
+build_tools = ["node", "npm"]
+# The installed node must be on the line this file pins (major only, e.g. 24).
+# Empty or absent skips the check.
+node_version_file = "web/.node-version"
 # Artifacts to checksum, sign, and attach. Placeholders: {package}, {version}
 # (as in VERSION), {pep440}, {deb_version}, {tag}. Each required pattern must
 # match at least one file; optional ones may match nothing.

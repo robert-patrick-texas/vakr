@@ -1,10 +1,10 @@
 # Keeping tools and dependencies current
 
-vakr always builds with the latest stable Python, Go, uv, ruff, and ty (blueprint section 16.1). Tools and dependencies are checked for updates at least once per release. This page explains how to run the checks, how to read their output, and what to do with each finding.
+vakr always builds with the latest stable Python, Go, uv, ruff, and ty (blueprint section 16.1), and builds the web UI with the newest Node.js LTS (ADR-035). Tools and dependencies are checked for updates at least once per release. This page explains how to run the checks, how to read their output, and what to do with each finding.
 
 | Command | What it does | Requirement |
 |---|---|---|
-| `make updates` | Lists every pinned toolchain, dependency, action, and asset version next to the latest stable release, with release-notes links. | TOOLS-001 |
+| `make updates` | Lists every pinned toolchain (Python, Go, Node), PyPI and npm dependency, action, and tool version next to the latest stable release, with release-notes links. | TOOLS-001 |
 | `make audit` | Fails if any locked runtime or development dependency has a known vulnerability. | QG-008 |
 | Dependabot | Opens weekly pull requests for GitHub Actions and `uv` dependencies. | TOOLS-002 (supplement only) |
 
@@ -16,7 +16,7 @@ make updates UPDATES_FLAGS=--json                # JSON for scripts
 make updates UPDATES_FLAGS=--fail-on-outdated    # exit 1 if anything is behind
 ```
 
-`make updates` runs [`tools/check-updates`](../../tools/check-updates/README.md), a portable tool that is configured only by [`tools/check-updates/check-updates.toml`](../../tools/check-updates/check-updates.toml). It needs network access to python.org, go.dev, PyPI, and GitHub. Standard `HTTPS_PROXY` and `NO_PROXY` settings are honoured. If the GitHub CLI is installed and logged in (`gh auth status`), GitHub lookups use it, which avoids the 60-requests-an-hour limit for anonymous API calls. The check reads files and runs `uv lock --upgrade --dry-run`; it never changes the repository.
+`make updates` runs [`tools/check-updates`](../../tools/check-updates/README.md), a portable tool that is configured only by [`tools/check-updates/check-updates.toml`](../../tools/check-updates/check-updates.toml). It needs network access to python.org, go.dev, nodejs.org, PyPI, the npm registry, and GitHub. Standard `HTTPS_PROXY` and `NO_PROXY` settings are honoured. If the GitHub CLI is installed and logged in (`gh auth status`), GitHub lookups use it, which avoids the 60-requests-an-hour limit for anonymous API calls. The check reads files and runs `uv lock --upgrade --dry-run` and `node --version`; it never changes the repository and never runs npm.
 
 ## Reading the output
 
@@ -34,7 +34,9 @@ Below the table, each `unknown` row and each `update available` row that has ext
 
 How to read the statuses:
 
-- **current**: nothing to do. A pin is compared at the precision it is written with. `3.15` in `.python-version` is current while 3.15.x is the newest series, `actions/checkout@v7` is current while 7.y.z is the newest, and a `go.mod` directive is compared by minor version. Patch releases inside a pinned series still appear in the more precise rows, such as *Python (interpreter uv selects)* and *Go (installed)*.
+- **current**: nothing to do. A pin is compared at the precision it is written with. `3.15` in `.python-version` is current while 3.15.x is the newest series, `actions/checkout@v7` is current while 7.y.z is the newest, and a `go.mod` directive is compared by minor version. Patch releases inside a pinned series still appear in the more precise rows, such as *Python (interpreter uv selects)*, *Go (installed)*, and *Node (installed)*.
+- **Node** rows compare with the newest **LTS** release, never with a Current one. `24` in `web/.node-version` and an `engines.node` floor of `24.22.0` are current while 24.x is the newest LTS line; the line under the table names the newest Current release for information. A new major line is adopted once nodejs.org promotes it to LTS.
+- **npm** rows compare the version locked in `web/package-lock.json` with the registry's `latest` release, for every package `web/package.json` lists. The detail says whether it is *bundled* into the shipped web UI (`dependencies`) or a *development* tool (`devDependencies`).
 - **update available**: apply the update or defer it (see the release policy below).
 - **unknown**: the tool could not decide, and the line under the table says why. Typical reasons:
   - a network failure or rate limit, in which case you re-run;
@@ -66,7 +68,7 @@ Step 1 of the release process (blueprint section 28.7) is:
 3. Resolve every `unknown` row that is not reference-only. Re-run after a network failure, or check the item by hand and record the result like a deferral.
 4. `make audit` must pass. A vulnerability is either fixed by upgrading, or recorded with a justification in the ignore list (see below).
 
-Dependabot pull requests are welcome between releases, but they do not replace this step. Dependabot does not see the Python and Go toolchains, PEP 723 inline pins, the pip-audit pin in the `Makefile`, the bundled interpreter, or vendored front-end assets. When the first `go.mod` lands, add a `gomod` entry to `.github/dependabot.yml` for its directory.
+Dependabot pull requests are welcome between releases, but they do not replace this step. Dependabot does not see the Python, Go, and Node toolchains, PEP 723 inline pins, the pip-audit pin in the `Makefile`, or the bundled interpreter. When the first `go.mod` lands, add a `gomod` entry to `.github/dependabot.yml` for its directory.
 
 ## Applying updates
 
@@ -81,7 +83,9 @@ Dependabot pull requests are welcome between releases, but they do not replace t
 | An action with a commit pin | Replace the SHA and the `# vX.Y.Z` comment together. `gh api repos/OWNER/REPO/commits/vX.Y.Z --jq .sha` prints the commit a tag points to. |
 | md2html inline pins | Edit the pins in `tools/md2html/md2html.py` and the test command in its README together. |
 | pip-audit | Edit `PIP_AUDIT` in the `Makefile`. |
-| A vendored asset (from M4) | Replace the file, then update its `version` in `check-updates.toml`. |
+| An npm package of the web UI | In `web/`: `npm install --save-exact --ignore-scripts NAME@VERSION` (add `--save-dev` for a development tool), which updates `package.json` and `package-lock.json` together; then `make check`. A major update of a bundled package needs its release notes read and the bundle-size budget in Appendix E.31 re-measured. |
+| Node.js | Install the new LTS on development hosts and the release machine. Within a major line nothing else changes, because `web/.node-version` names only the major. A new major line moves `web/.node-version`, `engines` in `web/package.json`, and the builder image in `packaging/Dockerfile` together. |
+| A hand-vendored front-end file | Replace the file, then update its `version` in `check-updates.toml`. vakr vendors none: the web UI's packages are locked by npm. |
 
 ## Moving to a new Python minor version (TOOLS-003)
 

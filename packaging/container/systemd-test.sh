@@ -29,6 +29,23 @@ print(answer.status, answer.read().decode())
 PY
 chmod 0644 /tmp/api_get.py
 api_get() { PYTHONDONTWRITEBYTECODE=1 /opt/vakr/venv/bin/python3 /tmp/api_get.py "$@"; }
+
+# web_get PATH: GET a web UI path over loopback TCP; prints the status, the
+# headers the web checks need, and the body (ADR-035, WEB-T10).
+cat >/tmp/web_get.py <<'PY'
+import http.client, sys
+conn = http.client.HTTPConnection("127.0.0.1", 8080, timeout=5)
+conn.request("GET", sys.argv[1], headers={"Accept-Encoding": "identity"})
+answer = conn.getresponse()
+body = answer.read().decode("utf-8", "replace")
+print("status:", answer.status)
+for name in ("content-type", "cache-control", "content-security-policy", "x-frame-options",
+             "x-content-type-options", "referrer-policy"):
+    print(f"{name}: {answer.getheader(name)}")
+print("body:", body[:20000])
+PY
+chmod 0644 /tmp/web_get.py
+web_get() { PYTHONDONTWRITEBYTECODE=1 /opt/vakr/venv/bin/python3 /tmp/web_get.py "$@"; }
 api_get_as() { local user=$1; shift; runuser -u "$user" -- env PYTHONDONTWRITEBYTECODE=1 /opt/vakr/venv/bin/python3 /tmp/api_get.py "$@" 2>&1; }
 
 stage_debs
@@ -94,6 +111,36 @@ check "loopback /api/v1/health/live answers 200 without auth" \
     grep -q '^200 ' <<<"$(api_get /api/v1/health/live tcp)"
 check "loopback data needs a role (401 without a session)" \
     grep -q '^401 ' <<<"$(api_get /api/v1/devices tcp)"
+
+section "the web UI is served same-origin with its CSP and cache headers (ADR-035, WEB-T10)"
+check "the package installs the web build and its manifest" \
+    test -f /opt/vakr/share/web/index.html -a -f /opt/vakr/share/web/vakr-web.json
+check "the bundled packages' licence texts are installed" \
+    test -f /opt/vakr/share/doc/web-licenses/echarts/NOTICE
+check "the API read the web build at start" \
+    grep -q 'api.web_ready' <<<"$(journalctl -u vakr-api.service --no-pager)"
+index=$(web_get /)
+check "the app's index answers 200 as HTML" \
+    bash -c 'grep -q "^status: 200" <<<"$1" && grep -q "^content-type: text/html; charset=utf-8" <<<"$1"' _ "$index"
+check "the index revalidates (Cache-Control: no-cache)" grep -q '^cache-control: no-cache$' <<<"$index"
+check "the CSP allows the bootstrap only by its SHA-256 hash" \
+    grep -qE "^content-security-policy: .*script-src 'self' 'sha256-[A-Za-z0-9+/]{43}='" <<<"$index"
+check "the CSP has no unsafe-inline or unsafe-eval" \
+    bash -c '! grep -qE "unsafe-(inline|eval)" <<<"$(grep "^content-security-policy" <<<"$1")"' _ "$index"
+check "the CSP forbids framing, base URIs, and other origins" \
+    grep -qE "^content-security-policy: .*connect-src 'self'.*base-uri 'none'.*frame-ancestors 'none'" <<<"$index"
+check "the E.30 headers stay (DENY, nosniff, no-referrer)" \
+    bash -c 'grep -q "^x-frame-options: DENY" <<<"$1" && grep -q "^x-content-type-options: nosniff" <<<"$1" && grep -q "^referrer-policy: no-referrer" <<<"$1"' _ "$index"
+asset=$(grep -oE '/_app/immutable/[^"]+\.js' <<<"$index" | head -n 1)
+check "the index references a hashed immutable asset" test -n "$asset"
+immutable=$(web_get "$asset")
+check "the immutable asset is cached for a year" \
+    grep -q '^cache-control: public, max-age=31536000, immutable$' <<<"$immutable"
+check "the immutable asset is JavaScript" grep -q '^content-type: text/javascript' <<<"$immutable"
+check "a deep link gets the app (single-page fallback)" \
+    grep -q '^status: 200' <<<"$(web_get /devices/0190a3c4-0000-7000-8000-00000000002a)"
+check "an unknown API path keeps the JSON envelope" \
+    grep -q '"code":"not_found"' <<<"$(web_get /api/v1/no-such-endpoint)"
 check "the socket is /run/vakr/api.sock, mode 0666, in /run/vakr 0751 (E.30)" \
     bash -c '[ "$(stat -c %a /run/vakr/api.sock)" = 666 ] && [ "$(stat -c %a /run/vakr)" = 751 ]'
 check "root on the socket is admin (E.12)" \

@@ -1,0 +1,287 @@
+/*
+ * vakr web UI styles (12.8, UI-011). Colours are tokens with light and dark values, chosen for
+ * WCAG 2.2 AA contrast; status never relies on colour alone (an icon and a label go with it).
+ * Motion is minimal and off under prefers-reduced-motion. No inline styles anywhere: the CSP
+ * refuses them (ADR-035 #13).
+ */
+:root {
+	color-scheme: light dark;
+	--bg: #ffffff;
+	--bg-raised: #f5f6f8;
+	--bg-sunken: #eceef2;
+	--fg: #16191f;
+	--fg-muted: #4a5160;
+	--border: #c9ced8;
+	--link: #0b57b8;
+	--focus: #0b57b8;
+	--red-fg: #a3140c;
+	--red-bg: #fde8e6;
+	--amber-fg: #7a4a00;
+	--amber-bg: #fff1d6;
+	--green-fg: #145c2e;
+	--green-bg: #e2f5e8;
+	--gray-fg: #4a5160;
+	--gray-bg: #eceef2;
+	--series-in: #1f5fae;
+	--series-out: #a14a00;
+	--series-3: #2e7d4f;
+	--series-4: #7b3fa0;
+	--smoke: rgba(60, 70, 90, 0.35);
+	--band: rgba(122, 74, 0, 0.12);
+	--band-gap: rgba(74, 81, 96, 0.14);
+	--font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	--radius: 6px;
+	--gap: 0.75rem;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #12151b;
+		--bg-raised: #1b1f27;
+		--bg-sunken: #232833;
+		--fg: #e8eaee;
+		--fg-muted: #aab1bf;
+		--border: #3a4150;
+		--link: #8ab8ff;
+		--focus: #8ab8ff;
+		--red-fg: #ffb4ab;
+		--red-bg: #3d1512;
+		--amber-fg: #ffd28a;
+		--amber-bg: #3a2a08;
+		--green-fg: #8fe0aa;
+		--green-bg: #10301c;
+		--gray-fg: #c3c8d2;
+		--gray-bg: #2a2f3a;
+		--series-in: #7fb1ff;
+		--series-out: #ffb070;
+		--series-3: #7fd8a0;
+		--series-4: #d0a4ff;
+		--smoke: rgba(200, 210, 230, 0.35);
+		--band: rgba(255, 210, 138, 0.14);
+		--band-gap: rgba(170, 177, 191, 0.16);
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font-family: var(--font);
+	font-size: 15px;
+	line-height: 1.45;
+}
+
+a {
+	color: var(--link);
+}
+
+:focus-visible {
+	outline: 3px solid var(--focus);
+	outline-offset: 2px;
+}
+
+button,
+input,
+select {
+	font: inherit;
+	color: inherit;
+}
+
+button,
+.button {
+	background: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.3rem 0.7rem;
+	cursor: pointer;
+	text-decoration: none;
+	color: var(--fg);
+	display: inline-block;
+}
+
+button[aria-pressed='true'],
+button[aria-current='true'] {
+	background: var(--fg);
+	color: var(--bg);
+}
+
+button:disabled {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
+input,
+select {
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.3rem 0.5rem;
+}
+
+h1 {
+	font-size: 1.45rem;
+	margin: 0 0 0.5rem;
+}
+
+h2 {
+	font-size: 1.15rem;
+	margin: 1.2rem 0 0.5rem;
+}
+
+h3 {
+	font-size: 1rem;
+	margin: 0.8rem 0 0.4rem;
+}
+
+/* Visually hidden but read by screen readers; also hides SvelteKit's route announcer,
+   whose inline style the build removes (vite-csp-announcer, E.31). */
+.sr-only,
+#svelte-announcer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.muted {
+	color: var(--fg-muted);
+}
+
+.mono {
+	font-family: var(--mono);
+	font-size: 0.92em;
+}
+
+.num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--gap);
+	align-items: center;
+}
+
+.grid {
+	display: grid;
+	gap: var(--gap);
+	grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+}
+
+.card {
+	background: var(--bg-raised);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0.75rem 0.9rem;
+	min-width: 0;
+	overflow-x: auto;
+}
+
+table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+th,
+td {
+	text-align: left;
+	padding: 0.35rem 0.5rem;
+	border-bottom: 1px solid var(--border);
+	vertical-align: top;
+}
+
+th {
+	background: var(--bg-sunken);
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.density-compact th,
+.density-compact td {
+	padding: 0.15rem 0.4rem;
+}
+
+.table-wrap {
+	overflow-x: auto;
+}
+
+caption {
+	text-align: left;
+	font-weight: 600;
+	padding: 0.3rem 0;
+}
+
+dl.facts {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.2rem 1rem;
+	margin: 0;
+}
+
+dl.facts dt {
+	color: var(--fg-muted);
+}
+
+dl.facts dd {
+	margin: 0;
+}
+
+.notice {
+	border: 1px solid var(--border);
+	border-left-width: 6px;
+	border-radius: var(--radius);
+	padding: 0.5rem 0.75rem;
+	margin: 0.5rem 0;
+	background: var(--bg-raised);
+}
+
+.notice-amber {
+	border-left-color: var(--amber-fg);
+}
+
+.notice-red {
+	border-left-color: var(--red-fg);
+}
+
+.notice-gray {
+	border-left-color: var(--gray-fg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.fade-in {
+		animation: fade-in 150ms ease-out;
+	}
+}
+
+@keyframes fade-in {
+	from {
+		opacity: 0.4;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}

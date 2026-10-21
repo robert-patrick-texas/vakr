@@ -10,6 +10,9 @@
 #   VAKR_UV_CACHE     docker volume caching uv downloads between builds
 #                     (default: vakr-uv-cache; set empty to disable). Every
 #                     download is hash-checked, so the cache cannot change output.
+#   VAKR_NPM_CACHE    the same for npm downloads of the web UI build
+#                     (default: vakr-npm-cache; set empty to disable); npm ci
+#                     checks each against web/package-lock.json's integrity hash.
 #   VAKR_BUILD_TRACE  set to 1 to trace the in-container build (bash -x)
 #
 # The source given to the container is every tracked file plus untracked,
@@ -24,6 +27,7 @@ mkdir -p "$out_dir"
 out_dir=$(cd "$out_dir" && pwd)
 image=${BUILDER_IMAGE:-vakr-deb-builder}
 cache=${VAKR_UV_CACHE-vakr-uv-cache}
+npm_cache=${VAKR_NPM_CACHE-vakr-npm-cache}
 
 version=${VERSION_OVERRIDE:-$(cat VERSION)}
 # One tested mapping from VERSION to the Debian version (VER-002); it also
@@ -51,6 +55,7 @@ docker build --quiet --tag "$image" - <packaging/Dockerfile >/dev/null
 
 cache_mount=()
 if [ -n "$cache" ]; then cache_mount=(--volume "$cache:/root/.cache/uv"); fi
+if [ -n "$npm_cache" ]; then cache_mount+=(--volume "$npm_cache:/root/.npm"); fi
 docker run --rm \
     --volume "$stage:/in:ro" --volume "$out_dir:/out" "${cache_mount[@]}" \
     --env VAKR_VERSION="$version" --env VAKR_DEB_VERSION="$deb_version" \

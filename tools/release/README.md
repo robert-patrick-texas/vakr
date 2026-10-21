@@ -22,7 +22,7 @@ Exit status: 0 on success (or a dry run that a real release would pass), 1 when 
 
 ## What a release does
 
-1. **Preflight.** `VERSION_OVERRIDE` must be unset. The working tree must be clean, `HEAD` must be on `branch`, and the tag must exist neither locally nor on `remote`. Every GitHub check run for `HEAD` must have passed (`gh api repos/<repo>/commits/<sha>/check-runs`). The changelog needs a `## <version>` section, and `allowed_signers` must list at least one key.
+1. **Preflight.** `VERSION_OVERRIDE` must be unset. The working tree must be clean, `HEAD` must be on `branch`, and the tag must exist neither locally nor on `remote`. Every GitHub check run for `HEAD` must have passed (`gh api repos/<repo>/commits/<sha>/check-runs`). The changelog needs a `## <version>` section, and `allowed_signers` must list at least one key. Each program in `build_tools` must answer `--version`, and when `node_version_file` is set, `node --version` must match it at the precision it is written with (`24` admits any 24.x).
 2. **Build** with `build_command`, with `VERSION_OVERRIDE` removed from its environment.
 3. **Stage** the files matching `artifacts` (required) and `optional_artifacts` into `output_dir`, and write `SHA256SUMS` in `sha256sum` format.
 4. **Sign** with `ssh-keygen -Y sign -f <signing_key> -n <namespace> SHA256SUMS`.
@@ -33,7 +33,7 @@ A real release stops at the first failed preflight check, before building. A dry
 
 ## Configuration
 
-`release.toml` keys (all required). Relative paths are relative to the repository root; `~` expands to the home directory of the user running the tool.
+`release.toml` keys, all required except `build_tools` and `node_version_file`. Relative paths are relative to the repository root; `~` expands to the home directory of the user running the tool.
 
 | Key | Example | Meaning |
 |---|---|---|
@@ -49,12 +49,14 @@ A real release stops at the first failed preflight check, before building. A dry
 | `artifacts`, `optional_artifacts` | `["dist/{package}_{deb_version}_amd64.deb"]` | Glob patterns relative to the root, with placeholders `{package}`, `{version}`, `{pep440}`, `{deb_version}`, `{tag}` |
 | `output_dir` | `dist/release/{tag}` | Where `SHA256SUMS`, the signature, notes, and artifact copies go |
 | `prerelease` | `rc-or-major-zero` | `rc-or-major-zero`, `rc`, `always`, or `never` |
+| `build_tools` (optional) | `["node", "npm"]` | Programs the release host must have; each is run with `--version` in preflight. Absent or empty: no check |
+| `node_version_file` (optional) | `web/.node-version` | The installed `node` must be on the version this file names. Absent or empty: no check |
 
 Unknown or mistyped keys are errors.
 
 ## Requirements
 
-Python 3.15 (standard library only), `git`, `ssh-keygen` (OpenSSH 8.1 or newer), and an authenticated `gh` for the CI check and the release itself.
+Python 3.15 (standard library only), `git`, `ssh-keygen` (OpenSSH 8.1 or newer), an authenticated `gh` for the CI check and the release itself, and whatever `build_tools` names (for vakr, Node.js and npm, ADR-035).
 
 ## Files and tests
 
@@ -68,6 +70,6 @@ Python 3.15 (standard library only), `git`, `ssh-keygen` (OpenSSH 8.1 or newer),
 | `release_publish.py` | Changelog notes and the tag, push, and release commands |
 | `release_proc.py` | Runs external commands with argument lists |
 
-`uv run pytest tools/release` runs the tests. They use real `git` repositories with a local bare remote and real `ssh-keygen` keys, all under a temporary directory. Only `gh` and `git push` are replaced by a fake runner, so no test touches GitHub.
+`uv run pytest tools/release` runs the tests. They use real `git` repositories with a local bare remote and real `ssh-keygen` keys, all under a temporary directory. Only `gh`, `git push`, and the `build_tools` versions are replaced by a fake runner, so no test touches GitHub or needs Node.
 
 To reuse the tool in another project, copy this directory and edit `release.toml`.

@@ -30,3 +30,17 @@ updates:
         update-types: [minor, patch]
     commit-message:
       prefix: deps
+
+  # web/package.json and web/package-lock.json: the web UI's npm packages
+  # (ADR-035 #18). Versions stay exact; Node itself is not covered.
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    versioning-strategy: increase
+    groups:
+      npm-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps

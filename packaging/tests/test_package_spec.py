@@ -228,7 +228,7 @@ def test_release_signers_entries_use_the_release_identity() -> None:
 
 
 def test_build_inputs_are_pinned() -> None:
-    """PKG-004: uv, nfpm, Go, and the build backend are pinned and verified.
+    """PKG-004: uv, nfpm, Go, Node, and the build backend are pinned and verified.
 
     Args:
         None
@@ -242,6 +242,11 @@ def test_build_inputs_are_pinned() -> None:
     dockerfile = (PKG / "Dockerfile").read_text(encoding="utf-8")
     assert re.search(r"FROM ghcr.io/astral-sh/uv:0\.13\.3@sha256:[0-9a-f]{64} ", dockerfile)
     assert re.search(r"FROM golang:1\.27\.3@sha256:[0-9a-f]{64} ", dockerfile)
+    node = re.search(r"FROM node:(\d+)\.\d+\.\d+-trixie-slim@sha256:[0-9a-f]{64} ", dockerfile)
+    assert node is not None
+    # ADR-035 #16: the builder's Node is the major line web/.node-version pins.
+    pinned = (PKG.parent / "web/.node-version").read_text(encoding="utf-8").strip()
+    assert node.group(1) == pinned.split(".")[0]
     assert "nfpm/v2/cmd/nfpm@v2.48.0" in dockerfile
     requirements = [
         line

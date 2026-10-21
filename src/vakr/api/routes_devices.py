@@ -2,13 +2,15 @@
 
 - ``GET /api/v1/devices``: the device list in 7.7 order (Attention, Active,
   Offline/Retired, then severity and natural name), searchable, filterable
-  by bucket, and, with ``site``, ``tag``, ``group``, ``provider``, or
-  ``admin_state``, browsable by those groupings (UI-005, UI-009). Paged
-  (API-005); ``counts`` and ``health`` describe every matching device.
+  by bucket, evidence freshness, and collector (12.3), and, with ``site``,
+  ``tag``, ``group``, ``provider``, or ``admin_state``, browsable by those
+  groupings (UI-005, UI-009). Paged (API-005); ``counts`` and ``health``
+  describe every matching device.
 - ``GET /api/v1/devices/{device_uuid}``: the device screen: facts, warnings,
   every position's verdict, and the interface table (TUI-004..006, UI-003).
 - ``GET /api/v1/devices/{device_uuid}/interfaces``: the device's interfaces,
-  sticky, WAN, and high-priority first, paged (UI-006, UI-016, UI-017).
+  sticky, WAN, and high-priority first, paged, optionally of one interest
+  class (UI-006, UI-016, UI-017).
 - ``GET /api/v1/devices/{device_uuid}/history/reachability``: latency, loss,
   jitter, and the per-probe smoke, one series set per position, never
   merged (12.6, MPOS-008).
@@ -31,7 +33,7 @@ Example:
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from vakr.api.context import ApiContext, call, get_context
@@ -47,10 +49,15 @@ from vakr.api.params import (
     device_scope,
     graph_request,
 )
+from vakr.api.params_devices import (
+    DeviceFilter,
+    DeviceInterfaceFilter,
+    device_filter,
+    device_interface_filter,
+)
 from vakr.api.principals import Viewer
 from vakr.api.responses import next_offset, paged, view_response
 from vakr.api.schemas import DeviceListPage, InterfaceListPage
-from vakr.domain.enums import StatusBucket
 from vakr.domain.ids import DeviceId
 from vakr.query import (
     DeviceDetailView,
@@ -106,10 +113,9 @@ async def devices(
     _: Viewer,
     context: Context,
     scope: Annotated[DeviceScope | None, Depends(device_scope)],
+    filters: Annotated[DeviceFilter, Depends(device_filter)],
     search: Search = "",
-    bucket: Annotated[list[StatusBucket], Query(max_length=3)] = [],  # noqa: B006 - FastAPI copies it
     sort: DeviceSort = DeviceSort.STATUS,
-    include_retired: bool = False,
     limit: Limit = DEFAULT_LIMIT,
     cursor: Cursor = None,
 ) -> JSONResponse:
@@ -119,10 +125,9 @@ async def devices(
         _: The caller (operator or admin).
         context: The services.
         scope: Site, tag, group, provider, or admin-state filter, if any.
+        filters: Bucket, retired, freshness, and collector filters.
         search: Substring of name, address, site, or tag.
-        bucket: Only these buckets (repeat the parameter).
         sort: ``status`` (7.7), ``name``, ``site``, or ``age``.
-        include_retired: Also list retired devices.
         limit: Page size.
         cursor: ``page.next_cursor`` of the previous page.
 
@@ -132,8 +137,9 @@ async def devices(
     Raises:
         ValidationError: If a bound is broken (422).
     """
-    request = DeviceListRequest(search, frozenset(bucket), sort, offset_of(cursor), limit,
-                                include_retired)  # fmt: skip
+    request = DeviceListRequest(search, filters.buckets, sort, offset_of(cursor), limit,
+                                filters.include_retired, filters.freshness,
+                                filters.collector)  # fmt: skip
     if scope is None:
         view = await call(context.overview.device_list, request)
     else:
@@ -178,9 +184,9 @@ async def device_interfaces(
     device_uuid: UUID,
     _: Viewer,
     context: Context,
+    filters: Annotated[DeviceInterfaceFilter, Depends(device_interface_filter)],
     search: Search = "",
     sort: InterfaceSort = InterfaceSort.PRIORITY,
-    include_retired: bool = False,
     collector: Collector = None,
     limit: Limit = DEFAULT_LIMIT,
     cursor: Cursor = None,
@@ -191,9 +197,9 @@ async def device_interfaces(
         device_uuid: The device.
         _: The caller.
         context: The services.
+        filters: Retired interfaces and interest class (UI-017).
         search: Substring of interface name, alias, description, provider, or circuit.
         sort: ``priority``, ``name``, ``traffic``, or ``utilization``.
-        include_retired: Also list retired interfaces.
         collector: Position whose current values to show.
         limit: Page size.
         cursor: ``page.next_cursor`` of the previous page.
@@ -207,7 +213,8 @@ async def device_interfaces(
     device_id = DeviceId(device_uuid)
     if not await call(device_exists, context, device_id):
         raise missing(device_uuid)
-    scope = InterfaceScope(device_id=device_id, include_retired=include_retired)
+    scope = InterfaceScope(device_id=device_id, include_retired=filters.include_retired,
+                           interest=filters.interest)  # fmt: skip
     request = InterfaceListRequest(search, scope, sort, offset_of(cursor), limit,
                                    collector_id(collector))  # fmt: skip
     view = await call(context.overview.catalog.interface_list, request)

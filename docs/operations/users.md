@@ -32,7 +32,7 @@ sudo vakr setup
 | Option | Meaning |
 |---|---|
 | `--username NAME` | Skip the username question. |
-| `--display-name TEXT` | The name the web UI shows for this account. |
+| `--display-name TEXT` | A longer name for this account. API v1 does not return it yet, so the web UI shows the username. |
 | `--add-admin` | Create another admin even though one exists. |
 
 Once an enabled admin exists, `vakr setup` refuses to run again, so a second run cannot quietly create an administrator. Use `vakr user add` for more accounts, or pass `--add-admin` if another admin really is what you want.
@@ -118,7 +118,7 @@ A NOC wall screen cannot type a password every 30 minutes. An admin creates a **
 - is shown once at creation and stored only as a digest;
 - can be revoked at any time, with immediate effect.
 
-At most 100 kiosk tokens can exist. The API accepts them as `Authorization: Bearer vkk_...`; creating and revoking them arrives with the web UI.
+At most 100 kiosk tokens can exist. The API accepts them as `Authorization: Bearer vkk_...`; creating and revoking them arrives with kiosk dashboards, after this release.
 
 ## Where the secrets live
 

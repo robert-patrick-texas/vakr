@@ -1,6 +1,6 @@
 # Web access through a reverse proxy
 
-vakr does not speak TLS itself. `vakr-api` serves plain HTTP on loopback (`127.0.0.1:8080`), and a reverse proxy on the same host (nginx here, or the proxy your site already runs) terminates TLS in front of it (SEC-013). Browsers, kiosk displays, and remote integrations connect only to the proxy. This page sets that up and shows how to check it.
+vakr does not speak TLS itself. `vakr-api` serves plain HTTP on loopback (`127.0.0.1:8080`), and a reverse proxy on the same host (nginx here, or the proxy your site already runs) terminates TLS in front of it (SEC-013). Browsers, kiosk displays, and remote integrations connect only to the proxy. The same upstream serves both the JSON API under `/api/` and the [web UI](web-ui.md) at every other path, so one `location /` forwards everything. This page sets that up and shows how to check it.
 
 - [How the pieces fit](#how-the-pieces-fit)
 - [1. Tell vakr to trust the proxy](#1-tell-vakr-to-trust-the-proxy)
@@ -13,7 +13,9 @@ vakr does not speak TLS itself. `vakr-api` serves plain HTTP on loopback (`127.0
 
 ```text
 browser ──HTTPS──▶ nginx :443 ──HTTP──▶ vakr-api 127.0.0.1:8080
-                   (TLS, HSTS)          believes X-Forwarded-* only from api.trusted_proxies
+                   (TLS, HSTS)          /api/v1/...  the JSON API
+                                        everything else: the web UI (/opt/vakr/share/web)
+                                        believes X-Forwarded-* only from api.trusted_proxies
 ```
 
 The connection vakr sees always comes from nginx. nginx tells vakr who the client was and that it used HTTPS, in `X-Forwarded-For` and `X-Forwarded-Proto`. Anyone can send those headers, so vakr believes them only when the connection comes from an address listed in `api.trusted_proxies`; from anyone else they are ignored (AUTH-006). What vakr does with them:
@@ -102,8 +104,8 @@ Notes on the block:
 
 - `proxy_set_header X-Forwarded-For $remote_addr` replaces whatever the client sent. vakr reads the list from the right and stops at the first address that is not a trusted proxy, so `$proxy_add_x_forwarded_for` works as well, but replacing is simpler to reason about. vakr reads `X-Forwarded-*` before `Forwarded` (RFC 7239), so a client's own `Forwarded` header cannot override nginx; clearing it as well keeps it out of vakr entirely. A proxy that sets only `Forwarded` must drop any `X-Forwarded-*` the client sent.
 - `X-Request-ID $request_id` makes nginx's request ID the one vakr names in its error answers and log, so one ID finds a request in both logs. Add `$request_id` to nginx's `log_format` to use it.
-- vakr sends its own security headers (CSP, `X-Frame-Options`, `nosniff`, referrer policy, `Cache-Control: no-store`) on every answer, so nginx needs to add only HSTS. Do not add CORS headers: the API is same-origin only (SEC-011).
-- Keep the whole site on one name and origin. The web UI that arrives later is served by `vakr-api` from the same origin as the API, and its Content-Security-Policy allows nothing else.
+- vakr sends its own security headers (CSP, `X-Frame-Options`, `nosniff`, referrer policy) on every answer, so nginx needs to add only HSTS. API answers are `Cache-Control: no-store`; the web UI's hashed files under `/_app/immutable/` are cacheable for a year and its pages revalidate (`no-cache`), so nginx needs no caching rules of its own. Do not add CORS headers: the API is same-origin only (SEC-011).
+- Keep the whole site on one name and origin. `vakr-api` serves the web UI from the same origin as the API, and its Content-Security-Policy allows nothing else: no other origin, no inline script except SvelteKit's bootstrap by its SHA-256 hash, no inline style. Do not let nginx inject scripts or rewrite pages (`sub_filter`, analytics snippets); the browser would refuse them.
 
 Test the configuration and reload nginx:
 
@@ -125,6 +127,18 @@ x-frame-options: DENY
 cache-control: no-store
 x-request-id: 3f0c...
 ```
+
+Check that the web UI comes through the same upstream, with its CSP:
+
+```console
+$ curl -sI https://vakr.example.net/devices
+HTTP/2 200
+content-type: text/html; charset=utf-8
+cache-control: no-cache
+content-security-policy: default-src 'self'; script-src 'self' 'sha256-...'; ... frame-ancestors 'none'
+```
+
+Then open `https://vakr.example.net/` in a browser and sign in ([web UI](web-ui.md)).
 
 Sign in and look at the cookie. It must be named `__Host-vakr_session` and carry `Secure`, `HttpOnly`, and `SameSite=lax`:
 

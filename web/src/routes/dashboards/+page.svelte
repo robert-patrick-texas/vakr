@@ -3,7 +3,8 @@
 The dashboards available in this release (12.1 "Dashboards", UI-008).
 
 The built-in dashboards: the overview, rankings, high-priority interfaces,
-and WAN circuits. Building and pinning one's own dashboards (UI-004) and
+and WAN circuits, each also as a kiosk display (UI-013). Building and
+pinning one's own dashboards (UI-004) and
 public dashboards (UI-007) come in a later release; the page says so.
 -->
 <svelte:head><title>Dashboards · vakr</title></svelte:head>
@@ -25,6 +26,10 @@ public dashboards (UI-007) come in a later release; the page says so.
 	<a class="card tile" href="/wan">
 		<h2>WAN circuits</h2>
 		<p>Circuits with provider, circuit ID, contracted rate, and current use.</p>
+	</a>
+	<a class="card tile" href="/kiosk">
+		<h2>Kiosk displays</h2>
+		<p>These dashboards for a wall display: large type, no navigation, optional rotation.</p>
 	</a>
 </div>
 <p class="muted">

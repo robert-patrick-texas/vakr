@@ -39,6 +39,7 @@ from vakr.api import (
     routes_health,
     routes_identity,
     routes_interfaces,
+    routes_kiosk,
     routes_views,
 )
 from vakr.api.context import ApiContext
@@ -59,7 +60,8 @@ DESCRIPTION = (
     "JSON API of vakr, the network performance and reachability monitor. "
     "Browsers authenticate with the session cookie from `POST /api/v1/auth/login` and send "
     "`X-CSRF-Token` (from `GET /api/v1/auth/session`) on every state-changing request. "
-    "Kiosk displays send `Authorization: Bearer vkk_...` (operator, read-only). "
+    "Kiosk displays exchange their token once at `POST /api/v1/auth/kiosk` for an `HttpOnly` "
+    "kiosk cookie, or send `Authorization: Bearer vkk_...` (operator, read-only). "
     "On the monitoring node, the Unix socket `/run/vakr/api.sock` authorizes by the "
     "connecting account (root and vakr-admin: admin; vakr-view and vakr: operator). "
     "Errors use one envelope: `code`, `message`, `request_id`, `fields`. "
@@ -69,6 +71,7 @@ DESCRIPTION = (
 TAGS = [
     {"name": "health", "description": "Liveness, readiness, component health, version."},
     {"name": "auth", "description": "Sign-in, sign-out, and the current session."},
+    {"name": "kiosk", "description": "Kiosk display setup and kiosk tokens (admin)."},
     {"name": "devices", "description": "Device list, device screen, reachability history."},
     {"name": "interfaces", "description": "Interface list, detail, and history graphs."},
     {"name": "identity", "description": "Interface identity history and reviews."},
@@ -82,8 +85,8 @@ COMMON_ERRORS: Responses = {
     422: {"model": ErrorEnvelope, "description": "a parameter is out of bounds"},
     503: {"model": ErrorEnvelope, "description": "metadata database unavailable"},
 }
-_ROUTERS = (routes_health, routes_auth, routes_devices, routes_interfaces, routes_identity,
-            routes_catalog, routes_views, routes_export)  # fmt: skip
+_ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_interfaces,
+            routes_identity, routes_catalog, routes_views, routes_export)  # fmt: skip
 
 
 def create_app(context: ApiContext | None = None, *, web: WebMount | None = None) -> FastAPI:

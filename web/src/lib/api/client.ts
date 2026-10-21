@@ -25,7 +25,7 @@ import type { paths } from './schema.d.ts';
 type AuthHooks = { csrf: () => string | null; lost: () => void };
 const hooks: AuthHooks = { csrf: () => null, lost: () => undefined };
 const SAFE = new Set(['GET', 'HEAD', 'OPTIONS']);
-const NO_LOSS = ['/api/v1/auth/login', '/api/v1/auth/session'];
+const NO_LOSS = ['/api/v1/auth/login', '/api/v1/auth/session', '/api/v1/auth/kiosk'];
 
 /**
  * Connect the client to the session: where the CSRF token comes from, what a 401 does.

@@ -9,6 +9,7 @@ vakr's web UI shows devices, interfaces, graphs, rankings, and vakr's own health
 - [Keyboard and screen readers](#keyboard-and-screen-readers)
 - [Refresh](#refresh)
 - [Who sees what](#who-sees-what)
+- [Kiosk displays](#kiosk-displays)
 - [Not in this release](#not-in-this-release)
 - [Troubleshooting](#troubleshooting)
 
@@ -102,9 +103,13 @@ Operators see every page. Admins also see **Admin** and the decision buttons on 
 
 To answer an identity review, an admin chooses **It is \<interface\>** (the row is that interface, and its history continues) or **It is a new interface**, then confirms. The decision is recorded with the admin's name in the identity history and the audit log.
 
+## Kiosk displays
+
+The overview, high-priority interfaces, WAN circuits, and rankings also run on a wall display without anyone signing in: `/kiosk/overview`, `/kiosk/high-priority`, `/kiosk/wan`, `/kiosk/rankings`, or several in turn with `/kiosk/rotate?pages=overview,wan&every=60`. An admin creates a kiosk token (**Admin** → **Kiosk tokens**, or `sudo vakr kiosk create`) and pastes it once at `/kiosk/setup`. See [kiosk displays](kiosk.md).
+
 ## Not in this release
 
-Building and pinning your own dashboards, public dashboards, kiosk tokens, editing devices and interfaces, rediscovery requests, policy explanations, and live updates (server-sent events) come later. Inventory changes are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
+Building and pinning your own dashboards, public dashboards, editing devices and interfaces, rediscovery requests, policy explanations, and live updates (server-sent events) come later. Inventory changes are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
 
 ## Troubleshooting
 

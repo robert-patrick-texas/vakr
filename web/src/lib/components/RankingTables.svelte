@@ -15,6 +15,7 @@ Example: `<RankingTables kind="utilization" view={ranking} />`
 	import type { ErrorRanking, UtilizationRanking } from '#lib/api/types.ts';
 	import { interfaceHref } from '#lib/links.ts';
 	import { bitRate, count, percent } from '#lib/format/units.ts';
+	import Link from './Link.svelte';
 
 	type Props =
 		| { kind: 'utilization'; view: UtilizationRanking; limit?: number }
@@ -31,7 +32,7 @@ Example: `<RankingTables kind="utilization" view={ranking} />`
 {/snippet}
 
 {#snippet subject(ref: { interface_id: string; device: string; name: string })}
-	<a href={interfaceHref(ref.interface_id)}>{ref.device} {ref.name}</a>
+	<Link href={interfaceHref(ref.interface_id)}>{ref.device} {ref.name}</Link>
 {/snippet}
 
 <div class="table-wrap">

@@ -9,8 +9,7 @@ filterable by site, tag, group, and provider, and refreshed every 30 s.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
-	import { bitRate } from '#lib/format/units.ts';
-	import { deviceHref, interfaceHref, query as qs } from '#lib/links.ts';
+	import { query as qs } from '#lib/links.ts';
 	import { filterOptions } from '#lib/query/options.svelte.ts';
 	import { wanQuery } from '#lib/query/reads.ts';
 	import { readInterfaceFilters } from '#lib/state/filters.ts';
@@ -19,7 +18,7 @@ filterable by site, tag, group, and provider, and refreshed every 30 s.
 	import InterfaceFilters from '#lib/components/InterfaceFilters.svelte';
 	import PageStatus from '#lib/components/PageStatus.svelte';
 	import Pager from '#lib/components/Pager.svelte';
-	import ReadingText from '#lib/components/ReadingText.svelte';
+	import WanTable from '#lib/components/WanTable.svelte';
 
 	const options = filterOptions();
 	const trail = new CursorTrail();
@@ -67,48 +66,7 @@ filterable by site, tag, group, and provider, and refreshed every 30 s.
 />
 <PageStatus state={shown} label="WAN circuits" emptyText="No interface is marked as a WAN circuit.">
 	{#snippet children(d)}
-		<div class="table-wrap">
-			<table class="density-compact">
-				<caption>WAN circuits (current values from {d.position})</caption>
-				<thead>
-					<tr>
-						<th scope="col">Circuit</th>
-						<th scope="col">Provider</th>
-						<th scope="col">Device and interface</th>
-						<th scope="col">Site</th>
-						<th scope="col" class="num">Contracted</th>
-						<th scope="col" class="num">In / out</th>
-						<th scope="col" class="num">Util. in / out</th>
-						<th scope="col">Admin/oper</th>
-						<th scope="col" class="num">Age</th>
-					</tr>
-				</thead>
-				<tbody>
-					{#each d.rows as r (r.ref.interface_id)}
-						<tr>
-							<th scope="row">{r.ref.circuit_id ?? '—'}</th>
-							<td>{r.ref.provider ?? '—'}</td>
-							<td>
-								<a href={deviceHref(r.ref.device_id)}>{r.ref.device}</a>
-								<a href={interfaceHref(r.ref.interface_id, { from: '/wan' })}>{r.ref.name}</a>
-							</td>
-							<td>{r.ref.site ?? '—'}</td>
-							<td class="num">{bitRate(r.contracted_bps)}</td>
-							<td class="num">
-								<ReadingText reading={r.current.in_rate} compact /> /
-								<ReadingText reading={r.current.out_rate} compact />
-							</td>
-							<td class="num">
-								<ReadingText reading={r.current.in_util} compact /> /
-								<ReadingText reading={r.current.out_util} compact />
-							</td>
-							<td><ReadingText reading={r.current.state} compact /></td>
-							<td class="num"><ReadingText reading={r.current.age} compact /></td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
+		<WanTable rows={d.rows} position={d.position} />
 		<Pager
 			page={d.page}
 			shown={d.rows.length}

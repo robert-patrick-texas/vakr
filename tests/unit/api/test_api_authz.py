@@ -32,6 +32,11 @@ LEVELS = {
     ("POST", "/api/v1/auth/login"): ANON,
     ("POST", "/api/v1/auth/logout"): ANON,
     ("GET", "/api/v1/auth/session"): VIEW,
+    ("POST", "/api/v1/auth/kiosk"): ANON,
+    ("POST", "/api/v1/auth/kiosk/forget"): ANON,
+    ("GET", "/api/v1/kiosk-tokens"): ADMIN,
+    ("POST", "/api/v1/kiosk-tokens"): ADMIN,
+    ("DELETE", "/api/v1/kiosk-tokens/{kiosk_uuid}"): ADMIN,
     ("GET", "/api/v1/devices"): VIEW,
     ("GET", "/api/v1/devices/{device_uuid}"): VIEW,
     ("GET", "/api/v1/device-lookup"): VIEW,
@@ -64,11 +69,15 @@ LEVELS = {
 }
 """Every route and the least role it needs; the session route needs any caller."""
 FILL = {"{kind}": "errors", "{device_uuid}": str(uuid.uuid4()),
-        "{interface_uuid}": str(uuid.uuid4()), "{collector_uuid}": str(uuid.uuid4())}  # fmt: skip
+        "{interface_uuid}": str(uuid.uuid4()), "{collector_uuid}": str(uuid.uuid4()),
+        "{kiosk_uuid}": str(uuid.uuid4())}  # fmt: skip
 QUERY = {"/api/v1/search": {"q": "core"}, "/api/v1/device-lookup": {"key": "core"}}
 BODY = {"/api/v1/interfaces/{interface_uuid}/identity-resolution":
         {"review_id": str(uuid.uuid4()), "decision": "map"},
-        "/api/v1/auth/login": {"username": "nobody", "password": new_password()}}  # fmt: skip
+        "/api/v1/auth/login": {"username": "nobody", "password": new_password()},
+        "/api/v1/kiosk-tokens": {"label": "matrix-wall"}}  # fmt: skip
+OWN_SESSION = ("/api/v1/auth/logout", "/api/v1/auth/login", "/api/v1/auth/kiosk",
+               "/api/v1/auth/kiosk/forget")  # fmt: skip
 CALLERS = ("anonymous", "operator", "admin", "kiosk", "socket-admin", "socket-operator",
            "socket-refused")  # fmt: skip
 
@@ -175,8 +184,8 @@ def test_auth001_authorization_matrix(kit: ApiKit, caller: str) -> None:
         elif caller == "kiosk":
             headers["Authorization"] = f"Bearer {kit.kiosk_token(f'wall-{uuid.uuid4().hex[:8]}')}"
     for (method, template), level in LEVELS.items():
-        if template in ("/api/v1/auth/logout", "/api/v1/auth/login") and caller != "socket-refused":
-            continue  # these change the caller's own session; test_api_auth covers them
+        if template in OWN_SESSION and caller != "socket-refused":
+            continue  # these change the caller's own session; test_api_auth(_kiosk) cover them
         url = concrete(template)
         response = client.request(method, url, params=QUERY.get(template),
                                   json=BODY.get(template), headers=headers)  # fmt: skip

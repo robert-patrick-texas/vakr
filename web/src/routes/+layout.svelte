@@ -8,6 +8,10 @@ session ends while a page is open (a 401: expired, idle, or revoked), the
 cached data is dropped and the sign-in page says why (UI-014). When the API
 cannot be reached at all, the shell says the backend is unavailable and
 retries on request; it never shows device data it cannot vouch for.
+
+Under `/kiosk` the shell steps aside: no navigation and no sign-in page.
+The kiosk layout checks the display's own session and shows its states
+full screen (UI-013), so a wall display never lands on a sign-in form.
 -->
 <script lang="ts">
 	import '../app.css';
@@ -27,12 +31,14 @@ retries on request; it never shows device data it cannot vouch for.
 	let problem = $state<string | null>(null);
 	let version = $state<string | null>(null);
 	const onLogin = $derived(page.url.pathname === '/login');
+	const kiosk = $derived(page.url.pathname === '/kiosk' || page.url.pathname.startsWith('/kiosk/'));
+	let checked = false;
 
 	/**
 	 * Send a signed-out browser to the sign-in page, keeping where it was.
 	 */
 	function toLogin(): void {
-		if (page.url.pathname === '/login') return;
+		if (page.url.pathname === '/login' || kiosk) return;
 		const next = `${page.url.pathname}${page.url.search}`;
 		void goto(`/login?next=${encodeURIComponent(next)}`, { replace: true });
 	}
@@ -65,8 +71,15 @@ retries on request; it never shows device data it cannot vouch for.
 		if (session.status === 'signed-in' && version === null) void fetchVersion();
 	});
 
+	$effect(() => {
+		// Outside the kiosk pages, ask once who is signed in; the kiosk layout asks for itself.
+		if (!kiosk && !checked) {
+			checked = true;
+			void check();
+		}
+	});
+
 	onMount(() => {
-		void check();
 		return onSessionEnd(() => {
 			client.clear();
 			version = null;
@@ -77,11 +90,13 @@ retries on request; it never shows device data it cannot vouch for.
 
 <QueryClientProvider {client}>
 	<a class="skip" href="#main">Skip to content</a>
-	{#if session.status === 'signed-in' && !onLogin}
+	{#if session.status === 'signed-in' && !onLogin && !kiosk}
 		<AppNav current={page.url.pathname} {version} />
 	{/if}
-	<main id="main" tabindex="-1">
-		{#if problem}
+	<main id="main" tabindex="-1" class:wide={kiosk}>
+		{#if kiosk}
+			{@render children()}
+		{:else if problem}
 			<div class="notice notice-red" role="alert" data-state="unavailable">
 				<strong>Backend unavailable.</strong>
 				{problem}
@@ -108,6 +123,9 @@ retries on request; it never shows device data it cannot vouch for.
 	}
 	main:focus {
 		outline: none;
+	}
+	main.wide {
+		max-width: none;
 	}
 	.skip {
 		position: absolute;

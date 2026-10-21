@@ -19,7 +19,7 @@ Example:
 """
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 
 from starlette.types import Message, Receive, Scope, Send
 
@@ -28,11 +28,34 @@ from vakr.api.proxy import ClientView
 
 _LOG = logging.getLogger("vakr.api.access")
 
-CSP = (
-    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
-    "font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; "
-    "form-action 'self'; frame-ancestors 'none'"
-)
+_CSP_DIRECTIVES = (
+    ("default-src", "'self'"), ("script-src", "'self'"), ("style-src", "'self'"),
+    ("img-src", "'self' data:"), ("font-src", "'self'"), ("connect-src", "'self'"),
+    ("object-src", "'none'"), ("base-uri", "'none'"), ("form-action", "'self'"),
+    ("frame-ancestors", "'none'"),
+)  # fmt: skip
+
+
+def content_security_policy(script_hashes: Sequence[str] = ()) -> str:
+    """Return the CSP, allowing extra inline scripts only by their SHA-256 hash (ADR-035 #13).
+
+    Args:
+        script_hashes: ``sha256-<base64>`` sources of the web build's inline
+            bootstrap scripts; never ``unsafe-inline`` or ``unsafe-eval``.
+
+    Returns:
+        str: The header value.
+
+    Raises:
+        None
+    """
+    extra = "".join(f" '{h}'" for h in script_hashes)
+    parts = [f"{name} {value}{extra if name == 'script-src' else ''}"
+             for name, value in _CSP_DIRECTIVES]  # fmt: skip
+    return "; ".join(parts)
+
+
+CSP = content_security_policy()
 """Same-origin only: no inline script, no CDN (UI-012), no framing (15.4)."""
 SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
     (b"content-security-policy", CSP.encode("ascii")),

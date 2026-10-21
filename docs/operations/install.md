@@ -76,6 +76,8 @@ sudo apt install ./vakr_${debver}_amd64.deb
 | `/opt/vakr/venv/` | Locked virtual environment containing vakr | package |
 | `/opt/vakr/share/defaults/` | Documented defaults for every option (CFGM-001) | package |
 | `/opt/vakr/share/release-signers` | Trusted release signing keys (UPD-001) | package |
+| `/opt/vakr/share/web/` | The web UI: static files that `vakr-api` serves at `/` beside the API (ADR-035) | package |
+| `/opt/vakr/share/doc/web-licenses/` | Licence and notice files of the front-end packages bundled into the web UI | package |
 | `/opt/vakr/share/systemd/`, `share/doc/`, `share/templates/` | Unit sources, license and changelog, config template | package |
 | `/usr/bin/vakr` | Symlink to `/opt/vakr/venv/bin/vakr` | package |
 | `/usr/lib/systemd/system/` | `vakr.target`, `vakr-collector.service` ([collector](collector.md)), `vakr-update.service`, `vakr-update.timer` | package |
@@ -114,7 +116,7 @@ To start monitoring:
 2. List the devices in `/etc/vakr/inventory.toml`, then run `vakr inventory validate`, `vakr inventory plan`, and `sudo vakr inventory apply` ([inventory](inventory.md)).
 3. Enable the collector and `vakr.target`, the unit that starts and stops all vakr services together: `sudo systemctl enable --now vakr-collector.service vakr.target` ([collector](collector.md)).
 4. Watch the result with `vakr status` or `vakr tui` ([status and TUI](status-and-tui.md)).
-5. Start the API for the web UI, integrations, and the local socket: `sudo systemctl enable --now vakr-api.service`, then put it behind TLS with a reverse proxy ([API](api.md), [web access](web-access.md)).
+5. Start the API for the web UI, integrations, and the local socket: `sudo systemctl enable --now vakr-api.service`, then put it behind TLS with a reverse proxy ([API](api.md), [web access](web-access.md)). The same service serves the web UI at the proxy's address; sign in with the account `vakr setup` created ([web UI](web-ui.md)).
 
 ## Automatic updates
 

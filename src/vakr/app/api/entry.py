@@ -6,9 +6,13 @@ executes. It installs journald-friendly logging, runs the startup checks
 A failed check exits ``EX_PREFLIGHT`` (78) with an operator sentence naming
 it; the unit does not restart on 78 (``RestartPreventExitStatus``), because
 a bad configuration, a schema mismatch, or a port in use needs an operator.
+The web UI build (``/opt/vakr/share/web``, or ``VAKR_WEB_DIR``) is read
+once before serving; a missing build is logged once and the API serves
+without pages (ADR-035, E.31).
 
 Dependencies:
     vakr.api.app, vakr.api.peer: The application and the socket protocol.
+    vakr.api.web: The web UI's pages.
     vakr.app.api: Build, listeners, server.
     vakr.service: Logging, signals, sd_notify.
 
@@ -24,10 +28,12 @@ Example:
 import asyncio
 import logging
 
-from vakr.api.app import create_app
+from vakr.api.app import WebMount, create_app
 from vakr.api.context import account_name
 from vakr.api.peer import peer_protocol
 from vakr.api.settings import SOCKET_CONCURRENCY, TCP_CONCURRENCY
+from vakr.api.web import mount_web
+from vakr.api.web_files import web_directory
 from vakr.app.api.build import ApiParts, build_parts
 from vakr.app.api.listeners import Listeners, open_listeners
 from vakr.app.api.server import ApiService, QuietServer, uvicorn_config
@@ -44,12 +50,15 @@ _LOG = logging.getLogger(__name__)
 __all__ = ["EX_PREFLIGHT", "run_api"]
 
 
-def _servers(parts: ApiParts, listeners: Listeners) -> list[tuple[QuietServer, object]]:
+def _servers(
+    parts: ApiParts, listeners: Listeners, web: WebMount | None
+) -> list[tuple[QuietServer, object]]:
     """Make one uvicorn server per listener, sharing one application.
 
     Args:
         parts: Services.
         listeners: The open sockets.
+        web: The web UI hook, or ``None`` to serve the API only.
 
     Returns:
         list: ``(server, socket)`` pairs, TCP first.
@@ -57,7 +66,7 @@ def _servers(parts: ApiParts, listeners: Listeners) -> list[tuple[QuietServer, o
     Raises:
         None
     """
-    app = create_app(parts.context)
+    app = create_app(parts.context, web=web)
     servers: list[tuple[QuietServer, object]] = []
     if listeners.tcp is not None:
         config = uvicorn_config(app, concurrency=TCP_CONCURRENCY)
@@ -128,7 +137,9 @@ async def run_api(
                        extra={"event_id": "api.preflight_failed"})  # fmt: skip
             notify(f"STATUS=startup check {exc.check} failed")
             return EX_PREFLIGHT
-        service = ApiService(parts, listeners, _servers(parts, listeners))
+        # The build is read once, off the event loop; without one the API still serves.
+        web = await asyncio.to_thread(mount_web, web_directory(paths))
+        service = ApiService(parts, listeners, _servers(parts, listeners, web))
         with service_signals(service.request_stop, service.request_reload):
             return await service.run()
     finally:

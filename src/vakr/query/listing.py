@@ -13,7 +13,10 @@ dark longest comes first).
 
 Search is a case-insensitive substring match over name, poll address,
 site, tags, collector position, and status label, so ``/down`` finds the
-red devices and ``/dal`` finds a site.
+red devices and ``/dal`` finds a site. The 12.3 freshness filter keeps
+devices whose newest evidence is fresh, stale, or that were never
+observed; the collector filter keeps devices that collector (position)
+has evidence for.
 
 Dependencies:
     vakr.logic.status, vakr.logic.natural: The 7.7 key and name order.
@@ -36,6 +39,7 @@ from typing import Any
 from vakr.domain.checks import require_int
 from vakr.domain.enums import StatusBucket
 from vakr.domain.errors import ValidationError
+from vakr.domain.ids import CollectorId
 from vakr.domain.paging import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from vakr.logic.natural import natural_key
 from vakr.query.views import BucketCounts, DeviceRow
@@ -53,6 +57,14 @@ class DeviceSort(StrEnum):
     AGE = "age"
 
 
+class FreshnessFilter(StrEnum):
+    """The device list's freshness filter (12.3): E.3 freshness, or never observed."""
+
+    FRESH = "fresh"
+    STALE = "stale"
+    NEVER = "never"
+
+
 @dataclass(frozen=True, slots=True)
 class DeviceListRequest:
     """What part of the device list to show.
@@ -64,6 +76,8 @@ class DeviceListRequest:
         offset: Index of the first row to return.
         limit: Rows per page, 1 to 500 (E.19).
         include_retired: Also list ``RETIRED`` devices (hidden by default, 7.5).
+        freshness: Only devices whose newest evidence is in these classes; empty means all.
+        collector: Only devices this collector (position) has evidence for.
     """
 
     search: str = ""
@@ -72,6 +86,8 @@ class DeviceListRequest:
     offset: int = 0
     limit: int = DEFAULT_PAGE_LIMIT
     include_retired: bool = False
+    freshness: frozenset[FreshnessFilter] = frozenset()
+    collector: CollectorId | None = None
 
     def __post_init__(self) -> None:
         """Validate the request.
@@ -93,8 +109,24 @@ class DeviceListRequest:
             )
 
 
+def freshness_of(row: DeviceRow) -> FreshnessFilter:
+    """Classify a row's newest evidence for the freshness filter.
+
+    Args:
+        row: A device row.
+
+    Returns:
+        FreshnessFilter: ``fresh`` or ``stale`` (E.3), or ``never`` without evidence.
+
+    Raises:
+        None
+    """
+    value = row.freshness.value
+    return FreshnessFilter(value) if value in ("fresh", "stale") else FreshnessFilter.NEVER
+
+
 def matches(row: DeviceRow, request: DeviceListRequest) -> bool:
-    """Tell whether a row passes the request's bucket filter and search.
+    """Tell whether a row passes the request's bucket, freshness, and collector filters and search.
 
     Args:
         row: A device row.
@@ -107,6 +139,13 @@ def matches(row: DeviceRow, request: DeviceListRequest) -> bool:
         None
     """
     if request.buckets and row.status.bucket not in request.buckets:
+        return False
+    if request.freshness and freshness_of(row) not in request.freshness:
+        return False
+    # Every position has a verdict; only one with evidence (an age) has seen the device.
+    if request.collector is not None and not any(
+        p.collector_id == request.collector and p.age.value is not None for p in row.positions
+    ):
         return False
     needle = request.search.strip().casefold()
     if not needle:

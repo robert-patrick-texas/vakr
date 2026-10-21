@@ -10,6 +10,8 @@
 #   SOURCE_DATE_EPOCH  commit time; every packaged file gets this mtime
 #   HOST_UID, HOST_GID owner for the files written to /out
 # Output: /out/vakr_<deb version>_amd64.deb, plus vakr-fieldkit.pyz if built.
+# The web UI build needs the npm registry; VAKR_NPM_CACHE in build-deb.sh
+# caches downloads, which npm ci checks against the lockfile's integrity hashes.
 set -euo pipefail
 
 : "${VAKR_VERSION:?}" "${VAKR_DEB_VERSION:?}" "${SOURCE_DATE_EPOCH:?}"
@@ -137,6 +139,24 @@ install_share() {
     write_debian_changelog
 }
 
+install_web() {
+    # The web UI (ADR-035): npm ci from the lockfile without running any
+    # package's install scripts, then the production build, which writes the
+    # CSP manifest and refuses a build over the E.31 size budget. The licence
+    # allowlist runs on the result. Only the built files and the bundled
+    # packages' licence texts are packaged; Node never is.
+    log "building the web UI (npm ci --ignore-scripts, npm run build)"
+    (
+        cd web
+        npm ci --ignore-scripts --no-audit --no-fund
+        npm run build
+        npm run licenses
+        node scripts/collect-licenses.js "$OPT/share/doc/web-licenses"
+    )
+    mkdir -p "$OPT/share/web"
+    cp -R web/build/. "$OPT/share/web/"
+}
+
 write_debian_changelog() {
     # Debian policy wants a Debian-format changelog in /usr/share/doc/vakr
     # (nfpm.yaml). It points at CHANGELOG.md, which stays the one real record.
@@ -206,6 +226,7 @@ install_python
 install_venv
 install_defaults
 install_share
+install_web
 smoke_test
 normalize_tree
 check_glibc_floor

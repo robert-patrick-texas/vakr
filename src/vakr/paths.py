@@ -123,3 +123,18 @@ class InstallPaths:
             None
         """
         return self.opt_dir / "share/release-signers"
+
+    @property
+    def web_dir(self) -> Path:
+        """The built web UI that ``vakr-api`` serves outside ``/api/`` (ADR-035).
+
+        Args:
+            None
+
+        Returns:
+            Path: ``/opt/vakr/share/web``.
+
+        Raises:
+            None
+        """
+        return self.opt_dir / "share/web"

@@ -7,8 +7,9 @@
 """Report newer versions of a project's toolchain, dependencies, and pinned actions.
 
 Staying on current releases is a release-time chore that is easy to skip:
-CPython and Go ship patch releases, uv, ruff, and ty move weekly, locked
-dependencies drift, and pinned GitHub Actions age silently. check-updates
+CPython, Go, and Node ship patch releases, uv, ruff, and ty move weekly,
+locked PyPI and npm dependencies drift, and pinned GitHub Actions age
+silently. check-updates
 lists everything a project pins next to the latest stable upstream
 version, with release-notes links, so each release can apply or knowingly
 defer every update (TOOLS-001, TOOLS-002). What to check is declared in
@@ -53,9 +54,11 @@ from updates_checks import Context, Task, check_entry, check_python
 from updates_config import ConfigError, load_config
 from updates_fetch import Fetcher
 from updates_go import check_go
+from updates_node import check_node
+from updates_npm import plan_npm
 from updates_pypi import check_lockfile, plan_pypi
 from updates_report import Result, exit_code, render_json, render_table
-from updates_upstream import GO_RELEASES_URL, PYTHON_RELEASES_URL, Upstream
+from updates_upstream import GO_RELEASES_URL, NODE_RELEASES_URL, PYTHON_RELEASES_URL, Upstream
 from updates_versions import UNKNOWN
 
 DEFAULT_CONFIG = Path(__file__).with_name("check-updates.toml")
@@ -70,14 +73,14 @@ def plan(ctx: Context, config: Mapping[str, Any]) -> list[Task]:
         config: Validated configuration.
 
     Returns:
-        list[Task]: Python, Go, tools, PyPI, lockfile, actions, then
-        assets; sections absent from the config are skipped.
+        list[Task]: Python, Go, Node, tools, PyPI, lockfile, npm,
+        actions, then assets; sections absent from the config are skipped.
 
     Raises:
         None
     """
     tasks = []
-    for section, check in (("python", check_python), ("go", check_go)):
+    for section, check in (("python", check_python), ("go", check_go), ("node", check_node)):
         if section in config:
             tasks.append(Task(section, section, functools.partial(check, ctx, config[section])))
     for entry in config.get("tools", []):
@@ -91,6 +94,8 @@ def plan(ctx: Context, config: Mapping[str, Any]) -> list[Task]:
     if "lockfile" in config:
         lockfile = functools.partial(check_lockfile, ctx, config["lockfile"], reported)
         tasks.append(Task("uv.lock", "lockfile", lockfile))
+    if "npm" in config:
+        tasks += plan_npm(ctx, config["npm"])
     if "actions" in config:
         tasks += plan_actions(ctx, config["actions"])
     for entry in config.get("assets", []):
@@ -187,7 +192,9 @@ def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
     fetcher = fetcher or Fetcher(timeout=timeout)
     python_url = config.get("python", {}).get("releases_url", PYTHON_RELEASES_URL)
     go_url = config.get("go", {}).get("releases_url", GO_RELEASES_URL)
-    ctx = Context(args.root.resolve(), fetcher, Upstream(fetcher, python_url, go_url))
+    node_url = config.get("node", {}).get("releases_url", NODE_RELEASES_URL)
+    upstream = Upstream(fetcher, python_url, go_url, node_url)
+    ctx = Context(args.root.resolve(), fetcher, upstream)
     results = run_tasks(plan(ctx, config), int(settings.get("max_workers", 8)))
     print(render_json(results) if args.json else render_table(results))
     return exit_code(results, args.fail_on_outdated)

@@ -101,6 +101,29 @@ License: Apache-2.0
 Comment: opentelemetry-api, a dependency of fastapi. The full text is in the
  opentelemetry_api-*.dist-info/licenses directory.
 
+Files: opt/vakr/share/web/*
+Copyright: 2026 Robert Patrick; and the authors of the bundled packages below
+License: Apache-2.0 and MIT and BSD-3-Clause and 0BSD
+Comment:
+ The web UI (ADR-035), built from web/ with Vite. The minified files bundle
+ vakr's own code (Apache-2.0) with these npm packages, whose licence and
+ notice files are in /opt/vakr/share/doc/web-licenses/:
+ .
+ MIT: svelte, @sveltejs/kit, clsx, devalue, @tanstack/svelte-query,
+ @tanstack/query-core, @tanstack/svelte-table, @tanstack/table-core,
+ @tanstack/store, openapi-fetch, uplot.
+ Apache-2.0: echarts (with its NOTICE).
+ BSD-3-Clause: zrender.
+ 0BSD: tslib.
+ .
+ web/scripts/check-licenses.js fails the build when a bundled package is
+ missing from this list or carries a licence outside the permissive set.
+
+License: 0BSD
+ Permission to use, copy, modify, and/or distribute this software for any
+ purpose with or without fee is hereby granted. The complete text is in
+ /opt/vakr/share/doc/web-licenses/tslib/LICENSE.txt.
+
 License: Apache-2.0
  Licensed under the Apache License, Version 2.0 (the "License"); you may not
  use this file except in compliance with the License. You may obtain a copy of

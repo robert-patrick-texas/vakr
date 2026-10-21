@@ -12,7 +12,8 @@
 #     collector, and the API are shipped disabled; the collector verifies,
 #     starts on an empty inventory, reloads, and stops cleanly; the API serves
 #     loopback HTTP and its socket (root admin, others refused) beside the
-#     collector and stops cleanly; the timer can be enabled;
+#     collector and stops cleanly, and serves the web UI with its CSP and
+#     cache headers; the timer can be enabled;
 #     and an upgrade restarts vakr.target only if it was running
 #     (packaging/container/systemd-test.sh). Set
 #     PACKAGE_TEST_SYSTEMD=0 where privileged containers are not allowed.
@@ -51,7 +52,7 @@ deb_n1=vakr_${debver_n1}_amd64.deb
 
 if [ "${PACKAGE_TEST_REPRO:-0}" = 1 ]; then
     echo "package-test: rebuilding release N to check reproducibility"
-    VAKR_UV_CACHE='' packaging/build-deb.sh "$work/repro"
+    VAKR_UV_CACHE='' VAKR_NPM_CACHE='' packaging/build-deb.sh "$work/repro"
     if ! cmp "$work/n/$deb_n" "$work/repro/$deb_n"; then
         echo "package-test: FAIL: two builds of one commit differ (PKG-004)"
         exit 1

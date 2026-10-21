@@ -1,0 +1,11 @@
+{
+  "name": "@sveltejs/kit",
+  "version": "3.1.0",
+  "repository": {
+    "url": "git+https://github.com/sveltejs/kit.git",
+    "type": "git",
+    "directory": "packages/kit"
+  },
+  "homepage": "https://svelte.dev",
+  "license": "MIT"
+}

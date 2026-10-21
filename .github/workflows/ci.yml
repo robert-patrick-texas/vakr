@@ -1,5 +1,6 @@
 # Quality gates for every push and pull request (blueprint section 17.8).
-# `make check` is the same command developers run locally.
+# `make check` is the same command developers run locally; it includes the
+# web UI's gates (ADR-035), and the web-e2e job runs its Playwright suite.
 name: CI
 
 on:
@@ -24,10 +25,50 @@ jobs:
           persist-credentials: false
       # setup-uv publishes no floating major tag; pinned to the v10.3.0 commit.
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      # Node is a build-time tool of the web UI (ADR-035); the major line is
+      # pinned in web/.node-version, and the newest patch of it is used.
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - name: Install locked environment (Python from .python-version)
         run: uv sync --locked
-      - name: Format, lint, types, tests, line counts, version source, doc links
+      - name: Install locked web dependencies (no install scripts)
+        run: make web-install
+      - name: Format, lint, types, tests, line counts, version source, doc links, web gates
         run: make check
+
+  # The web UI end to end (WEB-T01..T11): Chromium against a real `vakr api
+  # serve` on seeded SQLite databases (tests/e2e), axe for WEB-T08/T09.
+  web-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # setup-uv publishes no floating major tag; pinned to the v10.3.0 commit.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install locked environments
+        run: uv sync --locked && make web-install
+      - name: Install Chromium and its system libraries
+        run: cd web && npx playwright install --with-deps chromium
+      - name: Build the web UI and run the Playwright suite
+        run: make web-e2e
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report-${{ github.sha }}
+          path: |
+            web/playwright-report
+            web/test-results
+          retention-days: 7
 
   secrets:
     runs-on: ubuntu-latest
@@ -53,3 +94,11 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Scan locked dependencies with pip-audit
         run: make audit
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.node-version
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      # npm packages: every locked one, then the runtime ones; high or critical fails.
+      - name: Scan locked npm packages with npm audit
+        run: make web-audit

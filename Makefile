@@ -5,7 +5,7 @@ TY_PATHS := --extra-search-path tools/md2html --extra-search-path tools/snmpsim
 
 .PHONY: check fmt lint types test loc version docs docs-check
 
-check: lint types test loc version docstrings docs-check
+check: lint types test loc version docstrings docs-check web-check
 
 fmt:
 	uv run ruff format .
@@ -24,8 +24,11 @@ test:
 loc:
 	uv run python tools/check-loc/check_loc.py src tools --exceptions docs/architecture/loc-exceptions.md
 
+# web/package-lock.json is allowed for the same reason as uv.lock: a dependency's own
+# version may equal vakr's. web/package.json carries the fixed placeholder 0.0.0.
 version:
-	uv run python tools/check-version/check_version.py --allow CHANGELOG.md --allow uv.lock --allow src/vakr/defaults/options.toml
+	uv run python tools/check-version/check_version.py --allow CHANGELOG.md --allow uv.lock \
+		--allow web/package-lock.json --allow src/vakr/defaults/options.toml
 
 # Docstring sections and Args entries (QG-003); rules in [tool.check-docstrings].
 .PHONY: docstrings
@@ -44,13 +47,50 @@ openapi:
 snmp-load:
 	VAKR_SNMP_LOAD=1 uv run pytest -p no:cacheprovider -s tests/simulators/snmp/test_snmp_load.py
 
+# Generated web output (builds and test reports) is never published.
+DOCS_EXCLUDE := --exclude .claude --exclude web/build --exclude web/.svelte-kit \
+	--exclude web/test-results --exclude web/playwright-report
+
 docs:
 	uv run tools/md2html/md2html.py . $(SITE) --title vakr \
-		--repo-url https://github.com/robert-patrick-texas/vakr --branch main --exclude .claude
+		--repo-url https://github.com/robert-patrick-texas/vakr --branch main $(DOCS_EXCLUDE)
 
 docs-check:
 	uv run tools/md2html/md2html.py . $(SITE) --check --title vakr \
-		--repo-url https://github.com/robert-patrick-texas/vakr --branch main --exclude .claude
+		--repo-url https://github.com/robert-patrick-texas/vakr --branch main $(DOCS_EXCLUDE)
+
+# Web UI (ADR-035): a static SvelteKit app in web/. Node and npm are build-time
+# tools only (web/.node-version); `make check` runs the web gates as well:
+# ESLint (line and function limits, TSDoc, no raw HTML, no inline styles),
+# svelte-check, Prettier, Vitest, the OpenAPI type drift check, the production
+# build (CSP manifest and the E.31 size budget), and the licence allowlist.
+WEB_STAMP := web/node_modules/.package-lock.json
+.PHONY: web-install web-check web-build web-e2e web-audit
+
+$(WEB_STAMP): web/package.json web/package-lock.json
+	cd web && npm ci --ignore-scripts
+
+web-install: $(WEB_STAMP)
+
+web-check: $(WEB_STAMP)
+	cd web && npm run lint && npm run check:svelte && npm run format:check && npm test \
+		&& npm run check:api && npm run build && npm run licenses
+
+web-build: $(WEB_STAMP)
+	cd web && npm run build
+
+# End-to-end tests (WEB-T01..T11) in Chromium against a real `vakr api serve` on
+# seeded SQLite databases (tests/e2e). Install the browser once with
+# `cd web && npx playwright install chromium` (CI adds --with-deps). Where
+# Chromium's system libraries are missing, run the browser in the Playwright
+# container and set PW_WS_ENDPOINT (docs/development/web.md).
+web-e2e: web-build
+	cd web && npx playwright test
+
+# Known vulnerabilities in every npm package, then in the bundled runtime ones
+# (QG-008, SEC-017): high or critical fails.
+web-audit: $(WEB_STAMP)
+	cd web && npm audit --audit-level=high && npm audit --omit=dev --audit-level=high
 
 # Toolchain and dependency currency (TOOLS-001, TOOLS-002); run before every
 # release. Informational by default; UPDATES_FLAGS=--fail-on-outdated gates.

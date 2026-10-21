@@ -4,17 +4,20 @@
 
 A release is cut from a known state: a clean working tree on the release
 branch, a version whose tag does not exist yet, green CI for exactly the
-commit being released, and a normal (not test-overridden) version. Each check
-returns an ``Outcome`` instead of raising, so a dry run can list every
-problem at once and a real release can stop at the first.
+commit being released, a normal (not test-overridden) version, and the
+build-host tools the configuration names (Node and npm for vakr's web UI,
+ADR-035), with Node on the pinned line. Each check returns an ``Outcome``
+instead of raising, so a dry run can list every problem at once and a real
+release can stop at the first.
 
 Dependencies:
     json: Parses ``gh api`` responses.
-    release_proc: Runs ``git`` and ``gh`` with argument lists.
+    release_proc: Runs ``git``, ``gh``, and each tool's ``--version``
+        with argument lists.
 
 Safety:
-    Read-only: these checks inspect git and the GitHub API and change
-    nothing locally or remotely.
+    Read-only: these checks inspect git, the GitHub API, and tool versions
+    and change nothing locally or remotely.
 
 Example:
     >>> evaluate_check_runs({"check_runs": [{"name": "gates", "status": "completed",
@@ -23,8 +26,9 @@ Example:
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from release_proc import CommandError, Runner
@@ -205,3 +209,89 @@ def no_version_override(environ: Mapping[str, str]) -> Outcome:
     value = environ.get("VERSION_OVERRIDE", "")
     detail = f"VERSION_OVERRIDE={value} is for test builds only" if value else "not set"
     return Outcome("no VERSION_OVERRIDE", not value, detail)
+
+
+def tools_present(runner: Runner, tools: Sequence[str]) -> Outcome:
+    """Require every build-host tool the release needs (ADR-035: Node and npm).
+
+    The release machine runs ``make check`` and the web UI's checks, which
+    need Node and npm, so a missing tool stops the release before anything
+    is built rather than halfway through.
+
+    Args:
+        runner: Command runner in the repository.
+        tools: Program names; each must answer ``--version``.
+
+    Returns:
+        Outcome: OK with each tool's version, or not OK naming the missing ones.
+
+    Raises:
+        None
+    """
+    name = f"build tools present ({', '.join(tools)})"
+    found, missing = [], []
+    for tool in tools:
+        try:
+            lines = runner.run([tool, "--version"]).stdout.strip().splitlines()
+        except CommandError:
+            missing.append(tool)
+            continue
+        found.append(f"{tool} {lines[0] if lines else '(no version printed)'}")
+    if missing:
+        detail = f"missing or not working: {', '.join(missing)}; install them on this host"
+        return Outcome(name, False, detail)
+    return Outcome(name, True, ", ".join(found))
+
+
+def node_matches_pin(runner: Runner, pin: Path) -> Outcome:
+    """Require the installed Node to be on the line the project pins (ADR-035 #16).
+
+    The pin is compared at the precision it is written with: ``24`` admits
+    any 24.x, ``24.22.1`` only that release.
+
+    Args:
+        runner: Command runner in the repository.
+        pin: Version file such as ``web/.node-version``.
+
+    Returns:
+        Outcome: OK when ``node --version`` matches the pin.
+
+    Raises:
+        None
+    """
+    name = f"node matches {pin.name}"
+    try:
+        lines = [line.strip() for line in pin.read_text(encoding="utf-8").splitlines()]
+    except OSError as exc:
+        return Outcome(name, False, f"cannot read {pin}: {exc.strerror}")
+    wanted = next((x for x in lines if x and not x.startswith("#")), "").removeprefix("v")
+    if not wanted:
+        return Outcome(name, False, f"{pin.name} names no version")
+    try:
+        have = runner.run(["node", "--version"]).stdout.strip().removeprefix("v")
+    except CommandError as exc:
+        return Outcome(name, False, str(exc))
+    want_parts = wanted.split(".")
+    ok = have.split(".")[: len(want_parts)] == want_parts
+    detail = f"node {have}; {pin.name} pins {wanted}"
+    return Outcome(name, ok, detail if ok else f"{detail}: install Node {wanted}")
+
+
+def toolchain(runner: Runner, tools: Sequence[str], pin: Path | None) -> list[Outcome]:
+    """Run the configured build-host checks: tools present, then the Node pin.
+
+    Args:
+        runner: Command runner in the repository.
+        tools: ``build_tools`` from the configuration; empty skips the check.
+        pin: ``node_version_file``; ``None`` skips the check.
+
+    Returns:
+        list[Outcome]: Zero, one, or two outcomes.
+
+    Raises:
+        None
+    """
+    outcomes = [tools_present(runner, tools)] if tools else []
+    if pin is not None:
+        outcomes.append(node_matches_pin(runner, pin))
+    return outcomes

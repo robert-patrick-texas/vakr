@@ -5,12 +5,11 @@
 # Paths are relative to the repository root (--root, default: the current
 # directory). Delete a section to stop checking it.
 
-# Vendored front-end assets, each compared with its npm or GitHub releases.
-# None are vendored yet; ECharts and HTMX arrive in milestone M4, e.g.:
-#   assets = [
-#       { name = "echarts", version = "6.0.0", npm = "echarts" },
-#       { name = "htmx", version = "2.0.7", github = "bigskysoftware/htmx" },
-#   ]
+# Vendored front-end files copied into the repository by hand, each compared
+# with its npm or GitHub releases, e.g.
+#   { name = "htmx", version = "2.0.7", github = "bigskysoftware/htmx" }.
+# vakr vendors none: the web UI's packages (ECharts, uPlot, ...) are locked in
+# web/package-lock.json and reported by [npm] below (ADR-035 #18).
 assets = []
 
 [settings]
@@ -34,6 +33,15 @@ binary = ["go", "version"]
 go_mod = ["**/go.mod"]
 modules = true
 
+[node]
+# Newest Node.js LTS, compared with the web build's pin (major line, read by
+# CI's setup-node), the engines.node floor in package.json (by major line),
+# and the installed node. Current (non-LTS) releases are named, never chosen.
+releases_url = "https://nodejs.org/dist/index.json"
+version_file = "web/.node-version"
+engines = "web/package.json"
+binary = ["node", "--version"]
+
 [pypi]
 # Every direct dependency and dependency-group member in pyproject.toml,
 # compared with the version locked in uv.lock. `extra` adds more locked
@@ -48,6 +56,15 @@ extra = []
 # packages. --dry-run leaves uv.lock untouched.
 lockfile = "uv.lock"
 command = ["uv", "lock", "--upgrade", "--dry-run"]
+
+[npm]
+# Every direct npm package of the web UI (dependencies, which are bundled into
+# the shipped app, and devDependencies, the build and test tools), compared
+# with the version locked in package-lock.json. `extra` adds more locked names.
+package_json = "web/package.json"
+lockfile = "web/package-lock.json"
+direct_dependencies = true
+extra = []
 
 [actions]
 # `uses:` pins in workflows. Tag pins (@v7) compare at the precision written;

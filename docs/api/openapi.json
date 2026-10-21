@@ -806,6 +806,16 @@
         "title": "FilterOptions",
         "type": "object"
       },
+      "FreshnessFilter": {
+        "description": "The device list's freshness filter (12.3): E.3 freshness, or never observed.",
+        "enum": [
+          "fresh",
+          "stale",
+          "never"
+        ],
+        "title": "FreshnessFilter",
+        "type": "string"
+      },
       "GraphKind": {
         "description": "Interface graph kinds (12.5).",
         "enum": [
@@ -3944,35 +3954,11 @@
           },
           {
             "in": "query",
-            "name": "bucket",
-            "required": false,
-            "schema": {
-              "default": [],
-              "items": {
-                "$ref": "#/components/schemas/StatusBucket"
-              },
-              "maxItems": 3,
-              "title": "Bucket",
-              "type": "array"
-            }
-          },
-          {
-            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/DeviceSort",
               "default": "status"
-            }
-          },
-          {
-            "in": "query",
-            "name": "include_retired",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "Include Retired",
-              "type": "boolean"
             }
           },
           {
@@ -4096,6 +4082,63 @@
                 }
               ],
               "title": "Admin State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "$ref": "#/components/schemas/StatusBucket"
+              },
+              "maxItems": 3,
+              "title": "Bucket",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_retired",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Retired",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "freshness",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "$ref": "#/components/schemas/FreshnessFilter"
+              },
+              "maxItems": 3,
+              "title": "Freshness",
+              "type": "array"
+            }
+          },
+          {
+            "description": "Only devices this collector (position) has evidence for.",
+            "in": "query",
+            "name": "collector",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only devices this collector (position) has evidence for.",
+              "title": "Collector"
             }
           }
         ],
@@ -4461,16 +4504,6 @@
             }
           },
           {
-            "in": "query",
-            "name": "include_retired",
-            "required": false,
-            "schema": {
-              "default": false,
-              "title": "Include Retired",
-              "type": "boolean"
-            }
-          },
-          {
             "description": "Show this collector's (position's) values.",
             "in": "query",
             "name": "collector",
@@ -4520,6 +4553,34 @@
               ],
               "description": "`page.next_cursor` of the previous page.",
               "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_retired",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Retired",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "primary = high priority.",
+            "in": "query",
+            "name": "interest",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/InterestClass"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "primary = high priority.",
+              "title": "Interest"
             }
           }
         ],

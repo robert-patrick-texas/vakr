@@ -50,6 +50,9 @@ LOCK = 'version = 1\n[[package]]\nname = "cffi"\nversion = "2.1.0"\n'
         ("[[tools]]\nname = 'x'\npypi = 'x'\nregex = '('\n", "invalid regex"),
         ("[[tools]]\nname = 'x'\npypi = 'x'\nversoin = '1'\n", "unknown key(s) versoin"),
         ("assets = [{ name = 'echarts', npm = 'echarts' }]\n", "assets need a string 'version'"),
+        ("[npm]\npackage = 'web/package.json'\n", "[npm] unknown key(s) package"),
+        ("[node]\nbinary = 'node --version'\n", "[node] 'binary' must be a list of strings"),
+        ("node = 3\n", "[node] must be a table"),
         ("[python\n", "check-updates.toml"),
     ],
 )

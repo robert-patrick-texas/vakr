@@ -15,7 +15,8 @@
 Releases travel from the development host to production sites that trust
 nothing but the signed ``SHA256SUMS`` (UPD-001). This tool is the only path
 to a release: it checks that the tree is clean, on the release branch, not
-yet tagged, and green in CI; runs the configured clean-container build;
+yet tagged, and green in CI, and that the host has the configured build
+tools (Node and npm, ADR-035); runs the configured clean-container build;
 checksums and SSH-signs the artifacts; verifies that signature against the
 signers file the package ships; and only then tags, pushes, and creates the
 GitHub release with notes from the changelog. Everything project-specific
@@ -24,7 +25,8 @@ comes from ``release.toml`` (section 29).
 Dependencies:
     release_config, release_checks, release_artifacts, release_publish,
     release_version, release_proc: Sibling modules; standard library only.
-    External: git, gh (authenticated), ssh-keygen, and the build command.
+    External: git, gh (authenticated), ssh-keygen, the build command, and
+        the ``build_tools`` the configuration names.
 
 Safety:
     ``--dry-run`` runs every check and step except tag, push, and release,
@@ -95,6 +97,7 @@ def preflight(
             entries > 0,
             f"{entries} signer(s)" if entries else "placeholder only; add the release public key",
         ),
+        *checks.toolchain(runner, cfg.build_tools, cfg.node_version_file),
     ]
 
 

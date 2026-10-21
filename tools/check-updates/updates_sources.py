@@ -37,6 +37,8 @@ SOURCES = ("pypi", "github", "npm")
 _CPYTHON_NAME = re.compile(r"^Python (\d+\.\d+\.\d+\S*)$")
 # Preferred project_urls labels for release notes, best first.
 _NOTES_LABELS = ("releases", "release notes", "changelog", "changes", "history", "news")
+# npm's repository shorthand: "github:OWNER/REPO" or a bare "OWNER/REPO".
+_NPM_SHORTHAND = re.compile(r"^(?:github:)?([\w.-]+/[\w.-]+)$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,18 +187,52 @@ def github_latest(data: Any, repo: str) -> Latest:
     return Latest(best, pages[best.text])
 
 
+def npm_notes_url(manifest: Mapping[str, Any], name: str, version: str) -> str:
+    """Choose a release-notes link from an npm manifest's ``repository`` field.
+
+    npm writes repositories in several spellings: ``git+https://...git``,
+    ``git://``, ``github:OWNER/REPO``, or a bare ``OWNER/REPO``. GitHub
+    repositories link to their releases page, other HTTPS repositories to
+    themselves, and anything else to the npm page of that version.
+
+    Args:
+        manifest: Decoded ``https://registry.npmjs.org/NAME/latest`` manifest.
+        name: Package name, for the npm fallback link.
+        version: Release the link should describe.
+
+    Returns:
+        str: A GitHub releases page, a repository URL, or the npm page.
+
+    Raises:
+        None
+    """
+    repo = manifest.get("repository")
+    url = repo.get("url", "") if isinstance(repo, Mapping) else repo
+    url = url.strip() if isinstance(url, str) else ""
+    if match := _NPM_SHORTHAND.match(url):
+        url = f"https://github.com/{match[1]}"
+    url = re.sub(r"^git\+", "", url)
+    url = re.sub(r"^(?:git|ssh)://(?:git@)?", "https://", url)
+    url = url.removesuffix("/").removesuffix(".git")
+    if url.startswith("https://github.com/"):
+        return "/".join(url.split("/")[:5]) + "/releases"
+    if url.startswith("https://"):
+        return url
+    return f"https://www.npmjs.com/package/{name}/v/{version}"
+
+
 def npm_latest(data: Any, name: str) -> Latest:
-    """Read the version behind npm's ``latest`` dist-tag.
+    """Read the version behind npm's ``latest`` dist-tag (TOOLS-001, ADR-035 #18).
 
     Args:
         data: Decoded ``https://registry.npmjs.org/NAME/latest`` manifest.
         name: Package name.
 
     Returns:
-        Latest: That version and its npm page.
+        Latest: That version and its release notes (``npm_notes_url``).
 
     Raises:
         FetchError: If the tagged version is missing or a pre-release.
     """
     best = _require(latest_stable([data.get("version", "")]), f"npm {name}")
-    return Latest(best, f"https://www.npmjs.com/package/{name}/v/{best.text}")
+    return Latest(best, npm_notes_url(data, name, best.text))

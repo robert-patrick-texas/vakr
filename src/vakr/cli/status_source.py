@@ -7,9 +7,13 @@ node, and Appendix E.29 #10 fixes how the commands choose:
    Run as root, the command first switches to the ``vakr`` service user.
 2. Otherwise, when the API's socket (``api.socket_path``) exists: the
    running ``vakr-api`` over the socket. Nothing switches user; the socket
-   serves root and members of ``vakr-admin`` and ``vakr`` (E.30 #2).
+   serves root and members of ``vakr-admin``, ``vakr-view``, and ``vakr`` (E.30 #2).
 3. No socket: ``vakr-api`` is not running (the package installs it
    disabled, PKG-003), so the local databases, and the output says so.
+
+The local path needs the ``vakr`` group's access to the state directory.
+A member of ``vakr-view`` only has the socket (E.30 #16); without that check
+``metadata.db`` would look missing to them and read as "no data yet".
 
 A socket that exists but does not answer is never quietly replaced by the
 databases (13.4): the read fails, saying what to check, and ``--local`` is
@@ -28,6 +32,7 @@ Example:
     'local databases (--local)'
 """
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -56,6 +61,34 @@ def _nothing() -> None:
     Raises:
         None
     """
+
+
+def _readable_or_say(paths: InstallPaths, no_api: str | None) -> None:
+    """Refuse the local path, saying why, when this account cannot enter the state directory.
+
+    Args:
+        paths: Installation layout.
+        no_api: The missing socket, when the local path is a fallback; ``None`` for ``--local``.
+
+    Returns:
+        None
+
+    Raises:
+        SourceUnavailableError: If the directory exists but this account cannot enter it.
+    """
+    state = paths.state_dir
+    if not state.is_dir() or os.access(state, os.X_OK):
+        return  # a node without the directory gets "no data yet" from open_status
+    if no_api is None:
+        raise SourceUnavailableError(
+            f"--local reads the databases in {state}, which this account cannot read; "
+            "run the command with sudo, or without --local to use vakr-api"
+        )
+    raise SourceUnavailableError(
+        f"vakr-api is not running (no {no_api}), and this account cannot read the databases "
+        f"in {state} directly; start it (sudo systemctl enable --now vakr-api.service "
+        "vakr.target), or run the command with sudo"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,17 +122,19 @@ def open_source(paths: InstallPaths, command: str, *, local: bool) -> DataSource
         DataSource: The source and its description.
 
     Raises:
-        SourceUnavailableError: If the switch to the ``vakr`` user fails.
+        SourceUnavailableError: If the switch to the ``vakr`` user fails, or this
+            account cannot read the databases.
         NoDataYetError, MigrationError, StorageError: As ``open_status``, on the local path.
     """
     config = load_config(paths, command)
-    label = LOCAL_ASKED
+    label, no_api = LOCAL_ASKED, None
     if not local:
         socket = socket_path_of(config, paths)
         if socket.exists():
             return DataSource(SocketStatusSource(str(socket)), config, "api", API, _nothing)
-        label = LOCAL_NO_API
+        label, no_api = LOCAL_NO_API, str(socket)
     if (problem := drop_to_service_user()) is not None:
         raise SourceUnavailableError(problem)
+    _readable_or_say(paths, no_api)
     stores = open_status(paths, command, config)
     return DataSource(stores.queries, config, "local", label, stores.close)

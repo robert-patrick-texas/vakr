@@ -35,11 +35,11 @@ from vakr.query.source import SourceUnavailableError
 
 _MESSAGE_MAX = 512
 _ID_MAX = 64
-# The vakr group can also read the SNMP credentials and the password hashes, so the hint says so.
+# vakr-view, not vakr: the service group can also read the SNMP credentials and password hashes.
 REFUSED = ("this account may not use the vakr-api socket {path}: only root and members of "
-           "vakr-admin or vakr may; add the account to the vakr group (sudo usermod -aG vakr "
-           "NAME, then log in again; that group can also read the SNMP credentials and the "
-           "password hashes), run the command with sudo, or add --local")  # fmt: skip
+           "vakr-admin, vakr-view, or vakr may; add the account to the vakr-view group "
+           "(sudo usermod -aG vakr-view NAME, then log in again), or run the command "
+           "with sudo")  # fmt: skip
 
 type Envelope = tuple[str, str, str]
 """Code, message, and request ID of an error answer; empty strings when absent."""

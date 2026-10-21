@@ -97,8 +97,8 @@ def test_e30_2_a_refused_account_is_told_how_to_join() -> None:
         for read in (source.check, source.device_list, lambda: source.device_detail("core")):
             with pytest.raises(SourceUnavailableError) as exc:
                 read()
-            assert "only root and members of vakr-admin or vakr may" in str(exc.value)
-            assert "sudo usermod -aG vakr NAME" in str(exc.value)
+            assert "only root and members of vakr-admin, vakr-view, or vakr may" in str(exc.value)
+            assert "sudo usermod -aG vakr-view NAME" in str(exc.value)
 
 
 def test_answers_map_onto_the_local_failures() -> None:

@@ -135,7 +135,7 @@ The installation key is created by `vakr setup` and, once it exists, by `vakr-ap
 
 The key is not included in backups. If it is lost or deleted, vakr creates a new one. Open pages then need a reload to get a fresh CSRF token, and failure counts start from zero. Nothing else is affected.
 
-Members of the `vakr` group can read `metadata.db` and therefore the password hashes, just as they can read the SNMP credentials file. Argon2id makes guessing expensive, but give people web accounts rather than `vakr` group membership if that matters at your site. Database backups made by `vakr db migrate`, `vakr db backup`, and self-update contain the hashes too. They are kept in directories with mode 0700.
+Members of the `vakr` group can read `metadata.db` and therefore the password hashes, just as they can read the SNMP credentials file. Argon2id makes guessing expensive, but give people a web account or `vakr-view` membership ([local TUI and CLI access](#local-tui-and-cli-access)) rather than `vakr` membership if that matters at your site. Database backups made by `vakr db migrate`, `vakr db backup`, and self-update contain the hashes too. They are kept in directories with mode 0700.
 
 ## Local TUI and CLI access
 
@@ -144,10 +144,13 @@ On the monitoring node itself, `vakr status` and `vakr tui` talk to the API over
 | Connecting account | Role |
 |---|---|
 | root, or a member of `vakr-admin` | admin |
+| a member of `vakr-view` | operator |
 | a member of `vakr` | operator |
 | anyone else | refused |
 
-Group membership is that of the *connecting process*, the same rule the kernel uses for file access. After `sudo usermod -aG vakr-admin alice`, Alice must log out and in again before the new group counts. Members of `vakr-admin` need not also be in `vakr`: the socket is reachable by every account (mode 0666 in `/run/vakr`, mode 0751), and `vakr-api` refuses everyone else itself. `vakr-api` serves the socket ([API](api.md#the-local-socket)). When it is not running, `vakr status` and `vakr tui` read the databases directly instead, as described in [status and TUI](status-and-tui.md#where-the-data-comes-from).
+Operators only read (SEC-006). Give people who only look `vakr-view`: it grants the socket and nothing else. `vakr` is the service group, which can also read the SNMP credentials file and `metadata.db`. A `vakr-view` member needs `vakr-api` running, because the group cannot read the databases directly.
+
+Group membership is that of the *connecting process*, the same rule the kernel uses for file access. After `sudo usermod -aG vakr-admin alice`, Alice must log out and in again before the new group counts. Members of `vakr-admin` and `vakr-view` need not also be in `vakr`: the socket is reachable by every account (mode 0666 in `/run/vakr`, mode 0751), and `vakr-api` refuses everyone else itself. `vakr-api` serves the socket ([API](api.md#the-local-socket)). When it is not running, `vakr status` and `vakr tui` read the databases directly instead, as described in [status and TUI](status-and-tui.md#where-the-data-comes-from).
 
 ## Audit records
 

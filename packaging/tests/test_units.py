@@ -194,8 +194,8 @@ def test_target_is_the_common_contract() -> None:
     assert "systemctl enable" not in postinst
 
 
-def test_sysusers_defines_vakr_and_vakr_admin() -> None:
-    """PKG-003: system user vakr (home /var/lib/vakr, nologin) and group vakr-admin.
+def test_sysusers_defines_vakr_and_its_groups() -> None:
+    """PKG-003, E.12: user vakr (home /var/lib/vakr, nologin); groups vakr-admin and vakr-view.
 
     Args:
         None
@@ -209,6 +209,7 @@ def test_sysusers_defines_vakr_and_vakr_admin() -> None:
     rows = table(PKG / "sysusers.d/vakr.conf")
     assert ["u", "vakr", "-", "vakr network monitor", "/var/lib/vakr", "/usr/sbin/nologin"] in rows
     assert ["g", "vakr-admin", "-", "-", "-", "-"] in rows
+    assert ["g", "vakr-view", "-", "-", "-", "-"] in rows
 
 
 def test_tmpfiles_modes_match_the_layout() -> None:

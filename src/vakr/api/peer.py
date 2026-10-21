@@ -4,8 +4,8 @@
 ``/run/vakr/api.sock`` without a password. The kernel reports the
 connecting process's UID and groups (``SO_PEERCRED``, ``SO_PEERGROUPS``)
 once per connection; ``vakr.auth.role_for_peer`` turns them into a role:
-root and members of ``vakr-admin`` are admins, members of ``vakr`` are
-operators, and everyone else is refused, on every endpoint.
+root and members of ``vakr-admin`` are admins, members of ``vakr-view`` and
+``vakr`` are operators, and everyone else is refused, on every endpoint.
 
 The socket's server uses ``PeerProtocol``, an h11 protocol that attaches a
 ``SocketPeer`` to each request's scope. The TCP listener uses the stock
@@ -71,7 +71,7 @@ def peer_principal(
 
     Args:
         sock: The connected Unix socket.
-        groups: GIDs of ``vakr-admin`` and ``vakr`` on this host.
+        groups: GIDs of ``vakr-admin``, ``vakr``, and ``vakr-view`` on this host.
         name_of: UID to account name, for the audit actor ``local:<name>``.
 
     Returns:
@@ -95,7 +95,7 @@ def peer_protocol(groups: LocalGroups, name_of: Callable[[int], str]) -> type[H1
     """Build the socket listener's protocol class for this host's vakr groups.
 
     Args:
-        groups: GIDs of ``vakr-admin`` and ``vakr``, resolved once at startup.
+        groups: GIDs of ``vakr-admin``, ``vakr``, and ``vakr-view``, resolved once at startup.
         name_of: UID to account name.
 
     Returns:

@@ -15,14 +15,21 @@ When [`vakr-api`](api.md) is running, both commands ask it over its local socket
 | `--local` given | Read the databases directly, whatever the API is doing. | `data: local databases (--local)` |
 | The socket exists but nothing answers, it times out, or the answer is unusable | Stop with exit status 3. They do **not** fall back to the databases, so a crashed API is never hidden behind local reads. | `nothing answers on /run/vakr/api.sock: vakr-api stopped uncleanly or is still starting; check systemctl status vakr-api and vakr doctor, or add --local to read the databases directly` |
 
-**Who may use the socket.** `vakr-api` serves root and members of the `vakr-admin` and `vakr` groups, by the account that connects; no password is involved ([users](users.md#local-tui-and-cli-access)). Any other account is refused, and both commands say how to get in:
+**Who may use the socket.** `vakr-api` serves root and members of the `vakr-admin`, `vakr-view`, and `vakr` groups, by the account that connects; no password is involved ([users](users.md#local-tui-and-cli-access)). Any other account is refused, and both commands say how to get in:
 
 ```console
 $ vakr status
-vakr status: this account may not use the vakr-api socket /run/vakr/api.sock: only root and members of vakr-admin or vakr may; add the account to the vakr group (sudo usermod -aG vakr NAME, then log in again; that group can also read the SNMP credentials and the password hashes), run the command with sudo, or add --local
+vakr status: this account may not use the vakr-api socket /run/vakr/api.sock: only root and members of vakr-admin, vakr-view, or vakr may; add the account to the vakr-view group (sudo usermod -aG vakr-view NAME, then log in again), or run the command with sudo
 ```
 
-After `sudo usermod -aG vakr alice`, Alice must log out and in again before the new group counts. Membership of `vakr` is more than a status view: the group can also read the SNMP credentials file and `metadata.db`, with its password hashes ([where the secrets live](users.md#where-the-secrets-live)). Give it only to people you would trust with the communities, and give others a web account.
+`vakr-view` is the group for people who only look. It gives read-only access over the socket and no access to any file. The `vakr` group is the service's own: it can also read the SNMP credentials file and `metadata.db`, with its password hashes ([where the secrets live](users.md#where-the-secrets-live)), so keep it for people you would trust with the communities. After `sudo usermod -aG vakr-view alice`, Alice must log out and in again before the new group counts.
+
+A member of `vakr-view` can read only through `vakr-api`. When it is not running, or with `--local`, the commands stop with exit status 3 and say so, rather than reporting "no data yet" for a database they cannot see:
+
+```console
+$ vakr status
+vakr status: vakr-api is not running (no /run/vakr/api.sock), and this account cannot read the databases in /var/lib/vakr directly; start it (sudo systemctl enable --now vakr-api.service vakr.target), or run the command with sudo
+```
 
 **Reading the databases directly** (`--local`, or no API) needs read access to `/var/lib/vakr`. As root, `sudo vakr status --local` first switches to the `vakr` service user, just as `vakr db` does. Running as the `vakr` user works too. The SQLite stores have no read-only connection mode, so this path opens its connections read-write. It only ever reads, without taking a write lock, and never creates a missing file.
 
@@ -84,7 +91,7 @@ The exit codes follow the Nagios plugin convention, so a monitoring system can r
 
 The exit code covers the devices listed, so `vakr status --bucket attention` exits 1 exactly when something needs attention. A search that matches nothing exits 0.
 
-A monitoring agent that runs the check under its own account, such as NRPE as `nagios`, needs that account in the `vakr` group (`sudo usermod -aG vakr nagios`, then restart the agent). Otherwise the socket refuses it and the check reports UNKNOWN (3) with the reason. That group can also read the SNMP credentials, so where that matters, let the agent run the check through `sudo` with a rule that allows only `vakr status` instead.
+A monitoring agent that runs the check under its own account, such as NRPE as `nagios`, needs that account in the `vakr-view` group (`sudo usermod -aG vakr-view nagios`, then restart the agent), and `vakr-api` running. Otherwise the check reports UNKNOWN (3) with the reason. `vakr-view` cannot read the SNMP credentials, so the agent gets nothing beyond the status itself.
 
 ### JSON
 

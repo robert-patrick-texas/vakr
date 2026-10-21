@@ -14,7 +14,7 @@ reports its components directly.
   hangs), no answer within ``TIMEOUT_S``, or ``not_ready`` (metadata
   database unavailable).
 - UNKNOWN: the caller may not use the socket (run it as root or a member of
-  ``vakr``), or an unexpected answer.
+  ``vakr-view`` or ``vakr``), or an unexpected answer.
 
 Dependencies:
     http.client: An HTTP/1.1 request over a Unix socket, standard library only.
@@ -118,7 +118,7 @@ def judge(status: int, body: dict[str, object], elapsed: float) -> CheckResult:
                            "is unavailable to vakr-api", perf)  # fmt: skip
     if status == 403:
         return CheckResult(NAME, Status.UNKNOWN, "this account may not use the API socket; run "
-                           "as root or a member of vakr")  # fmt: skip
+                           "as root or a member of vakr-view or vakr")  # fmt: skip
     return CheckResult(NAME, Status.UNKNOWN, f"unexpected answer from vakr-api (HTTP {status})")
 
 

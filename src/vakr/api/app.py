@@ -61,7 +61,7 @@ DESCRIPTION = (
     "`X-CSRF-Token` (from `GET /api/v1/auth/session`) on every state-changing request. "
     "Kiosk displays send `Authorization: Bearer vkk_...` (operator, read-only). "
     "On the monitoring node, the Unix socket `/run/vakr/api.sock` authorizes by the "
-    "connecting account (root and vakr-admin: admin; vakr: operator). "
+    "connecting account (root and vakr-admin: admin; vakr-view and vakr: operator). "
     "Errors use one envelope: `code`, `message`, `request_id`, `fields`. "
     "Lists page with `limit` and `cursor` and answer `page.next_cursor`. "
     "Times are UTC ISO 8601 with `Z`; a missing value is `null`, never 0."

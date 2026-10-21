@@ -28,6 +28,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - A new `rankings` check in `vakr check health` and `vakr doctor` warns when more than an hour of recent data is not projected (rankings then stay exact but slower). It is never CRITICAL.
 - `GET /api/v1/device-lookup?key=` (operator) answers the device screen for an exact display name, else a device UUID, exactly as `vakr status DEVICE` looks devices up (E.30 #15). `docs/api/openapi.json` and the web UI's generated types are regenerated.
 - `vakr status --local` and `vakr tui --local` read the local databases directly, as before, even while `vakr-api` runs.
+- A new `vakr-view` group (Appendix E.12, E.30 #16), created by the package: its members get read-only operator access on the local API socket, so they can use `vakr status`, `vakr tui`, and the API there, and nothing else. Unlike the service group `vakr`, it cannot read the SNMP credentials file or `metadata.db`. Give it to people and monitoring agents (such as NRPE's `nagios`) that only look. The socket's refusal message now points to `vakr-view`, and an account that cannot read the databases is told so, instead of "no data yet", when `vakr-api` is not running or `--local` is given.
 - New runtime dependencies `fastapi` (MIT) and `uvicorn` (BSD-3-Clause), with `starlette`, `pydantic`, `pydantic-core`, `h11`, `anyio`, `idna`, `click`, `annotated-types`, `typing-inspection`, `annotated-doc`, and `opentelemetry-api`; licenses are listed in the package's copyright file.
 
 ### Changed

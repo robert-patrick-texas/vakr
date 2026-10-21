@@ -15,6 +15,7 @@ import pytest
 from vakr.auth.peercred import (
     ADMIN_GROUP,
     OPERATOR_GROUP,
+    VIEWER_GROUP,
     LocalGroups,
     local_groups,
     read_peer_credentials,
@@ -23,7 +24,7 @@ from vakr.auth.peercred import (
 from vakr.auth.principal import Permission, allows
 from vakr.domain.users import Role
 
-GROUPS = LocalGroups(admin_gid=990, operator_gid=991)
+GROUPS = LocalGroups(admin_gid=990, operator_gid=991, viewer_gid=992)
 
 
 @pytest.mark.parametrize(
@@ -38,12 +39,16 @@ GROUPS = LocalGroups(admin_gid=990, operator_gid=991)
         (1000, (), GROUPS, None),
         (1000, (990, 991), LocalGroups(None, None), None),
         (1000, (991,), LocalGroups(admin_gid=None, operator_gid=991), Role.OPERATOR),
+        (1000, (992,), GROUPS, Role.OPERATOR),
+        (1000, (992, 990), GROUPS, Role.ADMIN),
+        (1000, (992,), LocalGroups(None, None, viewer_gid=992), Role.OPERATOR),
+        (1000, (992,), LocalGroups(None, None), None),
     ],
 )
 def test_e12_peer_role_mapping(
     uid: int, gids: tuple[int, ...], groups: LocalGroups, role: Role | None
 ) -> None:
-    """E.12: root and vakr-admin are admin, vakr is operator, everyone else is refused.
+    """E.12: root and vakr-admin are admin, vakr-view and vakr operator, others refused.
 
     Args:
         uid: Peer UID.
@@ -74,6 +79,8 @@ def test_local_groups_uses_the_lookup_and_tolerates_missing_groups() -> None:
     """
     table = {ADMIN_GROUP: 990}
     assert local_groups(table.get) == LocalGroups(990, None)
+    assert local_groups({VIEWER_GROUP: 992}.get) == LocalGroups(None, None, viewer_gid=992)
+    assert VIEWER_GROUP == "vakr-view"
     assert OPERATOR_GROUP == "vakr"
     local_groups()  # the real group database answers without raising
 

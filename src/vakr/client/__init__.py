@@ -2,7 +2,7 @@
 
 On the monitoring node the status views read through the running API, over
 ``/run/vakr/api.sock``. The socket authorizes by account (E.12, E.30 #2):
-root and members of ``vakr-admin`` or ``vakr`` are served, so no password,
+root and members of ``vakr-admin``, ``vakr-view``, or ``vakr`` are served, so no password,
 cookie, or token is ever sent.
 
 Modules:

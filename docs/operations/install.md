@@ -104,10 +104,11 @@ vakr check health         # Nagios/CheckMK plugin output and exit code
 
 Create the first admin account for the web UI with `sudo vakr setup`, which asks for the password twice and lists the remaining steps ([users](users.md)).
 
-To give an operator administrative access to the local vakr API and TUI, add them to `vakr-admin` (members of `vakr` get operator access):
+To give an operator administrative access to the local vakr API and TUI, add them to `vakr-admin`. For read-only access, which is all `vakr status` and `vakr tui` need, use `vakr-view`, which, unlike `vakr`, cannot read the SNMP credentials:
 
 ```sh
 sudo usermod -aG vakr-admin alice
+sudo usermod -aG vakr-view bob
 ```
 
 To start monitoring:

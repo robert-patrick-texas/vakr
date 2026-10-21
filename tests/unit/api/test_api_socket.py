@@ -16,6 +16,7 @@ Example:
 
 import os
 import socket
+import uuid
 from pathlib import Path
 
 import httpx2
@@ -55,6 +56,9 @@ def test_e12_peer_principal_from_a_socketpair() -> None:
         admin, _ = peer_principal(right, LocalGroups(os.getgid(), None), account_name)
         assert admin is not None
         assert admin.role is Role.ADMIN
+        viewer, _ = peer_principal(right, LocalGroups(None, None, os.getgid()), account_name)
+        assert viewer is not None
+        assert viewer.role is (Role.ADMIN if ROOT else Role.OPERATOR)
     with socket.socket(socket.AF_INET) as tcp:
         assert peer_principal(tcp, mine, account_name) == (None, None)
 
@@ -92,6 +96,34 @@ def test_e12_real_socket_roles_and_refusal(tmp_path: Path) -> None:
         answer = client.get("/api/v1/health/live")
         if not ROOT:
             assert (answer.status_code, answer.json()["code"]) == (403, "peer_refused")
+
+
+def test_e12_vakr_view_reads_but_changes_nothing(tmp_path: Path) -> None:
+    """E.12, SEC-006: a vakr-view member is an operator on the socket: reads, never admin writes.
+
+    Args:
+        tmp_path: Directory for the socket.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    kit = ApiKit.create()
+    path = tmp_path / "api.sock"
+    groups = LocalGroups(admin_gid=None, operator_gid=None, viewer_gid=os.getgid())
+    resolve = f"/api/v1/interfaces/{uuid.uuid4()}/identity-resolution"
+    with (
+        serving(kit.app, open_unix(path), peer_protocol(groups, account_name)),
+        httpx2.Client(transport=httpx2.HTTPTransport(uds=str(path)),
+                      base_url="http://localhost") as client,
+    ):  # fmt: skip
+        assert client.get("/api/v1/devices").status_code == 200
+        if not ROOT:
+            assert client.get("/api/v1/auth/session").json()["role"] == "operator"
+            answer = client.post(resolve, json={"review_id": str(uuid.uuid4()), "decision": "new"})
+            assert (answer.status_code, answer.json()["code"]) == (403, "forbidden")
 
 
 def test_e12_tcp_never_carries_peer_credentials() -> None:

@@ -247,7 +247,7 @@ def test_e30_2_a_refused_account_exits_unknown_with_the_way_in(
     with served(node, refuse=True):
         code, _, err = run(capsys)
     assert code == 3
-    assert "add the account to the vakr group (sudo usermod -aG vakr NAME" in err
+    assert "add the account to the vakr-view group (sudo usermod -aG vakr-view NAME" in err
 
 
 def test_tui_opens_on_the_socket_and_refuses_one_that_does_not_answer(

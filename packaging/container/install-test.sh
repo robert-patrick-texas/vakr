@@ -73,6 +73,7 @@ check_accounts_and_dirs() {
         equals "$(getent passwd vakr | cut -d: -f6,7)" "/var/lib/vakr:/usr/sbin/nologin"
     check "group vakr exists" getent group vakr
     check "group vakr-admin exists" getent group vakr-admin
+    check "group vakr-view exists (E.12)" getent group vakr-view
     check "/run/vakr is 0751 vakr:vakr" owner_mode /run/vakr "751 vakr vakr"
     check "/var/lib/vakr is 0750 vakr:vakr" owner_mode /var/lib/vakr "750 vakr vakr"
     check "/var/cache/vakr is 0750 root:vakr" owner_mode /var/cache/vakr "750 root vakr"

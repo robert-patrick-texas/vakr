@@ -727,7 +727,7 @@ type = "str"
 default = ""
 since = "0.2.1"
 reload = "restart"
-description = "Unix socket for vakr tui and the CLI on this node. Empty means /run/vakr/api.sock. Each connection gets the role of the connecting account (SO_PEERCRED): root and members of vakr-admin are admins, members of vakr are operators, and everyone else is refused (Appendix E.12)."
+description = "Unix socket for vakr tui and the CLI on this node. Empty means /run/vakr/api.sock. Each connection gets the role of the connecting account (SO_PEERCRED): root and members of vakr-admin are admins, members of vakr-view and vakr are operators (read-only), and everyone else is refused (Appendix E.12)."
 
 [[options]]
 key = "api.trusted_proxies"

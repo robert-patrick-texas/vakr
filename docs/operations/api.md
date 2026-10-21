@@ -78,7 +78,7 @@ There are two roles ([users](users.md)). Every endpoint checks the caller's role
 | Anyone | nothing | Only `health/live`, `health/ready`, and `auth/login` |
 | A signed-in user | the session cookie from `POST /api/v1/auth/login` | The account's role |
 | A kiosk display | `Authorization: Bearer vkk_...` | operator, always |
-| A process on the node | the Unix socket | By account: root and members of `vakr-admin` are admin, members of `vakr` are operator, anyone else is refused on every endpoint |
+| A process on the node | the Unix socket | By account: root and members of `vakr-admin` are admin, members of `vakr-view` and `vakr` are operator, anyone else is refused on every endpoint |
 
 Operators read everything the API offers. Admins can also change things; in this release that is the identity-review decision. An anonymous request to a protected endpoint gets 401, and a role that lacks the permission gets 403. Both use the error envelope below.
 
@@ -86,7 +86,7 @@ Operators read everything the API offers. Admins can also change things; in this
 
 Programs on the monitoring node talk to `/run/vakr/api.sock` without a password. The kernel reports which account connected, and the role follows from it (Appendix E.12). Group membership is the connecting process's own, the same rule the kernel uses for files: after `sudo usermod -aG vakr-admin alice`, Alice must log in again before it counts.
 
-The socket file is mode 0666 inside `/run/vakr` (mode 0751), so any account on the node can reach it by name. That is deliberate: members of `vakr-admin` need not also be in `vakr`. The API itself refuses every account that is neither root nor in one of the two groups, with 403 `peer_refused`, before it reads any data. This is how PostgreSQL's peer authentication works too.
+The socket file is mode 0666 inside `/run/vakr` (mode 0751), so any account on the node can reach it by name. That is deliberate: members of `vakr-admin` and `vakr-view` need not also be in `vakr`, which can also read the SNMP credentials. The API itself refuses every account that is neither root nor in one of the three groups, with 403 `peer_refused`, before it reads any data. This is how PostgreSQL's peer authentication works too.
 
 No cookie, token, or CSRF header is used on the socket, and the sign-in endpoints answer 400 `local_socket` there.
 
@@ -242,7 +242,7 @@ All of them are in [Appendix E.30](../../tool-blueprint.md#e30-api-service-m4) w
 
 ## Examples
 
-On the node, as root or a member of `vakr`, over the socket:
+On the node, as root or a member of `vakr-view` or `vakr`, over the socket:
 
 ```console
 $ curl -s --unix-socket /run/vakr/api.sock http://localhost/api/v1/health/ready

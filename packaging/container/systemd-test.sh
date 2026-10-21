@@ -148,6 +148,14 @@ check "root on the socket is admin (E.12)" \
 check "root on the socket gets /api/v1/health/live" grep -q '^200 ' <<<"$(api_get /api/v1/health/live unix)"
 check "an unprivileged account is refused on the socket (403 peer_refused)" \
     grep -q '^403 .*peer_refused' <<<"$(api_get_as nobody /api/v1/health/live unix)"
+check "create a vakr-view member" \
+    useradd --system --no-create-home --shell /usr/sbin/nologin --groups vakr-view vakrview
+check "a vakr-view member is operator on the socket (E.30 #16)" \
+    grep -q '"role":"operator"' <<<"$(api_get_as vakrview /api/v1/auth/session unix)"
+check "vakr status as a vakr-view member reads through the socket (E.29 #10)" \
+    grep -q '^data: vakr-api socket$' <<<"$(runuser -u vakrview -- vakr status 2>&1)"
+check "a vakr-view member cannot read /etc/vakr/secrets" \
+    bash -c '! runuser -u vakrview -- ls /etc/vakr/secrets >/dev/null 2>&1'
 check "vakr check health asks the API over its socket" grep -q 'api: ready' <<<"$(vakr check health)"
 check "the API serves beside the running collector (SQLite WAL, both as vakr)" \
     systemctl start vakr-collector.service

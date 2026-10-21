@@ -5,8 +5,12 @@ without a password: the kernel tells the server who connected
 (``SO_PEERCRED``), and the role follows from that account's groups:
 
 - root, or a member of ``vakr-admin``: admin;
-- a member of ``vakr``: operator;
+- a member of ``vakr-view`` or ``vakr``: operator (read-only, SEC-006);
 - anyone else: refused.
+
+``vakr-view`` exists for people and monitoring agents that only look:
+unlike ``vakr``, the service group, it grants no file access, so its
+members cannot read the SNMP credentials file or ``metadata.db``.
 
 Groups are the connecting *process's* groups (``SO_PEERGROUPS``), the same
 credentials the kernel uses for file permissions, so after ``usermod -aG
@@ -24,8 +28,8 @@ Safety:
     anything the client sends.
 
 Example:
-    >>> groups = LocalGroups(admin_gid=990, operator_gid=991)
-    >>> role_for_peer(0, (), groups), role_for_peer(1000, (991,), groups)
+    >>> groups = LocalGroups(admin_gid=990, operator_gid=991, viewer_gid=992)
+    >>> role_for_peer(0, (), groups), role_for_peer(1000, (992,), groups)
     (<Role.ADMIN: 'admin'>, <Role.OPERATOR: 'operator'>)
     >>> role_for_peer(1000, (100,), groups) is None
     True
@@ -43,6 +47,7 @@ from vakr.domain.users import Role
 
 ADMIN_GROUP = "vakr-admin"
 OPERATOR_GROUP = "vakr"
+VIEWER_GROUP = "vakr-view"
 _UCRED = struct.Struct("=iII")  # struct ucred: pid_t, uid_t, gid_t
 _NO_ID = 0xFFFFFFFF  # (uid_t)-1: the kernel's "no credentials" answer
 _SO_PEERGROUPS = getattr(socket, "SO_PEERGROUPS", 59)  # Linux >= 4.13; 59 on x86-64
@@ -51,15 +56,17 @@ _GROUPS_BUFLEN = 1024  # CPython's getsockopt limit: room for 256 groups
 
 @dataclass(frozen=True, slots=True)
 class LocalGroups:
-    """The GIDs of the two vakr groups on this host.
+    """The GIDs of the vakr groups on this host.
 
     Attributes:
         admin_gid: GID of ``vakr-admin``, or ``None`` when it does not exist.
         operator_gid: GID of ``vakr``, or ``None`` when it does not exist.
+        viewer_gid: GID of ``vakr-view``, or ``None`` when it does not exist.
     """
 
     admin_gid: int | None
     operator_gid: int | None
+    viewer_gid: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,12 +111,12 @@ def local_groups(lookup: Callable[[str], int | None] = _group_gid) -> LocalGroup
         lookup: Group-name-to-GID function; tests pass a table.
 
     Returns:
-        LocalGroups: The two GIDs.
+        LocalGroups: The three GIDs.
 
     Raises:
         None
     """
-    return LocalGroups(lookup(ADMIN_GROUP), lookup(OPERATOR_GROUP))
+    return LocalGroups(lookup(ADMIN_GROUP), lookup(OPERATOR_GROUP), lookup(VIEWER_GROUP))
 
 
 def role_for_peer(uid: int, gids: Iterable[int], groups: LocalGroups) -> Role | None:
@@ -122,7 +129,7 @@ def role_for_peer(uid: int, gids: Iterable[int], groups: LocalGroups) -> Role | 
 
     Returns:
         Role | None: ``ADMIN`` for root or ``vakr-admin`` members, ``OPERATOR``
-        for ``vakr`` members, ``None`` (refuse) for everyone else.
+        for ``vakr-view`` or ``vakr`` members, ``None`` (refuse) for everyone else.
 
     Raises:
         None
@@ -132,7 +139,8 @@ def role_for_peer(uid: int, gids: Iterable[int], groups: LocalGroups) -> Role | 
     member = set(gids)
     if groups.admin_gid is not None and groups.admin_gid in member:
         return Role.ADMIN
-    if groups.operator_gid is not None and groups.operator_gid in member:
+    readers = (groups.operator_gid, groups.viewer_gid)
+    if any(gid is not None and gid in member for gid in readers):
         return Role.OPERATOR
     return None
 

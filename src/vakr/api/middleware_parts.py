@@ -163,7 +163,7 @@ async def too_large(scope: Scope, receive: Receive, send: Send, rid: str, limit:
 
 
 async def refuse_peer(scope: Scope, receive: Receive, send: Send, rid: str) -> None:
-    """Answer 403 to a socket peer that is neither root nor in ``vakr-admin`` or ``vakr`` (E.12).
+    """Answer 403 to a socket peer that is not root and in no vakr group (E.12).
 
     Args:
         scope: The ASGI scope.
@@ -178,7 +178,7 @@ async def refuse_peer(scope: Scope, receive: Receive, send: Send, rid: str) -> N
         None
     """
     message = ("this account may not use the local API socket: only root and members of "
-               "vakr-admin (admin) or vakr (operator) may")  # fmt: skip
+               "vakr-admin (admin), vakr-view, or vakr (operator) may")  # fmt: skip
     await envelope_response(403, "peer_refused", message, rid)(scope, receive, send)
 
 

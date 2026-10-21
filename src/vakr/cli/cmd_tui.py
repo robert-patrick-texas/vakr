@@ -3,7 +3,7 @@
 ``vakr tui [--local] [--refresh SECONDS]`` opens the device list and
 refreshes it every ``tui.refresh_interval`` (10 s by default, 2 s to 10 min,
 Appendix E.29). It reads through the running ``vakr-api`` on its local
-socket, which serves root and members of ``vakr-admin`` and ``vakr`` without
+socket, which serves root and members of ``vakr-admin``, ``vakr-view``, and ``vakr`` without
 a password (13.1, E.29 #10). When ``vakr-api`` is not running, or with
 ``--local``, it reads the local databases in-process instead and says so in
 the header; on that path, run as root, it first switches to the ``vakr``

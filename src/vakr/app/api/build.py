@@ -77,7 +77,7 @@ class ApiParts:
     Attributes:
         context: The shared services.
         config: The validated configuration.
-        groups: GIDs of ``vakr-admin`` and ``vakr`` (socket roles).
+        groups: GIDs of ``vakr-admin``, ``vakr``, and ``vakr-view`` (socket roles).
         closers: Release the stores, in order.
     """
 

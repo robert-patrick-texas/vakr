@@ -58,7 +58,7 @@ Until step 2 is done, the shipped signers file is a placeholder, every signature
    make github-update-test FROM=1.3.0 TO=1.4.0
    ```
 
-   In a systemd-booted `ubuntu:26.04` container it installs the previous release from GitHub, verifying the key fingerprint against this checkout's `packaging/release-signers`, the signature, and the checksum, exactly as the install guide does. It then runs `vakr self-update --yes`, `--rollback`, and the timer's `vakr-update.service` twice. It checks the version, the update record, the databases (current, vakr-owned, and accepted by the older release after the rollback), health, the pre-update backup, that the second timer run changes nothing, and a collector start and stop. It needs Docker, privileged containers, and outbound HTTPS.
+   In a systemd-booted `ubuntu:26.04` container it installs the previous release from GitHub, verifying the key fingerprint against this checkout's `packaging/release-signers`, the signature, and the checksum, exactly as the install guide does. It then runs `vakr self-update --yes`, `--rollback`, and the timer's `vakr-update.service` twice. For a release marked `manual-update-required`, it checks instead that the rolled-back release refuses the new telemetry schema and that the timer skips the release, and then updates as an operator would. It checks the version, the update record, the databases (current, vakr-owned, and accepted by the older release after the rollback), health, the pre-update backup, that the second timer run changes nothing, and a collector start and stop. It needs Docker, privileged containers, and outbound HTTPS.
 7. Documentation publishes to GitHub Pages automatically.
 
 ## What tools/release does

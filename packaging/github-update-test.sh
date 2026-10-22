@@ -10,8 +10,11 @@
 #      update record, databases current and vakr-owned, new options listed
 #      (or none claimed), recommended packages installed, health not
 #      CRITICAL, no telemetry in the pre-update backup;
-#   3. rolls back to FROM, and checks the older release accepts the databases;
-#   4. lets vakr-update.service (the timer's unit) update to TO again, then
+#   3. rolls back to FROM, and checks the older release accepts the databases
+#      (or, when TO's notes carry manual-update-required, refuses its telemetry
+#      schema, which is why the release is marked);
+#   4. lets vakr-update.service (the timer's unit) update to TO again (for a
+#      marked TO: checks the timer skips it, then updates as an operator), then
 #      checks a second run changes nothing;
 #   5. starts the collector on an empty inventory and stops it cleanly.
 #

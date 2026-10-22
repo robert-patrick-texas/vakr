@@ -76,6 +76,7 @@ check_accounts_and_dirs() {
     check "group vakr-view exists (E.12)" getent group vakr-view
     check "/run/vakr is 0751 vakr:vakr" owner_mode /run/vakr "751 vakr vakr"
     check "/var/lib/vakr is 0750 vakr:vakr" owner_mode /var/lib/vakr "750 vakr vakr"
+    check "/var/lib/vakr/backups is 0700 vakr:vakr" owner_mode /var/lib/vakr/backups "700 vakr vakr"
     check "/var/cache/vakr is 0750 root:vakr" owner_mode /var/cache/vakr "750 root vakr"
     check "/etc/vakr is 0755 root:vakr" owner_mode /etc/vakr "755 root vakr"
     check "/etc/vakr/secrets is 0750 root:vakr" owner_mode /etc/vakr/secrets "750 root vakr"
@@ -128,7 +129,13 @@ check "reinstall leaves the operator's config untouched" equals "$(config_sum)" 
 check_installed_release "$DEBVER_N" "$PEP_N"
 
 section "upgrade N ($DEBVER_N) -> N+1 ($DEBVER_N1)"
+# A 0.2.x self-update leaves the backups directory root-owned (its own mkdir);
+# the next package's postinst must give it back before `vakr db migrate`.
+chown root:root /var/lib/vakr/backups
 apt_get install "$DEB_N1"
+check "the upgrade gives /var/lib/vakr/backups back to vakr" \
+    owner_mode /var/lib/vakr/backups "700 vakr vakr"
+check "vakr db backup writes there after the upgrade" vakr db backup
 check "upgrade keeps the operator's config byte for byte (CFGM-005)" \
     equals "$(config_sum)" "$before"
 check_installed_release "$DEBVER_N1" "$PEP_N1"

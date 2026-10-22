@@ -2,6 +2,23 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## 0.3.1 - 2026-10-22
+
+Fixes the update from 0.2.x. `vakr self-update` to 0.3.0 failed, and rolled itself back to 0.2.x, on a node where an earlier self-update had created `/var/lib/vakr/backups`. Install 0.3.1 instead of 0.3.0.
+
+**This release is marked `manual-update-required`**, as 0.3.0 is: it carries 0.3.0's telemetry migration. The update timer skips it, so install it with `sudo vakr self-update`.
+
+### Fixed
+
+- The package now gives `/var/lib/vakr/backups` to `vakr` (mode 0700) before it migrates the databases (PKG-003). A 0.2.x self-update had created the directory as root, so the migration, which runs as `vakr`, could not write its pre-migration backup. dpkg then failed, and self-update rolled back to 0.2.x, as designed. Installing the 0.3.0 package with `apt` on a node that had never self-updated was not affected.
+- Developers: `make github-update-test` understands a release marked `manual-update-required`. After the rollback it expects the older release to refuse the new telemetry schema, and it expects the timer to skip the release; it then updates as an operator would.
+
+### Notes for operators updating from 0.2.x or 0.3.0
+
+- Everything in the 0.3.0 notes below applies: the migrations, enabling `vakr-api`, the first admin, and `vakr-view`.
+- If your self-update to 0.3.0 failed: 0.2.x is running and its data is as it was. Run `sudo vakr self-update`; the failed version recorded is 0.3.0, so nothing holds back 0.3.1.
+- On 0.3.0, the timer also skips 0.3.1 because of the marker. 0.3.1 changes no schema or option, so `sudo vakr self-update` is all it takes.
+
 ## 0.3.0 - 2026-10-21
 
 Milestone M4, viewing: the web UI and JSON API v1 (`vakr-api`, shipped disabled), local accounts, `vakr status` and `vakr tui` over the API socket, kiosk displays with dashboard rotation, custom dashboards, manual rediscovery, rollups and retention, the ranking projection, and self-metrics. **This release is marked `manual-update-required`**: the update timer skips it, so install it with `sudo vakr self-update` (see the notes at the end).

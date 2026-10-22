@@ -76,6 +76,7 @@ class StatusQueries:
         telemetry: Callable[[], TelemetryBackend] | None,
         settings: QuerySettings | None = None,
         clock: Clock | None = None,
+        replication: Callable[[], Reading | None] | None = None,
     ) -> None:
         """Bind the service to its stores.
 
@@ -84,6 +85,8 @@ class StatusQueries:
             telemetry: Opens a telemetry view; ``None`` when no store exists yet.
             settings: Defaults and bounds; packaged defaults when ``None``.
             clock: Time source; the system clock when ``None``.
+            replication: Reads replication health for the header (MPOS-006);
+                ``None`` shows none.
 
         Returns:
             None
@@ -95,6 +98,7 @@ class StatusQueries:
         self._telemetry = telemetry
         self._settings = settings or QuerySettings()
         self._clock = clock or SystemClock()
+        self._replication = replication
 
     def device_list(self, request: DeviceListRequest | None = None) -> DeviceListView:
         """Return one page of the device list in 7.7 order (or the requested sort).
@@ -267,4 +271,23 @@ class StatusQueries:
                     spool,
                 )
             )
-        return HealthView(OK, telemetry, tuple(collectors))
+        return HealthView(OK, telemetry, tuple(collectors), self._replication_reading())
+
+    def _replication_reading(self) -> Reading | None:
+        """Read replication health; a failure to read it never costs the view.
+
+        Args:
+            None
+
+        Returns:
+            Reading | None: The reading, or ``None`` without a reader or partner.
+
+        Raises:
+            None
+        """
+        if self._replication is None:
+            return None
+        try:
+            return self._replication()
+        except Exception:  # noqa: BLE001 - a status-file problem must not hide the devices
+            return missing("replication status unreadable")

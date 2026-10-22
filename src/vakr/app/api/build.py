@@ -45,6 +45,7 @@ from vakr.api.context import ApiContext
 from vakr.api.settings import ApiSettings, api_settings_from_config
 from vakr.app.api.metrics_storage import api_metrics
 from vakr.app.api.readonly import ReadOnlyTelemetry
+from vakr.app.api.replication_feed import observation_source
 from vakr.app.collector import preflight
 from vakr.app.collector.preflight import PreflightError
 from vakr.auth import (
@@ -69,6 +70,7 @@ from vakr.ports.clock import Clock, SystemClock
 from vakr.ports.migrations import MigrationError
 from vakr.ports.telemetry import TelemetryBackend
 from vakr.query import HistoryQueries, OverviewQueries, settings_from_config
+from vakr.replication.overview import replication_reader
 
 type TelemetryOpener = Callable[[], TelemetryBackend]
 
@@ -273,7 +275,8 @@ def build_parts(
         auth.passwords.warm_up()
         uow = sqlite_uow_factory(metadata)
         query = settings_from_config(config, hostname=socket.gethostname())
-        overview = OverviewQueries(uow, telemetry, query, clock,
+        reader = replication_reader(paths.state_dir, node_settings(config))
+        overview = OverviewQueries(uow, telemetry, query, clock, replication=reader,
                                    incidents=incident_reader(config, paths))  # fmt: skip
         history = HistoryQueries(uow, telemetry, query, clock)
         context = ApiContext(auth, overview, history, uow, clock, settings, clock.now_utc(),
@@ -281,7 +284,8 @@ def build_parts(
         context.operations = operation_service(uow, clock, config)
         context.metrics = api_metrics(paths, uow, overview)
         context.node = node_settings(config)
-        return ApiParts(context, config, local_groups(), [*closers, metadata.close])
+        context.observations, feed = observation_source(paths, uow)
+        return ApiParts(context, config, local_groups(), [*closers, feed.close, metadata.close])
     except BaseException:
         for closer in (*closers, metadata.close):
             closer()

@@ -68,6 +68,23 @@ def _pull(service: Any) -> str:
     return MetadataPuller(client, parts.uow_factory, record, service.clock).pull_once()
 
 
+async def replication_loops(service: Any) -> None:
+    """Run the metadata pull (a peer) and the observation pull (both roles) side by side.
+
+    Args:
+        service: The running collector service.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    from vakr.app.collector.observation_loop import observation_pull_loop
+
+    await asyncio.gather(metadata_pull_loop(service), observation_pull_loop(service))
+
+
 async def metadata_pull_loop(service: Any) -> None:
     """Pull the primary's metadata until the collector stops; idle on a primary.
 

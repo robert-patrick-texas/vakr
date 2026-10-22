@@ -38,11 +38,13 @@ from vakr.adapters.sqlite.telemetry import (
     sqlite_telemetry_factory,
 )
 from vakr.config.loader import ConfigError, EffectiveConfig, load_effective_config
+from vakr.config.node import node_settings
 from vakr.domain.errors import StorageError
 from vakr.paths import InstallPaths
 from vakr.ports.migrations import MigrationError
 from vakr.ports.telemetry import TelemetryBackend
 from vakr.query import QuerySettings, StatusQueries, settings_from_config
+from vakr.replication.overview import replication_reader
 
 
 class NoDataYetError(Exception):
@@ -176,4 +178,6 @@ def open_status(
         for closer in closers:
             closer()
 
-    return StatusStores(StatusQueries(sqlite_uow_factory(meta), telemetry, settings), config, close)
+    reader = replication_reader(paths.state_dir, node_settings(config))
+    queries = StatusQueries(sqlite_uow_factory(meta), telemetry, settings, replication=reader)
+    return StatusStores(queries, config, close)

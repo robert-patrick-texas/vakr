@@ -183,11 +183,14 @@ class HealthView:
         metadata: Whether inventory could be read.
         telemetry: Whether telemetry could be read, and why not.
         collectors: Each collector's latest self-report.
+        replication: Replication with the other position (27.5 item 7, MPOS-006);
+            ``None`` on a node without a partner.
     """
 
     metadata: Reading
     telemetry: Reading
     collectors: tuple[CollectorHealthView, ...] = ()
+    replication: Reading | None = None
 
     @property
     def telemetry_ok(self) -> bool:

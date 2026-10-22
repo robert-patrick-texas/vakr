@@ -1581,7 +1581,7 @@
         "type": "object"
       },
       "HealthView": {
-        "description": "Storage and collector health shown above every list (13.2, 13.4).\n\nAttributes:\n    metadata: Whether inventory could be read.\n    telemetry: Whether telemetry could be read, and why not.\n    collectors: Each collector's latest self-report.",
+        "description": "Storage and collector health shown above every list (13.2, 13.4).\n\nAttributes:\n    metadata: Whether inventory could be read.\n    telemetry: Whether telemetry could be read, and why not.\n    collectors: Each collector's latest self-report.\n    replication: Replication with the other position (27.5 item 7, MPOS-006);\n        ``None`` on a node without a partner.",
         "properties": {
           "collectors": {
             "default": [],
@@ -1593,6 +1593,16 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/Reading"
+          },
+          "replication": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reading"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "telemetry": {
             "$ref": "#/components/schemas/Reading"
@@ -10826,6 +10836,175 @@
           }
         ],
         "summary": "Replicated metadata digest (replication token)",
+        "tags": [
+          "replication"
+        ]
+      }
+    },
+    "/api/v1/replication/observations": {
+      "get": {
+        "description": "Return observations of one local collector after ``after``, oldest first.",
+        "operationId": "page_api_v1_replication_observations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "collector",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Collector",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 2000,
+              "maximum": 10000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Page Api V1 Replication Observations Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "security": [
+          {
+            "replicationToken": []
+          }
+        ],
+        "summary": "One page of this node's observations (replication token)",
+        "tags": [
+          "replication"
+        ]
+      }
+    },
+    "/api/v1/replication/observations/state": {
+      "get": {
+        "description": "Describe this node's own collectors for the partner.",
+        "operationId": "state_api_v1_replication_observations_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response State Api V1 Replication Observations State Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "security": [
+          {
+            "replicationToken": []
+          }
+        ],
+        "summary": "This node's collectors and log bounds (replication token)",
         "tags": [
           "replication"
         ]

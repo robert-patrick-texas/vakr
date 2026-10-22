@@ -48,7 +48,7 @@ from vakr.app.collector.plans import PlanBook
 from vakr.app.collector.ranking_projector import collector_projector
 from vakr.app.collector.reload import reload_service
 from vakr.app.collector.replan import Replanner
-from vakr.app.collector.replication_loop import metadata_pull_loop
+from vakr.app.collector.replication_loop import replication_loops
 from vakr.app.collector.rollup_job import collector_job
 from vakr.app.collector.shutdown import shut_down
 from vakr.app.collector.snmp_step import CollectorSnmpStep
@@ -259,7 +259,7 @@ class CollectorService:
             ),
             "health": health_loop(self),
             "metrics snapshot": metrics_loop(self),
-            "metadata pull": metadata_pull_loop(self),
+            "replication": replication_loops(self),
         }
         return {name: asyncio.create_task(job, name=name) for name, job in jobs.items()}
 

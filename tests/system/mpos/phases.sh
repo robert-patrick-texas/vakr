@@ -43,6 +43,20 @@ covers() {
         $2 == c {seen++; if ((have[$1] + 0) < $3) bad++} END {exit !(seen && !bad)}' \
         <(echo "$now") <(echo "$2")
 }
+replication_clean() {
+    # replication_clean NODE: its observation pull record shows no error, no gap, and every
+    # partner collector within 300 s (E.13's warning threshold) of its newest observation.
+    on "$1" cat /var/lib/vakr/replication/observation-pull.json | python3 -c '
+import json, sys
+from datetime import UTC, datetime
+r = json.load(sys.stdin)
+now = datetime.now(UTC)
+ok = r["last_error"] is None and r["sources"] and all(
+    s["gaps"] == 0 and s["newest_ts"]
+    and (now - datetime.fromisoformat(s["newest_ts"])).total_seconds() < 300
+    for s in r["sources"].values())
+sys.exit(0 if ok else 1)'
+}
 peer_refuses_edit() {
     # MPOS-T03: an inventory edit on the peer is refused, and the refusal names the primary.
     local out
@@ -58,6 +72,8 @@ peer_refuses_edit() {
 mpos_t04() {
     section "MPOS-T04: 60 ms between positions; each position's latency stays its own (MPOS-008)"
     local device=${names[0]} east_lat west_lat
+    # Each node pulls the other every 30 s; one window lets both copies arrive.
+    has_feature replication && hold "$window" "replication of each position's evidence"
     east_lat=$(on east "${PROBE[@]}" latency "$device")
     west_lat=$(on west "${PROBE[@]}" latency "$device")
     echo "      $device latency (position, collector, median ms, probes), on east:"
@@ -122,7 +138,15 @@ mpos_t02() {
         skip "west holds every observation east's collector had made" "$NEEDS_B"
         skip "east holds every observation west's collector had made" "$NEEDS_B"
     fi
-    skip "the backfill runs oldest first" "written with M5 part B, from its replication cursor"
+    if has_feature replication; then
+        # Oldest first is the seq order of the source's log (test_e13_budget_paces_a_backfill_
+        # oldest_first); a packaged node's 50,000-observation pass drains this backfill at once,
+        # so here the end state is checked: caught up, no error, no gap.
+        check "west's backfill of east finished: no error, no gap, caught up" replication_clean west
+        check "east's backfill of west finished: no error, no gap, caught up" replication_clean east
+    else
+        skip "the backfill finished in both directions, oldest first" "$NEEDS_B"
+    fi
     check "east holds no duplicate observation UUIDs" no_duplicates east
     check "west holds no duplicate observation UUIDs" no_duplicates west
 }

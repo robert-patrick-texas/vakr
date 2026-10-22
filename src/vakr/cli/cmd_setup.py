@@ -226,8 +226,10 @@ def next_steps() -> list[str]:
         "`vakr inventory plan` and `sudo vakr inventory apply`.",
         "  3. Start collecting: `sudo systemctl enable --now vakr-collector.service vakr.target`.",
         "  4. Watch with `vakr status` or `vakr tui`.",
-        "The web UI arrives with the vakr-api service in a later release; sign in there with "
-        "this account.",
+        "  5. Start the API and web UI: `sudo systemctl enable --now vakr-api.service`, put it "
+        "behind your HTTPS reverse proxy (docs: web access), and sign in with this account.",
+        "  6. Give people who only look, and monitoring agents, the `vakr-view` group: "
+        "`sudo usermod -aG vakr-view NAME`.",
         "Manage accounts with `sudo vakr user list|add|passwd|disable|enable|role|"
         "revoke-sessions`.",
     ]

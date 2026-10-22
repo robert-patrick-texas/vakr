@@ -2,6 +2,12 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## Unreleased
+
+### Fixed
+
+- `vakr setup`'s closing checklist no longer says the web UI arrives in a later release. It now ends with starting `vakr-api` behind the HTTPS reverse proxy and signing in, then giving read-only people and monitoring agents the `vakr-view` group, as the [install guide](docs/operations/install.md#first-run) does.
+
 ## 0.4.0 - 2026-10-22
 
 Milestone M5, two positions: node roles, `vkr_` replication tokens, metadata pull to a read-only peer, and observation replication in both directions. Each position keeps working through a partition and backfills afterwards; the composite status reads "Reachable from <position> only". Also read-compatible telemetry versioning, and a security fix: self-update's archives, record, and lock now live where only root may write. **This release is marked `manual-update-required`** for nodes updating from 0.3.x (telemetry schema 3); a new installation is unaffected.

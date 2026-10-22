@@ -106,6 +106,8 @@ $ cd web && npm run gen:api        # regenerate the TypeScript types
 
 ## End-to-end tests
 
+The automated accessibility checks run with the suite below. The manual part, a screen-reader walk-through of every core workflow, is [a separate script](screen-reader-review.md). It has not been run yet, and is an open follow-up action.
+
 ```console
 $ cd web && npx playwright install chromium     # once; CI adds --with-deps
 $ make web-e2e                                  # builds, then runs Playwright

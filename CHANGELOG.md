@@ -4,6 +4,10 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Security
+
+- Self-update keeps its pre-update archives and its `update-state.json` in `/var/lib/vakr-update`, which only root may write (UPD-005, Appendix E.14 decision 6). Rollback runs as root and restores the newest archive into `/etc/vakr` and the metadata database. Before, the archives lived in `/var/lib/vakr/backups`, which the `vakr` service account owns, so a compromised service could have planted one for root to restore. The update lock moved there too, from `/run/vakr`, and is opened without following links. Rollback now restores only a regular archive that root owns, with one link, that nobody else may write. Self-update refuses its directories if anyone else owns or may write them. The first `sudo vakr self-update` of this release moves an older release's root-owned archives and record across (`update.storage.adopted`). `apt purge` removes `/var/lib/vakr-update`, whose archives copy the configuration and its secrets.
+
 ### Added
 
 - Two positions, part A (MPOS-001 to MPOS-003, MPOS-006; ADR-024, [two positions](docs/operations/two-positions.md)): `[node] role = "peer"` makes a node copy its primary's metadata (inventory, interface identity and annotations, sites, tags, groups, policies, accounts, dashboards, identity reviews) every 60 s. The copy is row for row, UUIDs and versions kept, and is applied only when it matches the primary's digest. A peer refuses local metadata changes, naming the primary (409 `peer_read_only`, and the CLI likewise), keeps polling with its last-known copy while the primary is away, and reports a failing pull as node health only.

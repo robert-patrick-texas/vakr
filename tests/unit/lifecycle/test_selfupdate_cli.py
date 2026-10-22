@@ -144,13 +144,13 @@ def test_timer_invocation_updates_once(
     out = capsys.readouterr().out
     assert installer.installed == ["vakr_99.0.0_amd64.deb"]
     # E.14: the pre-update backup holds metadata.db only, never the large telemetry.db.
-    (archive,) = (paths.state_dir / "backups").glob("pre-update-*.tar.gz")
+    (archive,) = (paths.update_dir / "backups").glob("pre-update-*.tar.gz")
     with tarfile.open(archive) as tar:
         assert [n for n in tar.getnames() if n.startswith("state/")] == ["state/metadata.db"]
     assert "update.hook.skipped: config upgrade" in out
     assert "vakr self-update: updated:" in out
     assert "  Release notes line" in out
-    state = load_state(paths.state_dir / "update-state.json")
+    state = load_state(paths.update_dir / "update-state.json")
     assert (state.result, state.to_version) == ("success", "99.0.0")
     monkeypatch.setattr(cmd_selfupdate, "get_version", lambda: "99.0.0")
     assert main(timer) == 0
@@ -214,7 +214,7 @@ def test_usage_and_environment_errors(
     captured = capsys.readouterr()
     assert "[FAIL] tcp" in captured.out
     assert "cannot connect" in captured.err
-    with exclusive_lock(paths.run_dir / "self-update.lock"):
+    with exclusive_lock(paths.update_dir / "self-update.lock"):
         assert main(["self-update", "--yes", "--rollback"]) == 1
     assert "already running" in capsys.readouterr().err
     assert main(["self-update", "--rollback", "--yes"]) == 1

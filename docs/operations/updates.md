@@ -18,14 +18,14 @@ The requirements behind this behavior are in the blueprint, sections [28.3 Self-
 2. **Discover.** It lists the 30 most recent releases of `update.repository` from the GitHub API and selects the newest release on `update.channel`, at or below `update.hold_version`.
 3. **Download.** It saves `vakr_<version>_amd64.deb`, `SHA256SUMS`, and `SHA256SUMS.sig` into `/var/cache/vakr/updates/<version>/`.
 4. **Verify.** It runs `ssh-keygen -Y verify` to check the signature on `SHA256SUMS` against the release signers in the installed package (`/opt/vakr/share/release-signers`, identity and namespace `vakr-release`). It then checks that the package's SHA-256 matches its line in `SHA256SUMS`. If either check fails, the update stops with nothing changed.
-5. **Back up.** It writes `/var/lib/vakr/backups/pre-update-<UTC>.tar.gz` (mode 0600). The archive holds `/etc/vakr`, which includes `secrets/` and the trusted-CA directory, plus a consistent snapshot of the metadata database, `/var/lib/vakr/metadata.db`. The five newest archives are kept. The telemetry database, `telemetry.db`, is not copied: at the MVP workload it grows to about 40 GB, too large to copy before every update. A rollback therefore keeps the telemetry collected so far, and releases never make a change to it that the previous release cannot read.
+5. **Back up.** It writes `/var/lib/vakr-update/backups/pre-update-<UTC>.tar.gz` (mode 0600). The archive holds `/etc/vakr`, which includes `secrets/` and the trusted-CA directory, plus a consistent snapshot of the metadata database, `/var/lib/vakr/metadata.db`. The five newest archives are kept. The telemetry database, `telemetry.db`, is not copied: at the MVP workload it grows to about 40 GB, too large to copy before every update. A rollback therefore keeps the telemetry collected so far, and releases never make a change to it that the previous release cannot read.
 6. **Prepare rollback.** It makes sure a verified package of the version that is running now is cached. If that package isn't cached, it downloads it by tag.
 7. **Install.** It runs `apt-get install -y --allow-downgrades <package>` with `DEBIAN_FRONTEND=noninteractive`, so apt resolves dependencies.
 8. **Post-install hooks.** These run through the **new** binary, `/opt/vakr/venv/bin/vakr`:
    1. `config upgrade`. Exit status 3 means the command is not available yet; this is logged and skipped.
    2. `systemctl try-restart vakr.target`, which restarts only the services that were running.
    3. `check health`. A CRITICAL result counts as a failure, except from a check of a host setting such as ICMP permission (`ping_group_range`): that counts as a warning, because rolling the release back cannot fix the host. Monitoring still sees it as CRITICAL.
-9. **Record.** It writes the outcome to `/var/lib/vakr/update-state.json`. On success it prunes the package cache to the installed version plus the two most recent older versions.
+9. **Record.** It writes the outcome to `/var/lib/vakr-update/update-state.json`. On success it prunes the package cache to the installed version plus the two most recent older versions.
 
 If the install or any hook fails, self-update rolls back automatically. See [Rollback](#rollback).
 
@@ -319,10 +319,14 @@ During the MVP, telemetry migrations are additive, so a rollback doesn't need a 
 |---|---|
 | `/opt/vakr/share/release-signers` | Trusted release signing keys (`allowed_signers` format), shipped in the package. |
 | `/var/cache/vakr/updates/<version>/` | Downloaded package, `SHA256SUMS`, and signature. The installed version and two older versions are kept. |
-| `/var/lib/vakr/backups/` | `pre-update-*` and `pre-rollback-*` archives (mode 0600, five of each kept). |
-| `/var/lib/vakr/update-state.json` | Last result, versions, message, and versions that failed to install. |
+| `/var/lib/vakr-update/backups/` | `pre-update-*` and `pre-rollback-*` archives (mode 0600, five of each kept), in a directory only root can open (0700). |
+| `/var/lib/vakr-update/update-state.json` | Last result, versions, message, and versions that failed to install (0644, so health checks run by other accounts can read it). |
 | `/etc/vakr/tls/ca.d/` | Extra trusted CAs for vakr's outbound HTTPS. |
-| `/run/vakr/self-update.lock` | Update lock. |
+| `/var/lib/vakr-update/self-update.lock` | Update lock, opened without following links. |
+
+**Why a separate directory.** Rollback runs as root and restores a pre-update archive into `/etc/vakr` and the metadata database. So the archives, the record that names versions, and the update lock live in `/var/lib/vakr-update`, which only root may write, and not in `/var/lib/vakr`, which the `vakr` service account owns. Before this change they were there, and a compromised service account could have planted an archive for root to restore. Self-update refuses to use `/var/lib/vakr-update` or its `backups/` if anyone but root owns them or may write them, and rollback restores only a regular archive that root owns, with one link, that nobody else may write. The package's tmpfiles entry creates both directories.
+
+**Moving in from an older release.** A release before this one kept its archives in `/var/lib/vakr/backups/` and its record in `/var/lib/vakr/update-state.json`. The first `vakr self-update` of this release, run as root, moves the root-owned ones into `/var/lib/vakr-update` and logs `update.storage.adopted`. A file there that root does not own, or that others may change, stays where it is and is never restored. The move happens then and not at package installation, because during that installation the older release's updater is still running and may need its archive to roll back. Until the move, `vakr check health` shows the older record. `vakr db` backups (`metadata-*.db`, `telemetry-*.db`) stay in `/var/lib/vakr/backups/`; they belong to the service, which writes them.
 
 ## Exit status
 

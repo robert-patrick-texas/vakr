@@ -55,12 +55,15 @@ class Layout:
         cache_root: Package cache (``<cache_dir>/updates``).
         backups_dir: Pre-update backups.
         state_file: ``update-state.json``.
-        lock_file: Update lock in the runtime directory.
+        lock_file: Update lock, in the root-only update directory (UPD-005).
         config_dir: Configuration directory to back up and restore.
         db_dir: Directory whose databases are backed up.
         db_names: Database file names to back up; empty means every ``*.db``.
         keep_packages: Older cached versions kept (E.14: 2).
         keep_backups: Backups kept.
+        legacy_backups_dir: Where an older release kept its archives, adopted
+            once (``vakr.lifecycle.update.private``); ``None`` for none.
+        legacy_state_file: Where an older release kept its state, likewise.
     """
 
     cache_root: Path
@@ -72,6 +75,8 @@ class Layout:
     db_names: tuple[str, ...] = ()
     keep_packages: int = 2
     keep_backups: int = 5
+    legacy_backups_dir: Path | None = None
+    legacy_state_file: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)

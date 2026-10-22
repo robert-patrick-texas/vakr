@@ -23,7 +23,7 @@ Example:
 
 from collections.abc import Sequence
 
-from vakr.lifecycle.update import cache, engine
+from vakr.lifecycle.update import cache, engine, private
 from vakr.lifecycle.update.console import Confirm
 from vakr.lifecycle.update.github import HttpGetter
 from vakr.lifecycle.update.lock import exclusive_lock
@@ -104,6 +104,7 @@ class SelfUpdater:
             OSError: When the cache or backup cannot be written.
         """
         with exclusive_lock(self.kit.layout.lock_file):
+            private.prepare(self.kit)
             online = self.sources.online()
             releases = online.get_releases()
             release, skip = self._select(current, request, releases)
@@ -143,6 +144,7 @@ class SelfUpdater:
             OSError: When the cache or backup cannot be written.
         """
         with exclusive_lock(self.kit.layout.lock_file):
+            private.prepare(self.kit)
             target = version_from_name(self.project, files.package.name)
             if target is None:
                 expected = f"{self.project.package}_<version>_{self.project.arch}.deb"
@@ -175,6 +177,7 @@ class SelfUpdater:
             OSError: When the safety backup cannot be written.
         """
         with exclusive_lock(self.kit.layout.lock_file):
+            private.prepare(self.kit)
             previous = previous_version(self.sources, current, engine.current_state(self.kit))
             if previous is None:
                 return Outcome("failed", "no previous version is recorded or cached")

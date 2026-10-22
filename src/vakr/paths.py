@@ -95,6 +95,24 @@ class InstallPaths:
         return cls.under(Path(env.get("VAKR_ROOT") or "/"))
 
     @property
+    def update_dir(self) -> Path:
+        """Self-update's own state and pre-update backups, writable by root alone (UPD-005).
+
+        Rollback restores what is kept here as root, so it is not under
+        ``state_dir``, which the service account owns.
+
+        Args:
+            None
+
+        Returns:
+            Path: ``/var/lib/vakr-update``.
+
+        Raises:
+            None
+        """
+        return self.root / "var/lib/vakr-update"
+
+    @property
     def defaults_dir(self) -> Path:
         """Packaged, documented defaults for every option (read-only).
 

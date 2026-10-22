@@ -133,7 +133,7 @@ If the edited file is invalid or unsafe, vakr stops using the old values as well
 - **Errors name only the location.** File errors give the path, line, key, and rule, never the value, and the parser's own error, which holds the whole file, is discarded.
 - **Logs are scrubbed.** A logging filter replaces any known secret value in log messages, arguments, and exception text with `***`, as a second line of defence.
 - **Values stay in memory only while needed.** A service holds them only while the file is unchanged, resolves a credential immediately before opening an SNMP session, and doesn't keep it afterwards.
-- **Backups contain secrets.** The pre-update backup under `/var/lib/vakr/backups/` (mode `0600`) includes `/etc/vakr/secrets/`; see [Updates](updates.md).
+- **Backups contain secrets.** The pre-update backup under `/var/lib/vakr-update/backups/` (mode `0600`, in a directory only root can open) includes `/etc/vakr/secrets/`; see [Updates](updates.md#files).
 
 ## Recommended: SNMPv3 authPriv with SHA-2 and AES
 

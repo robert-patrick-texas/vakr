@@ -945,8 +945,9 @@ def make_harness(root: Path, signer: Signer, http: FakeHttp | None) -> Harness:
     """
     layout = Layout(
         cache_root=root / "cache/updates",
-        backups_dir=root / "state/backups",
-        state_file=root / "state/update-state.json",
+        # Self-update's own directory, apart from the service's state (UPD-005).
+        backups_dir=root / "update/backups",
+        state_file=root / "update/update-state.json",
         lock_file=root / "run/self-update.lock",
         config_dir=root / "etc",
         db_dir=root / "state",

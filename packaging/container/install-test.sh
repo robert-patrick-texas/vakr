@@ -77,6 +77,9 @@ check_accounts_and_dirs() {
     check "/run/vakr is 0751 vakr:vakr" owner_mode /run/vakr "751 vakr vakr"
     check "/var/lib/vakr is 0750 vakr:vakr" owner_mode /var/lib/vakr "750 vakr vakr"
     check "/var/lib/vakr/backups is 0700 vakr:vakr" owner_mode /var/lib/vakr/backups "700 vakr vakr"
+    check "/var/lib/vakr-update is 0755 root:root (UPD-005)" owner_mode /var/lib/vakr-update "755 root root"
+    check "/var/lib/vakr-update/backups is 0700 root:root" \
+        owner_mode /var/lib/vakr-update/backups "700 root root"
     check "/var/cache/vakr is 0750 root:vakr" owner_mode /var/cache/vakr "750 root vakr"
     check "/etc/vakr is 0755 root:vakr" owner_mode /etc/vakr "755 root vakr"
     check "/etc/vakr/secrets is 0750 root:vakr" owner_mode /etc/vakr/secrets "750 root vakr"
@@ -147,6 +150,7 @@ check "purge prints the kept-history notice" \
 printf '%s\n' "$purge_log" | grep '^vakr:' | sed 's/^/      /'
 check "/etc/vakr is removed" test ! -e /etc/vakr
 check "/var/cache/vakr is removed" test ! -e /var/cache/vakr
+check "/var/lib/vakr-update is removed (its archives hold configuration)" test ! -e /var/lib/vakr-update
 check "/var/lib/vakr history is kept" test -e /var/lib/vakr/history.sentinel
 check "dpkg no longer lists vakr" not_installed vakr
 check "user vakr is kept so kept files have an owner" getent passwd vakr

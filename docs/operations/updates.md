@@ -118,6 +118,7 @@ In unattended mode the rules are stricter than at the console:
 - It installs only a release newer than the installed version, at or below `update.hold_version`.
 - A version whose install failed is **not retried** until a newer release appears. You can retry it by hand with `sudo vakr self-update --version X`.
 - A release whose notes contain the marker `manual-update-required` is skipped. The release tool adds this marker when a release needs an operator, for example when rollback would also need a telemetry restore (UPD-005).
+- A newer release is skipped too while a marked release lies between it and the installed one, because installing it would apply the marked release's changes as well. Run `sudo vakr self-update` once by hand; the timer takes over again after that. 0.2.x releases lack this rule and check only the newest release's notes, so update a node still on 0.2.x by hand.
 - Every step is sent to journald with a stable `EVENT_ID`.
 
 ```console

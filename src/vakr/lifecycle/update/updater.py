@@ -28,7 +28,7 @@ from vakr.lifecycle.update.console import Confirm
 from vakr.lifecycle.update.github import HttpGetter
 from vakr.lifecycle.update.lock import exclusive_lock
 from vakr.lifecycle.update.model import Outcome, Toolkit
-from vakr.lifecycle.update.policy import Request, Skip, gate, no_release
+from vakr.lifecycle.update.policy import Request, Skip, crossed_marker, gate, no_release
 from vakr.lifecycle.update.releases import Release, asset_names, newest, notes_excerpt
 from vakr.lifecycle.update.sources import (
     Project,
@@ -212,5 +212,8 @@ class SelfUpdater:
         if release is None:
             return None, None
         failed = engine.current_state(self.kit).failed_versions
-        rules = {"explicit": explicit, "notes": release.body, "marker": self.project.manual_marker}
+        marker = self.project.manual_marker
+        listed = ((r.version, r.body) for r in releases if not r.draft)
+        crossed = crossed_marker(listed, current, release.version, marker)
+        rules = {"explicit": explicit, "notes": release.body, "marker": marker, "crossed": crossed}
         return release, gate(release.version, current, request, failed, **rules)

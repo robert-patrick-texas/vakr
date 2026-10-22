@@ -19,7 +19,7 @@ import pytest
 
 from tests.unit.lifecycle.helpers import Harness
 from vakr.lifecycle.update.lock import LockBusyError, exclusive_lock
-from vakr.lifecycle.update.policy import Request
+from vakr.lifecycle.update.policy import Request, crossed_marker
 from vakr.lifecycle.update.state import load_state
 from vakr.lifecycle.update.versions import Version
 
@@ -256,6 +256,54 @@ def test_manual_marker_blocks_only_unattended(harness: Harness) -> None:
     assert "manual update" in blocked.message
     assert h.updater.update(V("7.2.0"), Request(), lambda _question: False).status == "cancelled"
     assert h.updater.update(V("7.2.0"), Request(), yes).status == "updated"
+
+
+def test_manual_marker_on_a_skipped_release_blocks_the_timer(harness: Harness) -> None:
+    """UPD-005: the timer never jumps over a release that needs a manual update.
+
+    Installing 7.4.0 from 7.2.0 would apply 7.3.0's migrations too, so 7.3.0's
+    marker holds the timer even though 7.4.0's notes have none. Once 7.3.0 is
+    installed, by an operator, the timer may take 7.4.0.
+
+    Args:
+        harness: Updater with fakes.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    h = harness
+    h.publish("7.3.0", body="Telemetry schema 2: manual-update-required")
+    h.publish("7.4.0", body="Fixes only.")
+    timer = Request(if_newer=True, unattended=True)
+    blocked = h.updater.update(V("7.2.0"), timer, yes)
+    assert blocked.status == "skipped"
+    assert "7.4.0 includes 7.3.0" in blocked.message
+    assert h.installer.installed == []
+    assert h.updater.update(V("7.3.0"), timer, yes).status == "updated"
+    assert h.installer.installed == ["vakr_7.4.0_amd64.deb"]
+
+
+def test_crossed_marker_looks_only_strictly_between() -> None:
+    """UPD-005: the installed and target releases are not "between"; the oldest marked one wins.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    mark = "x manual-update-required"
+    listed = [(V("7.2.0"), mark), (V("7.3.0"), mark), (V("7.3.1"), mark), (V("7.4.0"), mark)]
+    assert crossed_marker(listed, V("7.2.0"), V("7.4.0")) == V("7.3.0")
+    assert crossed_marker(listed, V("7.3.1"), V("7.4.0")) is None
+    assert crossed_marker([(V("7.3.0"), "fixes")], V("7.2.0"), V("7.4.0")) is None
+    assert crossed_marker(listed, V("7.2.0"), V("7.4.0"), marker="") is None
 
 
 def test_manual_rollback_restores_previous_version(harness: Harness) -> None:

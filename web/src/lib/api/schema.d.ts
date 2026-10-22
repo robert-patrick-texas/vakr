@@ -903,6 +903,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/replication/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One page of this node's observations (replication token)
+         * @description Return observations of one local collector after ``after``, oldest first.
+         */
+        get: operations["page_api_v1_replication_observations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/replication/observations/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * This node's collectors and log bounds (replication token)
+         * @description Describe this node's own collectors for the partner.
+         */
+        get: operations["state_api_v1_replication_observations_state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -1864,6 +1904,8 @@ export interface components {
          *         metadata: Whether inventory could be read.
          *         telemetry: Whether telemetry could be read, and why not.
          *         collectors: Each collector's latest self-report.
+         *         replication: Replication with the other position (27.5 item 7, MPOS-006);
+         *             ``None`` on a node without a partner.
          */
         HealthView: {
             /**
@@ -1872,6 +1914,7 @@ export interface components {
              */
             collectors: components["schemas"]["CollectorHealthView"][];
             metadata: components["schemas"]["Reading"];
+            replication?: components["schemas"]["Reading"] | null;
             telemetry: components["schemas"]["Reading"];
         };
         /**
@@ -6977,6 +7020,122 @@ export interface operations {
         };
     };
     state_api_v1_replication_metadata_state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    page_api_v1_replication_observations_get: {
+        parameters: {
+            query: {
+                collector: string;
+                after?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    state_api_v1_replication_observations_state_get: {
         parameters: {
             query?: never;
             header?: never;

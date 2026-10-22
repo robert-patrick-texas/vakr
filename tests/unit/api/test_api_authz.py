@@ -33,6 +33,8 @@ LEVELS = {
     ("GET", "/api/v1/metrics"): VIEW,  # OBS-005, OBS-T02: never anonymous
     ("GET", "/api/v1/replication/metadata/state"): REPL,
     ("GET", "/api/v1/replication/metadata"): REPL,
+    ("GET", "/api/v1/replication/observations/state"): REPL,
+    ("GET", "/api/v1/replication/observations"): REPL,
     ("POST", "/api/v1/auth/login"): ANON,
     ("POST", "/api/v1/auth/logout"): ANON,
     ("GET", "/api/v1/auth/session"): VIEW,

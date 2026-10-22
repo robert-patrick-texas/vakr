@@ -199,4 +199,6 @@ def health_line(health: HealthView) -> str:
         else:
             spool = f", spool {c.spool.text}" if c.spool.value is not None else ""
             parts.append(f"{c.position} {c.state.text} ({c.age.text} ago{spool})")
+    if health.replication is not None:
+        parts.append(f"replication {health.replication.text}")
     return " · ".join(parts)

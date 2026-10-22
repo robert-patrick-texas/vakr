@@ -9,7 +9,9 @@
   more old, or that never succeeded since its record began.
 
 A failing pull is node health: the peer keeps polling every device with its
-last-known metadata, and no target ever changes state because of it.
+last-known metadata, and no target ever changes state because of it. On a
+node with a partner URL the observation pull is judged too
+(``vakr.health.observation_check``), and the worse of the two answers.
 
 Dependencies:
     vakr.replication.status: The pull record the collector writes.
@@ -24,13 +26,15 @@ Example:
     'WARNING'
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from vakr.config.loader import ConfigError, load_effective_config
 from vakr.config.node import node_settings
+from vakr.health import observation_check
 from vakr.health.model import CheckResult, PerfDatum, Status
 from vakr.paths import InstallPaths
 from vakr.ports.clock import SystemClock
+from vakr.replication import observation_status as obs_status
 from vakr.replication import status
 from vakr.replication.status import PullStatus
 
@@ -59,10 +63,56 @@ def check_replication() -> CheckResult:
         node = node_settings(load_effective_config(paths.config_dir))
     except ConfigError:
         return CheckResult(NAME, Status.UNKNOWN, "the configuration cannot be read; see config")
-    if not node.is_peer:
-        return CheckResult(NAME, Status.OK, f"{node.role} node; it pulls no metadata")
-    record = status.read_status(paths.state_dir / status.FILE)
-    return judge(record, _age(record))
+    metadata = None
+    if node.is_peer:
+        record = status.read_status(paths.state_dir / status.FILE)
+        metadata = judge(record, _age(record))
+    if not node.partner_url:
+        return metadata or CheckResult(NAME, Status.OK, f"{node.role} node without a partner; "
+                                       "it replicates nothing")  # fmt: skip
+    found = obs_status.read_status(paths.state_dir / obs_status.FILE)
+    now = SystemClock().now_utc()
+    since = _since(found, now)
+    observed = observation_check.judge(found, None if found is None else found.lag_s(now), since)
+    return observed if metadata is None else _worse(metadata, observed)
+
+
+def _since(record: obs_status.ObservationPullStatus | None, now: datetime) -> float:
+    """Return seconds since the newest successful observation pull.
+
+    Args:
+        record: The record.
+        now: Current time.
+
+    Returns:
+        float: Seconds; 0 without a recorded success.
+
+    Raises:
+        None
+    """
+    if record is None or record.last_success_at is None:
+        return 0.0
+    return (now - datetime.fromisoformat(record.last_success_at)).total_seconds()
+
+
+def _worse(first: CheckResult, second: CheckResult) -> CheckResult:
+    """Combine the metadata and observation answers: the worse status, both summaries.
+
+    Args:
+        first: The metadata answer.
+        second: The observation answer.
+
+    Returns:
+        CheckResult: The combined result.
+
+    Raises:
+        None
+    """
+    rank = (Status.OK, Status.WARNING, Status.UNKNOWN, Status.CRITICAL)
+    word = max(first.status, second.status, key=rank.index)
+    return CheckResult(
+        NAME, word, f"{first.summary}; {second.summary}", (*first.perfdata, *second.perfdata)
+    )
 
 
 def _age(record: PullStatus | None) -> float | None:

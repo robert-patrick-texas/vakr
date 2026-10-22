@@ -18,6 +18,9 @@ that stores interface samples also unlists, in the same transaction, the
 ranking-projection buckets they fall in, so a projected bucket always
 matches its samples (E.28).
 
+``write_batch`` (the local spool's path) also logs each new row for partners to
+pull; ``write_replicated`` stores a partner's page unlogged with its cursor (MPOS-004).
+
 Dependencies:
     vakr.adapters.sqlite.telemetry.*: Codecs, keys, catalog, and the store.
     vakr.domain, vakr.ports.telemetry: Observations and the result type.
@@ -36,6 +39,7 @@ Example:
 import sqlite3
 from collections import defaultdict
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from vakr.adapters.sqlite.telemetry.codec import encode
 from vakr.adapters.sqlite.telemetry.codec_rows import EncodedRow
@@ -44,11 +48,20 @@ from vakr.adapters.sqlite.telemetry.layout import all_columns, day_start, hot_ta
 from vakr.adapters.sqlite.telemetry.partitions import BOUNDARY, ensure_day, state
 from vakr.adapters.sqlite.telemetry.ranking_projection import forget_buckets
 from vakr.adapters.sqlite.telemetry.rankings import FAMILY
+from vakr.adapters.sqlite.telemetry.replication_log import (
+    FAMILY_CODE,
+    LogEntry,
+    cursor_of,
+    log_rows,
+    set_cursor,
+    store_part,
+)
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.adapters.sqlite.telemetry.tuning import MAX_BATCH_ROWS
 from vakr.domain.errors import ValidationError
-from vakr.domain.ids import BatchId
+from vakr.domain.ids import BatchId, CollectorId, new_id
 from vakr.domain.observations import Observation
+from vakr.domain.timestamps import to_epoch_us
 from vakr.ports.telemetry.results import WriteResult
 
 type KeyedRow = tuple[object, ...]
@@ -104,22 +117,104 @@ class SqliteObservationWriter:
                 or a value cannot be stored; nothing is written.
             StorageError: If the database is unavailable; nothing is committed.
         """
-        if len(observations) > MAX_BATCH_ROWS:
-            raise ValidationError(
-                f"batch of {len(observations)} exceeds max_batch_rows {MAX_BATCH_ROWS}"
-            )
-        rows, seen = [], set()
-        for row in (encode(o) for o in observations):
-            if row.observation not in seen:
-                seen.add(row.observation)
-                rows.append(row)
+        rows = _unique(observations)
         inserted = 0
         if rows:
             with self._store.writing() as conn:
                 keys = KeyAllocator(conn, self._store.keys)
-                inserted = _insert(conn, keys, rows)
+                log: list[LogEntry] = []
+                inserted = _insert(conn, keys, rows, log)
+                log.sort(key=lambda e: (e[3], e[4]))  # seq order follows observation time
+                log_rows(conn, log)
             keys.publish()
         return WriteResult(batch_id, inserted, len(observations) - inserted)
+
+    def write_replicated(
+        self, source: CollectorId, observations: Sequence[Observation], through_seq: int
+    ) -> WriteResult:
+        """Store a partner's page and move its cursor in one transaction (MPOS-004).
+
+        Args:
+            source: The partner collector the page came from.
+            observations: Its observations; none is logged here.
+            through_seq: The page's ``next_after``.
+
+        Returns:
+            WriteResult: Inserted and duplicate counts.
+
+        Raises:
+            ValidationError: Another collector's observation, or the cursor moving back.
+            StorageError: If the database is unavailable; nothing is committed.
+        """
+        if any(o.collector_id != source for o in observations):
+            raise ValidationError("a replicated page holds another collector's observation")
+        rows = _unique(observations)
+        with self._store.writing() as conn:
+            held = cursor_of(conn, source)
+            if held is not None and through_seq < held:
+                raise ValidationError(f"cursor would move back from {held} to {through_seq}")
+            keys = KeyAllocator(conn, self._store.keys)
+            inserted = _insert(conn, keys, rows, None) if rows else 0
+            set_cursor(conn, source, through_seq, to_epoch_us(datetime.now(UTC)))
+        keys.publish()
+        return WriteResult(BatchId(new_id(BatchId)), inserted, len(observations) - inserted)
+
+    def rewind(self, source: CollectorId) -> None:
+        """Forget ``source``'s cursor, so the next pull starts from its oldest entry.
+
+        For a partner whose log restarted (its newest seq is below the cursor
+        held here); replaying what is already stored changes nothing.
+
+        Args:
+            source: The partner collector.
+
+        Returns:
+            None
+
+        Raises:
+            StorageError: If the database is unavailable.
+        """
+        with self._store.writing() as conn:
+            set_cursor(conn, source, 0, to_epoch_us(datetime.now(UTC)))
+
+    def cursor(self, source: CollectorId) -> int | None:
+        """Return the newest partner seq stored for ``source``.
+
+        Args:
+            source: A partner collector.
+
+        Returns:
+            int | None: The seq, or ``None`` before the first page.
+
+        Raises:
+            StorageError: If the database is unavailable.
+        """
+        with self._store.reading() as conn:
+            return cursor_of(conn, source)
+
+
+def _unique(observations: Sequence[Observation]) -> list[EncodedRow]:
+    """Check the batch size and encode each observation once.
+
+    Args:
+        observations: The batch.
+
+    Returns:
+        list[EncodedRow]: Encoded rows, the first copy of each observation UUID.
+
+    Raises:
+        ValidationError: If the batch is too large or holds a non-observation.
+    """
+    if len(observations) > MAX_BATCH_ROWS:
+        raise ValidationError(
+            f"batch of {len(observations)} exceeds max_batch_rows {MAX_BATCH_ROWS}"
+        )
+    rows, seen = [], set()
+    for row in (encode(o) for o in observations):
+        if row.observation not in seen:
+            seen.add(row.observation)
+            rows.append(row)
+    return rows
 
 
 def _keyed(row: EncodedRow, keys: KeyAllocator) -> KeyedRow:
@@ -146,13 +241,17 @@ def _keyed(row: EncodedRow, keys: KeyAllocator) -> KeyedRow:
     return (series, collector, row.ts_us, row.observation, *values)
 
 
-def _insert(conn: sqlite3.Connection, keys: KeyAllocator, rows: list[EncodedRow]) -> int:
+def _insert(
+    conn: sqlite3.Connection, keys: KeyAllocator, rows: list[EncodedRow], log: list[LogEntry] | None
+) -> int:
     """Route rows to staging or day partitions and insert them.
 
     Args:
         conn: Connection holding the write lock.
         keys: The transaction's key allocator.
         rows: Encoded rows, unique by observation UUID.
+        log: Collects a replication-log entry per row inserted for the first
+            time (the local spool's path); ``None`` logs nothing.
 
     Returns:
         int: Rows inserted; replays are ignored and not counted.
@@ -179,7 +278,7 @@ def _insert(conn: sqlite3.Connection, keys: KeyAllocator, rows: list[EncodedRow]
         # series first for a day partition.
         hot = table.endswith("_hot")
         part.sort(key=(lambda r: (r[2], r[0], r[1], r[3])) if hot else (lambda r: r[:4]))
-        stored = conn.executemany(insert_sql(table, family), part).rowcount
+        stored = store_part(conn, insert_sql(table, family), part, FAMILY_CODE[family], log)
         samples += stored if family == FAMILY else 0
         inserted += stored
     if samples:

@@ -42,6 +42,7 @@ from vakr.operations import OperationService
 from vakr.ports.clock import Clock
 from vakr.ports.metadata import MetadataUnitOfWorkFactory
 from vakr.query import HistoryQueries, OverviewQueries
+from vakr.replication.serving import ObservationSource
 
 
 def account_name(uid: int) -> str:
@@ -142,6 +143,7 @@ class ApiContext:
         metrics: Self-metrics for ``GET /api/v1/metrics`` (E.33); tests get one
             without a collector snapshot or database readers.
         node: This node's role and position (MPOS-003); a primary by default.
+        observations: Serves this node's observations to its partner (MPOS-004).
     """
 
     auth: AuthServices
@@ -160,6 +162,7 @@ class ApiContext:
     operations: OperationService | None = None
     metrics: MetricsService = field(default_factory=MetricsService)
     node: NodeSettings = field(default_factory=NodeSettings)
+    observations: ObservationSource | None = None
 
 
 def get_context(request: Request) -> ApiContext:

@@ -50,6 +50,7 @@ from vakr.adapters.sqlite.telemetry.partitions import (
     tables,
 )
 from vakr.adapters.sqlite.telemetry.ranking_projection import prune
+from vakr.adapters.sqlite.telemetry.replication_log import purge_log
 from vakr.adapters.sqlite.telemetry.rollups import coverage_end_us
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.domain.rollups import ROLLUP_BUCKET_SECONDS, bucket_start
@@ -169,6 +170,7 @@ class SqliteRetentionManager:
             native = 0 if cutoff is None else _advance_native(conn, encode_time(cutoff))
             rollups = _advance_rollups(conn, encode_time(rollup_cut))
             prune(conn, encode_time(now))  # the ranking projection never outlives native data
+            purge_log(conn, state(conn, HORIZON))  # nor the replication log (MPOS-005)
         return RetentionReport(now, cutoff, rollup_cut, native, rollups)
 
 

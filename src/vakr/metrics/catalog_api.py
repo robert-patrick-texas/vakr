@@ -30,6 +30,8 @@ from vakr.metrics.exposition import Kind
 
 C, G, S = Kind.COUNTER, Kind.GAUGE, Kind.SUMMARY
 PULL_RESULTS = frozenset({"applied", "unchanged", "failed"})
+OBS_PULL_RESULTS = frozenset({"ok", "failed"})
+OBS_RESULTS = frozenset({"inserted", "duplicate"})
 _PROC = ("process", PROCESSES)
 
 API_FAMILIES = (
@@ -76,6 +78,18 @@ API_FAMILIES = (
     spec("vakr_replication_metadata_pulls_total", C,
          "A peer's metadata pulls by result, since its pull record began.",
          ("result", PULL_RESULTS)),
+    spec("vakr_replication_observation_lag_seconds", G,
+         "Age of the newest observation stored from the other position (E.13, MPOS-006)."),
+    spec("vakr_replication_backlog", G,
+         "Observations the other position logged that this node has not stored yet."),
+    spec("vakr_replication_gaps_total", C,
+         "Observations the other position no longer held when this node asked (MPOS-005)."),
+    spec("vakr_replication_observations_total", C,
+         "Observations pulled from the other position: stored, or already held (replays).",
+         ("result", OBS_RESULTS)),
+    spec("vakr_replication_observation_pulls_total", C,
+         "Observation pulls from the other position by result, since the record began.",
+         ("result", OBS_PULL_RESULTS)),
     spec("vakr_database_size_bytes", G, "Size of a database file.",
          ("database", DATABASES), ("file", DB_FILES)),
     spec("vakr_database_schema_version", G, "Highest applied schema migration.",

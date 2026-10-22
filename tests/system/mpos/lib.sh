@@ -161,7 +161,9 @@ configure_roles() {
     # a test-only TLS terminator whose test CA each node trusts in
     # /etc/vakr/tls/ca.d (docs/operations/two-positions.md; nothing weakens TLS).
     tls_terminators || return 1
-    printf '[node]\nrole = "primary"\nposition = "east"\n' >dist/mpos-test/east-role.toml
+    # east pulls west's observations from node.peer_url, west east's from its primary_url (MPOS-004).
+    printf '[node]\nrole = "primary"\nposition = "east"\npeer_url = "https://%s"\n' "$WEST_INTER" \
+        >dist/mpos-test/east-role.toml
     printf '[node]\nrole = "peer"\nposition = "west"\nprimary_url = "https://%s"\n' "$EAST_INTER" \
         >dist/mpos-test/west-role.toml
     on east install -D -m 0644 /work/east-role.toml /etc/vakr/conf.d/50-mpos-role.toml &&

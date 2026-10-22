@@ -27,6 +27,7 @@ Example:
 import logging
 from functools import partial
 from pathlib import Path
+from typing import Any
 
 from vakr.adapters.sqlite.metadata.store import METADATA_FILE, metadata_migrations
 from vakr.adapters.sqlite.telemetry.store import TELEMETRY_FILE, telemetry_migrations
@@ -148,14 +149,41 @@ def replication_families(paths: InstallPaths) -> list[Family]:
     """
     from datetime import UTC, datetime
 
+    from vakr.replication import observation_status as obs
     from vakr.replication import status
 
-    record = status.read_status(paths.state_dir / status.FILE)
-    if record is None:
-        return []
-    age = record.success_age_s(datetime.now(UTC))
-    return [build("vakr_replication_metadata_age_seconds", [((), age)]),
-            build("vakr_replication_metadata_pulls_total",
+    found: list[Family] = []
+    if (record := status.read_status(paths.state_dir / status.FILE)) is not None:
+        age = record.success_age_s(datetime.now(UTC))
+        found += [build("vakr_replication_metadata_age_seconds", [((), age)]),
+                  build("vakr_replication_metadata_pulls_total",
+                        [((k,), float(v)) for k, v in sorted(record.pulls.items())])]  # fmt: skip
+    if (pulled := obs.read_status(paths.state_dir / obs.FILE)) is not None:
+        found += _observation_families(pulled, datetime.now(UTC))
+    return found
+
+
+def _observation_families(record: Any, now: Any) -> list[Family]:
+    """Turn the observation pull record into families (MPOS-006); the lag only once known.
+
+    Args:
+        record: The ``ObservationPullStatus``.
+        now: Current time (UTC).
+
+    Returns:
+        list[Family]: Lag, backlog, gaps, observations, and pulls.
+
+    Raises:
+        None
+    """
+    sources = record.sources.values()
+    inserted, dupes = sum(s.inserted for s in sources), sum(s.duplicates for s in sources)
+    return [build("vakr_replication_observation_lag_seconds", [((), record.lag_s(now))]),
+            build("vakr_replication_backlog", [((), float(sum(s.backlog for s in sources)))]),
+            build("vakr_replication_gaps_total", [((), float(sum(s.gaps for s in sources)))]),
+            build("vakr_replication_observations_total",
+                  [(("duplicate",), float(dupes)), (("inserted",), float(inserted))]),
+            build("vakr_replication_observation_pulls_total",
                   [((k,), float(v)) for k, v in sorted(record.pulls.items())])]  # fmt: skip
 
 

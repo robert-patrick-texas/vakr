@@ -77,7 +77,7 @@ def _primary_key(path: Path, table: str) -> list[str]:
 
 
 def test_mig001_fresh_install_creates_the_fixed_schema(tmp_path: Path) -> None:
-    """MIG-001: migrate creates every fixed table (0002: the projection), stamps the ID, seeds.
+    """MIG-001: migrate creates every fixed table (0002, 0003 included), stamps the ID, seeds.
 
     Args:
         tmp_path: Directory for the file.
@@ -92,14 +92,14 @@ def test_mig001_fresh_install_creates_the_fixed_schema(tmp_path: Path) -> None:
     manager = telemetry_migrations(path)
     assert manager.status().state is SchemaState.MISSING
     applied = manager.migrate()
-    assert [a.name for a in applied] == ["initial", "ranking_projection"]
+    assert [a.name for a in applied] == ["initial", "ranking_projection", "replication"]
     assert manager.status().state is SchemaState.CURRENT
     assert raw(path, "PRAGMA application_id") == [(TELEMETRY_APPLICATION_ID,)]
     assert TELEMETRY_APPLICATION_ID != METADATA_APPLICATION_ID
     names = {r[0] for r in raw(path, "SELECT name FROM sqlite_schema WHERE type = 'table'")}
     fixed = {"dict_collector", "dict_device", "dict_interface", "vocab_code",
              "partition_template", "partition_catalog", "telemetry_state",
-             "rank_unit", "rank_iface"}  # fmt: skip
+             "rank_unit", "rank_iface", "repl_log", "repl_cursor"}  # fmt: skip
     assert fixed | {f"{f}_hot" for f in NATIVE_FAMILIES} <= names
     assert raw(path, "SELECT value FROM telemetry_state WHERE name = 'staging_boundary_us'") == [
         (0,)

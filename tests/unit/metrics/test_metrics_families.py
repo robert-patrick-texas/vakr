@@ -50,6 +50,7 @@ from vakr.metrics.snapshot import encode_snapshot, write_snapshot
 from vakr.metrics.state import state_families
 from vakr.query import OverviewQueries
 from vakr.query.settings import QuerySettings
+from vakr.replication import observation_status as obs_status
 from vakr.replication import status as pull_status
 from vakr.replication.status import record as pull_record
 from vakr.scheduler.admission import Miss, MissReason
@@ -144,6 +145,13 @@ def test_obs_t01_every_catalogued_family_is_in_the_scrape(
                              lifetime=stats.lifetime)  # fmt: skip
     path = paths.run_dir / "collector-metrics.json"
     pull_record(paths.state_dir / pull_status.FILE, "applied", datetime.now(UTC), digest="0" * 64)
+    stamp = obs_status.stamp(datetime.now(UTC))
+    obs_status.write_status(
+        paths.state_dir / obs_status.FILE,
+        obs_status.ObservationPullStatus(
+            sources={"x": obs_status.SourceStatus(cursor=5, newest_seq=9, newest_ts=stamp)}
+        ),
+    )
     now = WHEN.timestamp()
     write_snapshot(path, encode_snapshot(collector_families(snap, stats), now - 3))
     fleet = Fleet()

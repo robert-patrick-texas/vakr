@@ -189,3 +189,14 @@ This happens when an older vakr runs against a database that a newer release has
 - **Go back.** Restore the backup from before the upgrade. `vakr self-update --rollback` restores self-update's pre-update archive (UPD-005). Otherwise use the `<name>-<time>.db` that `vakr db migrate` wrote before it migrated (see [restore](#restore)). Changes made after the upgrade are lost.
 
 Other refusals name their cause: "not a vakr metadata database" or "not a vakr telemetry database" means the path points at another file, and "differs from this release's" means a different build migrated the database. In both cases, check the path, then restore a backup.
+
+## Going back before telemetry schema 3
+
+Telemetry schema 3 (`0003_replication.sql`) adds observation replication's log and cursors ([two positions](two-positions.md#observation-replication)). It is additive, so a release with read-compatible versioning keeps running on it after a rollback. Releases from before read-compatible versioning (0.3.x) refuse it, so the release that adds it carries `manual-update-required`. To go back to such a release, remove schema 3 first. The two tables hold only the replication bookkeeping; every observation, local or replicated, stays:
+
+```console
+$ sudo systemctl stop vakr-collector vakr-api
+$ sudo -u vakr /opt/vakr/venv/bin/python -c 'import sqlite3; c = sqlite3.connect("/var/lib/vakr/telemetry.db"); c.executescript("BEGIN; DROP TABLE repl_log; DROP TABLE repl_cursor; DELETE FROM schema_compat WHERE version = 3; DELETE FROM schema_migrations WHERE version = 3; COMMIT;")'
+```
+
+Then install the older release. Upgrading again applies schema 3 with an empty log, whose sequence numbers start again at 1. The other node sees that this log is shorter than the cursor it holds and reads it again from the start, so it receives everything ingested after the upgrade. This node also pulls the other's log again from the start, and skips what it already holds. Observations ingested while the older release ran are not in any log, so the other node never receives them.

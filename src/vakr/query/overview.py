@@ -53,7 +53,7 @@ from vakr.query.rankings import RankingQueries
 from vakr.query.service import StatusQueries
 from vakr.query.settings import QuerySettings
 from vakr.query.snapshot import Inventory, TelemetrySnapshot, read_inventory, read_telemetry
-from vakr.query.views import DeviceListView, DeviceRow
+from vakr.query.views import DeviceListView, DeviceRow, Reading
 
 type IncidentReader = Callable[[], Sequence[LossIncident]]
 
@@ -127,6 +127,7 @@ class OverviewQueries(StatusQueries):
         *,
         index: IndexCache | None = None,
         incidents: IncidentReader | None = None,
+        replication: Callable[[], Reading | None] | None = None,
     ) -> None:
         """Bind the service and the M4 services it composes.
 
@@ -137,6 +138,7 @@ class OverviewQueries(StatusQueries):
             clock: Time source.
             index: Shared inventory index; a private one when ``None``.
             incidents: Reads recorded telemetry-loss incidents; ``None`` when unavailable.
+            replication: Reads replication health for the header (MPOS-006).
 
         Returns:
             None
@@ -144,7 +146,7 @@ class OverviewQueries(StatusQueries):
         Raises:
             None
         """
-        super().__init__(metadata, telemetry, settings, clock)
+        super().__init__(metadata, telemetry, settings, clock, replication)
         self._index = index or IndexCache(metadata, self._settings)
         self._incidents = incidents
         self.rankings = RankingQueries(

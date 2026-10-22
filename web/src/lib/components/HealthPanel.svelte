@@ -34,6 +34,23 @@ Example: `<HealthPanel health={overview.health} />`
 		if (r.value === 'unavailable') return { color: 'red', icon: '✖', label: r.text };
 		return { color: 'amber', icon: '▲', label: r.text };
 	}
+
+	/**
+	 * Map the replication reading (27.5 item 7): its value is the lag in seconds, or missing.
+	 *
+	 * @param r - The reading.
+	 * @returns Colour, icon, and label for `StatusBadge`; amber while nothing arrived or a
+	 *   pull fails, green otherwise. The lag thresholds are judged by `vakr check health`.
+	 */
+	function replicationBadge(r: Reading): {
+		color: 'green' | 'amber';
+		icon: string;
+		label: string;
+	} {
+		if (r.value === null) return { color: 'amber', icon: '?', label: 'not yet' };
+		if (r.stale) return { color: 'amber', icon: '▲', label: 'failing' };
+		return { color: 'green', icon: '✔', label: 'replicating' };
+	}
 </script>
 
 <!-- No cell holds a link, on any page, so a narrow screen's scroll area must take focus itself. -->
@@ -67,6 +84,14 @@ Example: `<HealthPanel health={overview.health} />`
 					<td><ReadingText reading={c.spool} compact /></td>
 				</tr>
 			{/each}
+			{#if health.replication}
+				{@const b = replicationBadge(health.replication)}
+				<tr>
+					<th scope="row">Replication</th>
+					<td><StatusBadge small color={b.color} icon={b.icon} label={b.label} /></td>
+					<td colspan="2">{health.replication.text}</td>
+				</tr>
+			{/if}
 		</tbody>
 	</table>
 </div>

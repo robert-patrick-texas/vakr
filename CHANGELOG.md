@@ -11,11 +11,19 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - `vakr setup --role --position --primary-url` writes the `[node]` table, asking at a first-install terminal; on a peer it creates no admin. `GET /api/v1/version` and the web and TUI headers show the node's position and role.
 - A `replication` check in `vakr check health` and `vakr doctor` (warning after 5 min, critical after 30 min without a successful pull, E.13), and the metrics `vakr_replication_metadata_age_seconds` and `vakr_replication_metadata_pulls_total`.
 - Metadata schema 6 adds the `replication_token` table. The package runs `vakr db migrate`, which takes a backup first.
+- Two positions, part B: observation replication (MPOS-004 to MPOS-008; [two positions](docs/operations/two-positions.md#observation-replication)). Each node pulls the other position's observations every 30 s from `GET /api/v1/replication/observations` with its replication token, oldest first and idempotently, so every device view shows both positions' verdicts side by side and the composite ("Reachable from east only"). After a partition the backlog drains without starving local ingestion. A primary pulls from the new option `node.peer_url`; a peer from `node.primary_url`.
+- The `replication` check, the self-metrics (`vakr_replication_observation_lag_seconds`, `vakr_replication_backlog`, `vakr_replication_observations_total`, `vakr_replication_gaps_total`), the collector health page, and the TUI header show each partner's lag, backlog, last exchange, and gaps (27.5 item 7). Warning at 5 min, critical at 30 min (E.13). A replication failure is node health, never a device state.
+- Telemetry schema 3 (`0003_replication.sql`) adds the replication log and cursors: two new tables, about 40 bytes per locally ingested observation, purged with native retention.
 - Read-compatible telemetry versioning (Appendix E.14; [writing migrations](docs/development/migrations.md)). Telemetry migrations from 0003 on declare `compat: additive` or `compat: breaking`, and each telemetry database records a reader floor in a new `schema_compat` table.
   - This release and later ones keep running on a newer telemetry schema whose later changes were all additive. A self-update rollback, which never restores `telemetry.db`, therefore no longer strands them.
   - `vakr db status` then reports "schema M (readable by schema F and later)" and exits 0, and `vakr db migrate` does nothing.
   - A newer schema with a breaking change is still refused, naming the migration.
   - Older releases refuse every newer telemetry schema, so releases that add telemetry migrations still carry `manual-update-required`.
+
+### Notes for operators updating from 0.3.x
+
+- **This release is marked `manual-update-required`.** It migrates the telemetry schema to 3 (`0003_replication.sql`), and self-update never copies `telemetry.db`, so an automatic rollback could not restore it. The update timer skips this release; install it with `sudo vakr self-update`. The migration adds two empty tables in milliseconds.
+- To go back to 0.3.x after updating, stop `vakr-collector` and `vakr-api`, then drop the two tables and the journal row of version 3, as [the database guide](docs/operations/database.md#going-back-before-telemetry-schema-3) shows, before installing the older release. Observations a partner replicated stay, as ordinary rows of its collector.
 
 ### Changed
 

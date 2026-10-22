@@ -3774,6 +3774,11 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | Partner client | HTTPS only, egress trust and proxy settings, 20 s timeout, answers up to 8 MiB, no redirects |
 | Metadata page / pull / set | 1 to 1,000 rows per page (500 by default); at most 1,000 page requests per pull; at most 500,000 replicated rows in all |
 | Metadata pull record | `/var/lib/vakr/replication/metadata-pull.json` (mode 0640): newest attempt and success, error, counts by result; the `replication` check warns 5 min and is critical 30 min after the newest success |
+| Observation cursor | `repl_log.seq` (telemetry schema 3): an `AUTOINCREMENT` ingestion sequence of this node's own observations, never reused; one log row (about 40 bytes) per local observation, purged with native retention, at most 1,000,000 rows per retention pass |
+| Observation page / pass | 1 to 10,000 observations per page (2,000 by default) and at most 6 MiB of envelopes; at most 50,000 observations per 30 s pass |
+| Backfill pacing (detail) | While the local spool holds more than 10,000 unacknowledged records, a pass stores at most half of what local ingestion stored since the previous pass, and nothing while it stored nothing |
+| Partner URL | A peer pulls observations from `node.primary_url`; a primary from `node.peer_url` (`https://` only; empty replicates nothing) |
+| Observation pull record | `/var/lib/vakr/replication/observation-pull.json`: newest attempt and success, error, and per partner collector the cursor, its newest seq, the backlog, the newest observation's time, gaps, and counts. The `replication` check warns when the newest partner observation is 5 min old, on gaps, or on a failing pull, and is critical at 30 min |
 
 Decisions taken with M5 part A (ADR-024, [two positions](docs/operations/two-positions.md)):
 
@@ -3783,6 +3788,14 @@ Decisions taken with M5 part A (ADR-024, [two positions](docs/operations/two-pos
 4. **Identity belongs to the primary.** A peer's discovery writes no metadata; it polls with the replicated interfaces, and manual rediscovery is refused there.
 5. **The peer refuses metadata writes** (409 `peer_read_only` in the API for every state change but sign-in and kiosk tokens; the CLI's write commands), naming the primary (MPOS-003).
 6. **Same release on both nodes.** A peer refuses metadata from another schema version, and a partner that reports itself as a peer.
+
+Decisions taken with M5 part B, observation replication (2026-10-22; ADR-024 decisions 15 to 22):
+
+7. **Cursor: an ingestion sequence, not the spool's.** 27.5 item 3 names the per-collector spool sequence, but stored observations do not keep it, and a recreated spool starts its sequence again. **Contradiction recorded; choice:** `repl_log` in telemetry schema 3 (compat `additive`, E.14) gives every locally ingested observation a durable `seq` in spool order, logged in the transaction that first inserts it.
+8. **Serve only one's own collector; pull the other's.** Each node serves its own collector's log, `GET /api/v1/replication/observations` (`replication_read`), and its collector pulls the other node's every 30 s, storing each verified page with its cursor in one transaction. Replicated rows are ordinary rows of the partner's collector, never logged or served onward.
+9. **Gaps and restarts are reported.** What the partner no longer holds is counted as a gap (MPOS-005). A partner log shorter than the cursor is read again from its start.
+10. **Visibility.** The `replication` check, five metrics (E.33), `HealthView.replication` (the health line of `vakr status`, the TUI header, and the web UI health panel), and `vakr replication status` show lag, backlog, last exchange, and gaps. A replication failure never changes a device's state (MPOS-006).
+11. **A month-long partition** takes at least 14 hours to backfill at this pace; a 30-minute one at the MVP workload, about 57,000 observations a direction, one or two passes.
 
 ### E.14 Updates
 

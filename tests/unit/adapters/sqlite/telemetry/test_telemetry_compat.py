@@ -39,9 +39,11 @@ from vakr.domain.errors import ValidationError
 from vakr.domain.ids import CollectorId, new_id
 from vakr.ports.migrations import SchemaState, SchemaTooNewError
 
-ADD_TABLE = "CREATE TABLE repl_cursor (source BLOB NOT NULL PRIMARY KEY, seq INTEGER NOT NULL);"
+ADD_TABLE = "CREATE TABLE later_cursor (source BLOB NOT NULL PRIMARY KEY, seq INTEGER NOT NULL);"
 ADD_COLUMN = "ALTER TABLE obs_icmp_hot ADD COLUMN note TEXT;"
 BREAK = "DROP INDEX IF EXISTS no_such_index; CREATE TABLE later_only (x INTEGER);"
+NEXT = len(telemetry_family().migrations) + 1
+"""The first version a later release would add after the ones shipped here."""
 
 
 def newer(*extra: Migration) -> SchemaFamily:
@@ -134,10 +136,11 @@ def test_telemetry_migrations_from_0003_must_declare_compat() -> None:
     """
     assert telemetry_family().compat_from == 3
     with pytest.raises(ValidationError, match="declare `-- compat: additive`"):
-        newer(synthetic(3, "bare", ADD_TABLE))
-    assert newer(at(3, "ok", ADD_TABLE, "additive")).additive(3)
-    assert not newer(at(3, "ok", ADD_TABLE, "breaking")).additive(3)
+        newer(synthetic(NEXT, "bare", ADD_TABLE))
+    assert newer(at(NEXT, "ok", ADD_TABLE, "additive")).additive(NEXT)
+    assert not newer(at(NEXT, "ok", ADD_TABLE, "breaking")).additive(NEXT)
     assert not telemetry_family().additive(2)
+    assert telemetry_family().additive(3)  # 0003_replication: two new tables
     assert not telemetry_family().additive(99)
 
 
@@ -167,7 +170,7 @@ def test_floor_is_the_newest_applied_breaking_migration(
 
 
 def test_e14_an_older_release_keeps_using_a_newer_additive_schema(tmp_path: Path) -> None:
-    """E.14, MIG-002: schema 4 (two additive steps) is CURRENT here; the store reads and writes.
+    """E.14, MIG-002: two later additive steps are CURRENT here; the store reads and writes.
 
     Args:
         tmp_path: Directory for the file.
@@ -178,30 +181,30 @@ def test_e14_an_older_release_keeps_using_a_newer_additive_schema(tmp_path: Path
     Raises:
         None
     """
-    later = newer(at(3, "add_cursor", ADD_TABLE, "additive"),
-                  at(4, "add_note", ADD_COLUMN, "additive"))  # fmt: skip
+    later = newer(at(NEXT, "add_cursor", ADD_TABLE, "additive"),
+                  at(NEXT + 1, "add_note", ADD_COLUMN, "additive"))  # fmt: skip
     path = migrated(tmp_path, later)
-    assert raw(path, "SELECT version, compat FROM schema_compat ORDER BY version") == [
-        (3, "additive"), (4, "additive")]  # fmt: skip
+    compat = raw(path, "SELECT version, compat FROM schema_compat ORDER BY version")
+    assert compat == [(v, "additive") for v in range(3, NEXT + 2)]
     status = telemetry_migrations(path).status()
-    assert (status.state, status.version, status.pending) == (SchemaState.CURRENT, 4, ())
-    assert "schema 4 (readable by schema 2 and later)" in status.detail
+    assert (status.state, status.version, status.pending) == (SchemaState.CURRENT, NEXT + 1, ())
+    assert f"schema {NEXT + 1} (readable by schema 2 and later)" in status.detail
     store = SqliteTelemetryStore(path)  # the startup preflight accepts it
     backend = SqliteTelemetry(store)
     dev, col = s.device().id, new_id(CollectorId)
     write(backend, [s.icmp(dev, col, T0), s.poll(dev, col, T0)])
     backend.maintain(T0 + s.MINUTE * 10)  # moves the rows into partitions built from 0001's DDL
     assert raw(path, "SELECT count(*) FROM obs_icmp_d20261001") == [(1,)]
-    assert raw(path, "SELECT count(*) FROM repl_cursor") == [(0,)]  # never touched here
+    assert raw(path, "SELECT count(*) FROM later_cursor") == [(0,)]  # never touched here
     store.close()
     assert telemetry_migrations(path).migrate() == ()  # nothing to run, nothing undone
 
 
 @pytest.mark.parametrize(
     ("steps", "breaking"),
-    [((("drop", BREAK, "breaking"),), 3),
-     ((("add", ADD_TABLE, "additive"), ("drop", BREAK, "breaking")), 4),
-     ((("drop", BREAK, "breaking"), ("add", ADD_TABLE, "additive")), 3)],
+    [((("drop", BREAK, "breaking"),), 0),
+     ((("add", ADD_TABLE, "additive"), ("drop", BREAK, "breaking")), 1),
+     ((("drop", BREAK, "breaking"), ("add", ADD_TABLE, "additive")), 0)],
 )  # fmt: skip
 def test_mig004_a_newer_breaking_schema_is_still_refused(
     tmp_path: Path, steps: tuple[tuple[str, str, str], ...], breaking: int
@@ -211,7 +214,7 @@ def test_mig004_a_newer_breaking_schema_is_still_refused(
     Args:
         tmp_path: Directory for the file.
         steps: Later migrations as (name, SQL, compat).
-        breaking: The version the refusal names.
+        breaking: The step the refusal names, counted from ``NEXT``.
 
     Returns:
         None
@@ -219,11 +222,11 @@ def test_mig004_a_newer_breaking_schema_is_still_refused(
     Raises:
         None
     """
-    extra = (at(3 + i, name, sql, c) for i, (name, sql, c) in enumerate(steps))
+    extra = (at(NEXT + i, name, sql, c) for i, (name, sql, c) in enumerate(steps))
     path = migrated(tmp_path, newer(*extra))
     status = telemetry_migrations(path).status()
     assert status.state is SchemaState.TOO_NEW
-    assert f"its migration {breaking:04d} is breaking" in status.detail
+    assert f"its migration {NEXT + breaking:04d} is breaking" in status.detail
     with pytest.raises(SchemaTooNewError, match="newer vakr release"):
         SqliteTelemetryStore(path)
 
@@ -240,11 +243,11 @@ def test_an_unfinished_or_foreign_newer_schema_is_not_trusted(tmp_path: Path) ->
     Raises:
         None
     """
-    path = migrated(tmp_path, newer(at(3, "add", ADD_TABLE, "additive")))
-    _sql(path, "UPDATE schema_migrations SET state = 'in_progress', finished_at = NULL "
-               "WHERE version = 3")  # fmt: skip
+    path = migrated(tmp_path, newer(at(NEXT, "add", ADD_TABLE, "additive")))
+    later = f"WHERE version = {NEXT}"  # an int this module computes, never input
+    _sql(path, "UPDATE schema_migrations SET state = 'in_progress', finished_at = NULL " + later)  # noqa: S608
     assert telemetry_migrations(path).status().state is SchemaState.TOO_NEW
-    _sql(path, "UPDATE schema_migrations SET state = 'applied', finished_at = 1 WHERE version = 3")
+    _sql(path, "UPDATE schema_migrations SET state = 'applied', finished_at = 1 " + later)  # noqa: S608
     assert telemetry_migrations(path).status().state is SchemaState.CURRENT
     _sql(path, "UPDATE schema_migrations SET checksum = 'sha256:other' WHERE version = 2")
     assert telemetry_migrations(path).status().state is SchemaState.MISMATCH
@@ -271,11 +274,11 @@ def test_e14_db_status_and_migrate_say_readable_and_exit_0(
     state.mkdir(parents=True)
     assert main(["db", "migrate"]) == 0
     SqliteMigrationManager(
-        state / TELEMETRY_FILE, newer(at(3, "add", ADD_TABLE, "additive"))
+        state / TELEMETRY_FILE, newer(at(NEXT, "add", ADD_TABLE, "additive"))
     ).migrate()
     capsys.readouterr()
     assert main(["db", "status", "telemetry"]) == 0
-    assert "schema 3 (readable by schema 2 and later)" in capsys.readouterr().out
+    assert f"schema {NEXT} (readable by schema 2 and later)" in capsys.readouterr().out
     assert main(["db", "migrate"]) == 0
     out = capsys.readouterr().out
     assert "readable by schema 2 and later" in out

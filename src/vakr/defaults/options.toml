@@ -67,6 +67,15 @@ reload = "restart"
 description = "HTTPS URL of the primary node, for example https://vakr-east.example.net. Required when node.role is peer; ignored on a primary."
 
 [[options]]
+key = "node.peer_url"
+type = "str"
+format = "url"
+default = ""
+since = "0.3.1"
+reload = "restart"
+description = "HTTPS URL of the peer node, for example https://vakr-west.example.net. On a primary it is where the collector pulls the peer's observations from (MPOS-004); empty replicates nothing. Not used on a peer, which pulls from node.primary_url."
+
+[[options]]
 key = "time.timezone"
 type = "str"
 format = "timezone"

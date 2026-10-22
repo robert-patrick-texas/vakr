@@ -97,6 +97,11 @@ Collector overload is the collector's own state (`vakr_collector_state{state="ov
 | `vakr_users` | gauge | none | Local web and API accounts. |
 | `vakr_replication_metadata_age_seconds` | gauge | none | Age of a peer's newest successful metadata pull (E.13); absent on a primary. |
 | `vakr_replication_metadata_pulls_total` | counter | `result` | A peer's metadata pulls by result, since its pull record began. |
+| `vakr_replication_observation_lag_seconds` | gauge | none | Age of the newest observation stored from the other position (E.13, MPOS-006); absent before the first. |
+| `vakr_replication_backlog` | gauge | none | Observations the other position logged that this node has not stored yet. |
+| `vakr_replication_gaps_total` | counter | none | Observations the other position no longer held when this node asked (MPOS-005). |
+| `vakr_replication_observations_total` | counter | `result` | Observations pulled from the other position: `inserted`, or `duplicate` (already held, a replay). |
+| `vakr_replication_observation_pulls_total` | counter | `result` | Observation pulls from the other position by result (`ok`, `failed`), since the record began. |
 | `vakr_database_size_bytes` | gauge | `database` (metadata, telemetry), `file` (main, wal) | Size of a database file. |
 | `vakr_database_schema_version` | gauge | `database` (metadata, telemetry) | Highest applied schema migration. |
 | `vakr_rollup_lag_seconds` | gauge | none | How far the 15-minute rollups are behind the newest complete native data. |

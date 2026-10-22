@@ -19,7 +19,7 @@ You need Docker with privileged containers (systemd as PID 1, nftables, and `tc`
 $ make mpos-test MPOS_QUICK=1                        # about 7 minutes, plus the package build
 $ make mpos-test                                     # the full run: a 30-minute partition
 $ make mpos-test MPOS_QUICK=1 DEB=dist/vakr_<version>_amd64.deb   # skip the package build
-$ make mpos-test MPOS_QUICK=1 MPOS_FEATURES=roles,replication     # once M5 parts A and B exist
+$ make mpos-test MPOS_QUICK=1 MPOS_FEATURES=roles,replication     # the whole of M5
 ```
 
 | Variable | Default | Quick (`MPOS_QUICK=1`) | Meaning |
@@ -61,18 +61,18 @@ Traffic shaping, inside the nodes:
 
 The tests run in this order after a warm-up in which both nodes must show every device Active.
 
-| Test | Steps | Checks today | Checks that wait for parts A and B |
+| Test | Steps | Checks without features | Checks with `roles,replication` |
 |---|---|---|---|
-| MPOS-T04 | The delays above are on from the start. | Each node's own median RTT to a device: east under 15 ms, west 45 to 90 ms. Each node's latency history has one series per position, with no position or collector twice. | Each node also shows the other's series beside its own, each with its own RTT (part B). |
-| MPOS-T01 | Cut east from west, and west from half the devices, for `MPOS_PARTITION_SECONDS`. | East still shows every device Active. West shows the cut devices down from west, and the others Active. Both nodes kept polling. | After east-west heals (west's device cut kept for one window), west's composite for the cut devices reads "Reachable from east only" (part B). |
-| MPOS-T02 | Heal everything. | Neither node holds a duplicate observation UUID. | Each node holds at least every observation the other's collector had made when the backfill window began, family by family (part B). That the backfill runs oldest first is written with part B, from its replication cursor. |
-| MPOS-T03 | Cut east (the primary) from west (the peer) for `MPOS_HOLD_SECONDS`. | West kept polling with its last-known inventory. | West refuses an inventory edit with a message naming the primary (part A). |
+| MPOS-T04 | The delays above are on from the start. | Each node's own median RTT to a device: east under 15 ms, west 45 to 90 ms. Each node's latency history has one series per position, with no position or collector twice. | After one window, each node also shows the other's series beside its own, each with its own RTT. |
+| MPOS-T01 | Cut east from west, and west from half the devices, for `MPOS_PARTITION_SECONDS`. | East still shows every device Active. West shows the cut devices down from west, and the others Active. Both nodes kept polling. | After east-west heals (west's device cut kept for one window), west's composite for the cut devices reads "Reachable from east only". |
+| MPOS-T02 | Heal everything. | Neither node holds a duplicate observation UUID. | Each node holds at least every observation the other's collector had made when the backfill window began, family by family. Each node's observation pull record shows no error, no gap, and every partner collector within 300 s. Oldest-first order is the source log's seq order, asserted by `test_e13_budget_paces_a_backfill_oldest_first`: a packaged node's 50,000-observation pass drains a quick-mode backfill at once, so the harness checks the end state. |
+| MPOS-T03 | Cut east (the primary) from west (the peer) for `MPOS_HOLD_SECONDS`. | West kept polling with its last-known inventory. | West refuses an inventory edit with a message naming the primary. |
 
 ## Checks that wait for M5 parts A and B
 
 Without `MPOS_FEATURES`, the nodes run as two independent single nodes with the same inventory, and the checks above that need roles or replication print `SKIP` with the part they wait for. `roles` (part A) makes east the metadata primary and west the peer, and exchanges replication tokens in `configure_roles` (`tests/system/mpos/lib.sh`). That function follows part A's contract ([two positions](../operations/two-positions.md), ADR-024):
 
-- **Roles:** `[node] role`, `position`, and, on west, `primary_url = "https://172.29.70.20"`.
+- **Roles:** `[node] role`, `position`, and, on west, `primary_url = "https://172.29.70.20"`. East also gets `peer_url = "https://<west's address>"`, so each node pulls the other's observations (part B); the `replication` feature turns on the checks that depend on it.
 - **Tokens:** each node runs `vakr replication token create mpos-<partner>`, and the token goes into the partner's `/etc/vakr/secrets/replication.token` (mode 0640, `root:vakr`). It is never printed.
 - **HTTPS between the nodes:** vakr-api listens on plain HTTP on loopback, as in production, so the harness puts `tests/system/mpos/tlsproxy.py` in front of it on each node's inter-position address, port 443. It is a test-only TLS terminator standing in for the operator's reverse proxy.
   - `tlsproxy.py gen` makes, on the host, a test CA and one server certificate per address (SAN = the address). They meet the strict X.509 profile (EGRESS-003).

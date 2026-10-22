@@ -20,6 +20,7 @@ from vakr.health.model import Status
 from vakr.health.replication_check import check_replication
 from vakr.paths import InstallPaths
 from vakr.ports.clock import ManualClock
+from vakr.replication import observation_status as obs_status
 from vakr.replication import status
 from vakr.replication.metadata_pull import PullError
 
@@ -112,5 +113,13 @@ def test_mpos006_the_check_is_ok_on_a_primary_and_ages_a_peer(
     assert check_replication().status is Status.WARNING  # no pull recorded yet
     status.record(paths.state_dir / status.FILE, "applied", datetime.now(UTC), digest="a" * 64)
     result = check_replication()
+    assert result.status is Status.WARNING  # metadata fresh, but no observation pulled yet
+    assert "no observation pulled" in result.summary
+    now = obs_status.stamp(datetime.now(UTC))
+    obs_status.write_status(paths.state_dir / obs_status.FILE, obs_status.ObservationPullStatus(
+        last_attempt_at=now, last_success_at=now,
+        sources={"x": obs_status.SourceStatus(position="east", newest_ts=now)}))  # fmt: skip
+    result = check_replication()
     assert result.status is Status.OK
     assert result.perfdata[0].label == "replication_metadata_age_s"
+    assert "observations from east" in result.summary

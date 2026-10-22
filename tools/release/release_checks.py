@@ -26,7 +26,7 @@ Example:
 """
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -136,11 +136,12 @@ def head_commit(runner: Runner) -> str:
     return runner.run(["git", "rev-parse", "HEAD"]).stdout.strip()
 
 
-def evaluate_check_runs(payload: Mapping[str, Any]) -> tuple[bool, str]:
+def evaluate_check_runs(payload: Mapping[str, Any], skip: Collection[str] = ()) -> tuple[bool, str]:
     """Decide whether GitHub check runs for a commit allow a release.
 
     Args:
         payload: JSON body of ``GET /repos/{repo}/commits/{sha}/check-runs``.
+        skip: Check-run names that never block (``ci_ignore_checks``).
 
     Returns:
         tuple[bool, str]: ``True`` only when at least one run exists and every
@@ -150,7 +151,7 @@ def evaluate_check_runs(payload: Mapping[str, Any]) -> tuple[bool, str]:
     Raises:
         None
     """
-    runs = payload.get("check_runs") or []
+    runs = [r for r in payload.get("check_runs") or [] if r.get("name") not in skip]
     if not runs:
         return False, "no CI check runs found for this commit (is it pushed?)"
     pending = sorted(r.get("name", "?") for r in runs if r.get("status") != "completed")
@@ -166,13 +167,14 @@ def evaluate_check_runs(payload: Mapping[str, Any]) -> tuple[bool, str]:
     return True, f"{len(runs)} check run(s) passed"
 
 
-def ci_green(runner: Runner, repo: str, sha: str) -> Outcome:
+def ci_green(runner: Runner, repo: str, sha: str, skip: Collection[str] = ()) -> Outcome:
     """Require green GitHub CI for the commit being released.
 
     Args:
         runner: Command runner; ``gh`` must be authenticated.
         repo: GitHub ``OWNER/NAME``.
         sha: Commit to check.
+        skip: Check-run names that never block (``ci_ignore_checks``).
 
     Returns:
         Outcome: OK when every check run for ``sha`` passed.
@@ -187,7 +189,7 @@ def ci_green(runner: Runner, repo: str, sha: str) -> Outcome:
         payload = json.loads(runner.run(["gh", "api", endpoint]).stdout)
     except (CommandError, json.JSONDecodeError) as exc:
         return Outcome(name, False, f"cannot read CI status: {exc}")
-    ok, detail = evaluate_check_runs(payload)
+    ok, detail = evaluate_check_runs(payload, skip)
     return Outcome(name, ok, detail)
 
 

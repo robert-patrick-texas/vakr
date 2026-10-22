@@ -34,6 +34,11 @@ build_tools = ["node", "npm"]
 # The installed node must be on the line this file pins (major only, e.g. 24).
 # Empty or absent skips the check.
 node_version_file = "web/.node-version"
+# Check runs that never block a release, by exact name. GitHub runs Dependabot's
+# update jobs on a commit that changes .github/dependabot.yml; they test nothing
+# being released and can fail for reasons outside the project (Dependabot does
+# not resolve Python 3.15). Absent or empty: every check run counts.
+ci_ignore_checks = ["Dependabot"]
 # Artifacts to checksum, sign, and attach. Placeholders: {package}, {version}
 # (as in VERSION), {pep440}, {deb_version}, {tag}. Each required pattern must
 # match at least one file; optional ones may match nothing.

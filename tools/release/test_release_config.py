@@ -47,6 +47,8 @@ def test_shipped_config_is_valid_and_uses_vakr_release_namespace() -> None:
     assert cfg.signing_key == Path("~/.config/vakr-release/release_ed25519").expanduser()
     assert cfg.prerelease == "rc-or-major-zero"
     assert cfg.build_command == ("make", "deb")
+    assert cfg.ci_ignore_checks == ("Dependabot",)
+    assert ReleaseConfig.from_mapping(EXAMPLE, root).ci_ignore_checks == ()
 
 
 def test_placeholders_expand_to_each_version_form() -> None:
@@ -80,6 +82,7 @@ def test_placeholders_expand_to_each_version_form() -> None:
         ({"artifacts": []}, "must not be empty"),
         ({"build_command": "make deb"}, "build_command must be a list"),
         ({"optional_artifacts": [""]}, "optional_artifacts must be a list"),
+        ({"ci_ignore_checks": "Dependabot"}, "ci_ignore_checks must be a list"),
     ],
 )
 def test_invalid_configs_are_rejected(change: dict[str, Any], message: str) -> None:

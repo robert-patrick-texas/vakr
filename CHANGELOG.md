@@ -60,6 +60,7 @@ Milestone M4, viewing: the web UI and JSON API v1 (`vakr-api`, shipped disabled)
 - Until the collector has built the ranking projection after a start (about 25 s at the MVP workload), a 24-hour ranking reads every native sample and takes about 6 s, against 4.7 s in 0.2.x, because the exact packet sum reads each sample.
 - Self-update's timer also skips a release when an older release it would jump over carries `manual-update-required`, because installing the newer one applies the marked release's changes too (UPD-005). Run `sudo vakr self-update` by hand once, and the timer takes over again. This protects nodes from 0.3.0 on; 0.2.x checks only the newest release's notes.
 - Toolchain and dependencies (TOOLS-001): uv 0.13.4 (package builder image), Node.js 24.22.1 (`web/.node-version`, the builder image, and the release host), `fastapi` 0.159.1, `httpx2` and `httpcore2` 2.16.0 (tests), `ty` 0.0.90, and the `astral-sh/setup-uv` action v10.3.1.
+- Developers: the release preflight disregards check runs named in `tools/release/release.toml`'s new `ci_ignore_checks`, set to Dependabot's update jobs, which run on any commit that changes `.github/dependabot.yml` and test nothing being released.
 
 ### Deferred updates (TOOLS-001)
 

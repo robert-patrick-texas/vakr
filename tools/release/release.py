@@ -76,7 +76,7 @@ def preflight(
     """
     try:
         sha = checks.head_commit(runner)
-        ci = checks.ci_green(runner, cfg.repo, sha)
+        ci = checks.ci_green(runner, cfg.repo, sha, cfg.ci_ignore_checks)
     except CommandError as exc:
         ci = checks.Outcome("CI green for HEAD", False, str(exc))
     notes = changelog_notes(_read(cfg.changelog), version.semver)

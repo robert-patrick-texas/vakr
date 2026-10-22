@@ -44,8 +44,8 @@ _STRINGS = (
     "prerelease",
 )
 _LISTS = ("build_command", "artifacts", "optional_artifacts")
-_OPTIONAL = ("build_tools", "node_version_file")
-"""Keys that may be absent: build-host tools to require, and a Node pin to match."""
+_OPTIONAL = ("build_tools", "node_version_file", "ci_ignore_checks")
+"""Keys that may be absent: build-host tools, a Node pin, and check runs that never block."""
 
 EXAMPLE: dict[str, Any] = {
     **{key: key for key in _STRINGS},
@@ -89,6 +89,7 @@ class ReleaseConfig:
             ``--version`` in preflight (ADR-035: ``node``, ``npm``).
         node_version_file: File whose version (a major such as ``24``)
             the installed ``node`` must match; ``None`` skips the check.
+        ci_ignore_checks: Check-run names the CI check disregards.
     """
 
     root: Path
@@ -109,6 +110,7 @@ class ReleaseConfig:
     prerelease: str
     build_tools: tuple[str, ...] = ()
     node_version_file: Path | None = None
+    ci_ignore_checks: tuple[str, ...] = ()
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any], root: Path) -> ReleaseConfig:
@@ -137,6 +139,7 @@ class ReleaseConfig:
         if not lists["build_command"] or not lists["artifacts"]:
             raise ConfigError("build_command and artifacts must not be empty")
         tools = _string_list(data, "build_tools") if "build_tools" in data else ()
+        ignore = _string_list(data, "ci_ignore_checks") if "ci_ignore_checks" in data else ()
         pin = _string(data, "node_version_file") if data.get("node_version_file") else None
         return cls(
             root=root,
@@ -157,6 +160,7 @@ class ReleaseConfig:
             prerelease=text["prerelease"],
             build_tools=tools,
             node_version_file=_resolve(root, pin) if pin else None,
+            ci_ignore_checks=ignore,
         )
 
     def placeholders(self, version: ReleaseVersion) -> dict[str, str]:

@@ -22,7 +22,7 @@ Exit status: 0 on success (or a dry run that a real release would pass), 1 when 
 
 ## What a release does
 
-1. **Preflight.** `VERSION_OVERRIDE` must be unset. The working tree must be clean, `HEAD` must be on `branch`, and the tag must exist neither locally nor on `remote`. Every GitHub check run for `HEAD` must have passed (`gh api repos/<repo>/commits/<sha>/check-runs`). The changelog needs a `## <version>` section, and `allowed_signers` must list at least one key. Each program in `build_tools` must answer `--version`, and when `node_version_file` is set, `node --version` must match it at the precision it is written with (`24` admits any 24.x).
+1. **Preflight.** `VERSION_OVERRIDE` must be unset. The working tree must be clean, `HEAD` must be on `branch`, and the tag must exist neither locally nor on `remote`. Every GitHub check run for `HEAD` must have passed (`gh api repos/<repo>/commits/<sha>/check-runs`), except those named in `ci_ignore_checks`. The changelog needs a `## <version>` section, and `allowed_signers` must list at least one key. Each program in `build_tools` must answer `--version`, and when `node_version_file` is set, `node --version` must match it at the precision it is written with (`24` admits any 24.x).
 2. **Build** with `build_command`, with `VERSION_OVERRIDE` removed from its environment.
 3. **Stage** the files matching `artifacts` (required) and `optional_artifacts` into `output_dir`, and write `SHA256SUMS` in `sha256sum` format.
 4. **Sign** with `ssh-keygen -Y sign -f <signing_key> -n <namespace> SHA256SUMS`.
@@ -33,7 +33,7 @@ A real release stops at the first failed preflight check, before building. A dry
 
 ## Configuration
 
-`release.toml` keys, all required except `build_tools` and `node_version_file`. Relative paths are relative to the repository root; `~` expands to the home directory of the user running the tool.
+`release.toml` keys, all required except `build_tools`, `node_version_file`, and `ci_ignore_checks`. Relative paths are relative to the repository root; `~` expands to the home directory of the user running the tool.
 
 | Key | Example | Meaning |
 |---|---|---|
@@ -51,6 +51,7 @@ A real release stops at the first failed preflight check, before building. A dry
 | `prerelease` | `rc-or-major-zero` | `rc-or-major-zero`, `rc`, `always`, or `never` |
 | `build_tools` (optional) | `["node", "npm"]` | Programs the release host must have; each is run with `--version` in preflight. Absent or empty: no check |
 | `node_version_file` (optional) | `web/.node-version` | The installed `node` must be on the version this file names. Absent or empty: no check |
+| `ci_ignore_checks` (optional) | `["Dependabot"]` | Check-run names the CI check disregards, such as Dependabot's update jobs on a commit that changes `.github/dependabot.yml`. Absent or empty: every check run counts |
 
 Unknown or mistyped keys are errors.
 

@@ -165,6 +165,29 @@ def test_ci_green_queries_the_exact_commit(tmp_path: Path, fake_runner: Any) -> 
     assert fake.calls == [["gh", "api", endpoint]]
 
 
+def test_ignored_check_runs_never_block() -> None:
+    """Step 3: a failed run named in ``ci_ignore_checks`` is disregarded; the others still count.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        AssertionError: If an ignored run blocks or a real failure passes.
+    """
+    runs = [
+        {"name": "gates", "status": "completed", "conclusion": "success"},
+        {"name": "Dependabot", "status": "completed", "conclusion": "failure"},
+    ]
+    assert checks.evaluate_check_runs({"check_runs": runs}, {"Dependabot"}) == (
+        True, "1 check run(s) passed")  # fmt: skip
+    assert not checks.evaluate_check_runs({"check_runs": runs})[0]
+    only_ignored = {"check_runs": runs[1:]}
+    assert not checks.evaluate_check_runs(only_ignored, {"Dependabot"})[0]
+
+
 @pytest.mark.parametrize("reply", [CommandError("gh exited with status 4"), "not json"])
 def test_ci_green_fails_when_status_is_unreadable(
     tmp_path: Path, fake_runner: Any, reply: object

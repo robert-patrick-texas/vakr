@@ -65,7 +65,7 @@ Until step 2 is done, the shipped signers file is a placeholder, every signature
 
 The tool reads all project-specific values from `tools/release/release.toml` (see [its README](../../tools/release/README.md)). In order, it:
 
-1. Checks that `VERSION_OVERRIDE` is unset, the tree is clean, `HEAD` is on `main`, the tag `v<version>` exists neither locally nor on `origin`, every GitHub check run for `HEAD` passed, `CHANGELOG.md` has a section for the version, `packaging/release-signers` lists a key, `node` and `npm` answer `--version`, and `node` is the release `web/.node-version` pins. A real release stops at the first failed check, before building anything.
+1. Checks that `VERSION_OVERRIDE` is unset, the tree is clean, `HEAD` is on `main`, the tag `v<version>` exists neither locally nor on `origin`, every GitHub check run for `HEAD` passed (except Dependabot's update jobs, `ci_ignore_checks`), `CHANGELOG.md` has a section for the version, `packaging/release-signers` lists a key, `node` and `npm` answer `--version`, and `node` is the release `web/.node-version` pins. A real release stops at the first failed check, before building anything.
 2. Builds with `make deb`, in a clean `ubuntu:26.04` container.
 3. Copies the artifacts into `dist/release/v<version>/` and writes `SHA256SUMS` there in `sha256sum` format, with one `<sha256>  <file name>` line per artifact.
 4. Signs it: `ssh-keygen -Y sign -f ~/.config/vakr-release/release_ed25519 -n vakr-release SHA256SUMS`, producing `SHA256SUMS.sig`.

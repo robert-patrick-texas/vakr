@@ -7,7 +7,9 @@ page lists the dashboards, an example rotation, and the URL options with
 their bounds (E.31), and lets the display forget its token.
 -->
 <script lang="ts">
+	import { createQuery } from '@tanstack/svelte-query';
 	import { forgetDisplay, session } from '#lib/api/session.svelte.ts';
+	import { dashboardsQuery } from '#lib/query/reads-dashboards.ts';
 	import {
 		BOARD_TITLES,
 		DWELL_DEFAULT_S,
@@ -22,6 +24,7 @@ their bounds (E.31), and lets the display forget its token.
 	} from '#lib/state/kiosk.ts';
 
 	const rotation = `/kiosk/rotate?pages=${KIOSK_BOARDS.join(',')}&every=${DWELL_DEFAULT_S}`;
+	const custom = createQuery(() => dashboardsQuery());
 	let forgetting = $state(false);
 
 	/**
@@ -50,6 +53,14 @@ their bounds (E.31), and lets the display forget its token.
 	{/each}
 	<li><a href={rotation}>Rotate through all four, {DWELL_DEFAULT_S} s each</a></li>
 </ul>
+{#if custom.data && custom.data.rows.length > 0}
+	<h2>Custom dashboards</h2>
+	<ul class="boards" aria-label="Custom dashboards">
+		{#each custom.data.rows as b (b.id)}
+			<li><a href="/kiosk/dashboard/{b.id}">{b.name}</a></li>
+		{/each}
+	</ul>
+{/if}
 
 <section aria-labelledby="options-h">
 	<h2 id="options-h">Address options</h2>
@@ -64,7 +75,8 @@ their bounds (E.31), and lets the display forget its token.
 		<dt><code>/kiosk/rotate?pages=overview,wan&amp;every=60</code></dt>
 		<dd>
 			Show {ROTATE_MIN_PAGES} to {ROTATE_MAX_PAGES} dashboards in turn (a dashboard may appear more than
-			once), each for {DWELL_MIN_S} to {DWELL_MAX_S} s ({DWELL_DEFAULT_S} s by default).
+			once), each for {DWELL_MIN_S} to {DWELL_MAX_S} s ({DWELL_DEFAULT_S} s by default). A custom dashboard
+			joins as <code>dashboard:&lt;uuid&gt;</code>, the ID in its kiosk address.
 		</dd>
 	</dl>
 </section>

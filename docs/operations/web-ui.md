@@ -36,7 +36,7 @@ The bar at the top has every section, a search box, your name and role, the rele
 | Interfaces | `/interfaces` | Every interface, sticky, WAN, and high-priority first, with state, lifecycle, rates, utilization, packets, errors, capacity, addresses, and age. Filter by site, tag, group, provider, WAN, interest, lifecycle, and the collector whose values are shown. |
 | An interface | `/interfaces/<uuid>` | Identity and circuit metadata, current values, traffic, utilization, packets, and errors over a chosen range, the admin/oper state timeline, and the identity history with earlier `ifIndex` values. |
 | Sites | `/sites` | Sites, tags, groups, providers, and admin states, each leading to the matching devices or interfaces. |
-| Dashboards | `/dashboards` | The built-in dashboards: overview, rankings, high priority, WAN circuits. |
+| Dashboards | `/dashboards` | The built-in dashboards (overview, rankings, high priority, WAN circuits) and the custom dashboards admins define ([dashboards](dashboards.md)). |
 | Rankings | `/rankings` | Top utilization (p95 of the window against capacity) and top errors, 10 to 100 rows, with coverage per row, interfaces left out and why, and CSV/JSON downloads. |
 | High priority | `/high-priority` | Every high-priority (primary-interest) interface. |
 | WAN circuits | `/wan` | Circuits with provider, circuit ID, contracted rate, and current use. |
@@ -105,11 +105,11 @@ To answer an identity review, an admin chooses **It is \<interface\>** (the row 
 
 ## Kiosk displays
 
-The overview, high-priority interfaces, WAN circuits, and rankings also run on a wall display without anyone signing in: `/kiosk/overview`, `/kiosk/high-priority`, `/kiosk/wan`, `/kiosk/rankings`, or several in turn with `/kiosk/rotate?pages=overview,wan&every=60`. An admin creates a kiosk token (**Admin** → **Kiosk tokens**, or `sudo vakr kiosk create`) and pastes it once at `/kiosk/setup`. See [kiosk displays](kiosk.md).
+The overview, high-priority interfaces, WAN circuits, and rankings also run on a wall display without anyone signing in: `/kiosk/overview`, `/kiosk/high-priority`, `/kiosk/wan`, `/kiosk/rankings`, or several in turn with `/kiosk/rotate?pages=overview,wan&every=60`. An admin creates a kiosk token (**Admin** → **Kiosk tokens**, or `sudo vakr kiosk create`) and pastes it once at `/kiosk/setup`. Custom dashboards run there too, at `/kiosk/dashboard/<uuid>` or as `dashboard:<uuid>` in a rotation. See [kiosk displays](kiosk.md) and [dashboards](dashboards.md#on-a-kiosk-display).
 
 ## Not in this release
 
-Building and pinning your own dashboards, public dashboards, editing devices and interfaces, rediscovery requests, policy explanations, and live updates (server-sent events) come later. Inventory changes are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
+Public dashboards, editing devices and interfaces, rediscovery requests, policy explanations, and live updates (server-sent events) come later. Inventory changes are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
 
 ## Troubleshooting
 

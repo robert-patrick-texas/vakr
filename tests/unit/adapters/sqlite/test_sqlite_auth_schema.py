@@ -54,7 +54,7 @@ def test_mig002_schema_2_upgrades_to_local_auth_with_data(tmp_path: Path) -> Non
         uow.commit()
     store.close()
     applied = metadata_migrations(db).migrate()
-    assert [(m.version, m.name) for m in applied] == [(3, "local_auth")]
+    assert [(m.version, m.name) for m in applied][:1] == [(3, "local_auth")]
     upgraded = SqliteMetadataStore(db)
     with sqlite_uow_factory(upgraded)() as uow:
         assert uow.devices.get(device.id) == device

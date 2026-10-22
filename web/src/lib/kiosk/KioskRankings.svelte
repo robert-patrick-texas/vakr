@@ -11,7 +11,7 @@ Example: `<KioskRankings settings={{ refreshMs: null, window: '1h' }} />`
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
 	import { rankingReads, type BoardSettings } from './boards.ts';
-	import type { RotationPosition } from '#lib/state/kiosk.ts';
+	import { BOARD_TITLES, type RotationPosition } from '#lib/state/kiosk.ts';
 	import { completenessNotes, pageState } from '#lib/state/page-state.ts';
 	import PageStatus from '#lib/components/PageStatus.svelte';
 	import RankingTables from '#lib/components/RankingTables.svelte';
@@ -41,7 +41,7 @@ Example: `<KioskRankings settings={{ refreshMs: null, window: '1h' }} />`
 </script>
 
 <KioskHeader
-	board="rankings"
+	title={BOARD_TITLES.rankings}
 	updatedAt={oldest}
 	refreshMs={rankingReads(settings)[0].refetchInterval}
 	{position}

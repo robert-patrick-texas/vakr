@@ -52,6 +52,7 @@ ReviewId = NewType("ReviewId", UUID)  # an identity case awaiting admin review (
 UserId = NewType("UserId", UUID)  # a local web/API account (SEC-005)
 SessionId = NewType("SessionId", UUID)  # a server-side login session (SEC-010)
 KioskTokenId = NewType("KioskTokenId", UUID)  # a read-only display token (E.12)
+DashboardId = NewType("DashboardId", UUID)  # a custom dashboard (UI-004)
 
 _CANONICAL = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 _RESERVED = {UUID(int=0), UUID(int=(1 << 128) - 1)}

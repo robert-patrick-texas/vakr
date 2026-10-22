@@ -39,7 +39,7 @@ def test_packaged_initial_migration_carries_every_5_6_note() -> None:
     Raises:
         None
     """
-    initial, reviews, auth = metadata_family().migrations
+    initial, reviews, auth, *_ = metadata_family().migrations
     assert (initial.version, initial.name) == (1, "initial")
     assert (reviews.version, reviews.name) == (2, "identity_review")
     assert (auth.version, auth.name) == (3, "local_auth")

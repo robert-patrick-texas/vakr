@@ -21,6 +21,7 @@ from types import TracebackType
 
 from vakr.adapters.sqlite.metadata import specs
 from vakr.adapters.sqlite.metadata.audit import SqliteAuditRepository
+from vakr.adapters.sqlite.metadata.dashboards import SqliteDashboardRepository
 from vakr.adapters.sqlite.metadata.interfaces import SqliteInterfaceRepository
 from vakr.adapters.sqlite.metadata.kiosk import SqliteKioskTokenRepository
 from vakr.adapters.sqlite.metadata.login_failures import SqliteLoginFailureRepository
@@ -57,6 +58,7 @@ class SqliteUnitOfWork:
         login_failures: Login throttle state.
         sessions: Login sessions.
         kiosk_tokens: Kiosk display tokens.
+        dashboards: Custom dashboards.
     """
 
     def __init__(self, pool: ConnectionPool, gate: WriterGate) -> None:
@@ -90,6 +92,7 @@ class SqliteUnitOfWork:
         self.login_failures = SqliteLoginFailureRepository(self._tx)
         self.sessions = SqliteSessionRepository(self._tx)
         self.kiosk_tokens = SqliteKioskTokenRepository(self._tx)
+        self.dashboards = SqliteDashboardRepository(self._tx)
 
     def change_counter(self) -> int:
         """Return the metadata change counter; see ``MetadataUnitOfWork``.

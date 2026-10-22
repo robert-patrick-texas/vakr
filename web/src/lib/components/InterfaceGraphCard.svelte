@@ -19,6 +19,7 @@ Example: `<InterfaceGraphCard row={row} range={{ range: '24h' }} />`
 	import { interfaceHref } from '#lib/links.ts';
 	import { CARD_POINTS, interfaceGraphQuery, type GraphParams } from '#lib/query/reads-history.ts';
 	import { pageState } from '#lib/state/page-state.ts';
+	import Link from './Link.svelte';
 	import PageStatus from './PageStatus.svelte';
 	import ReadingText from './ReadingText.svelte';
 
@@ -62,7 +63,7 @@ Example: `<InterfaceGraphCard row={row} range={{ range: '24h' }} />`
 
 <article class="card graph-card" bind:this={card} data-interface={row.ref.name}>
 	<h3>
-		<a href={interfaceHref(row.ref.interface_id, range)}>{row.ref.name}</a>
+		<Link href={interfaceHref(row.ref.interface_id, range)}>{row.ref.name}</Link>
 		{#each row.ref.markers as m (m)}<span class="tag">{m === 'primary' ? 'High priority' : m}</span
 			>{/each}
 	</h3>

@@ -144,6 +144,78 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/dashboards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Custom dashboards
+         * @description List dashboards by name.
+         */
+        get: operations["dashboards_api_v1_dashboards_get"];
+        put?: never;
+        /**
+         * Create a dashboard (admin)
+         * @description Create a dashboard (SEC-018: audited with the administrator).
+         */
+        post: operations["create_api_v1_dashboards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A dashboard's definition
+         * @description Return a dashboard's definition.
+         */
+        get: operations["dashboard_api_v1_dashboards__dashboard_uuid__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a dashboard (admin)
+         * @description Delete a dashboard; kiosk displays showing it say so at their next refresh.
+         */
+        delete: operations["delete_api_v1_dashboards__dashboard_uuid__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a dashboard (admin; carries its version)
+         * @description Change a dashboard, if nobody changed it since ``body.version`` (DB-003).
+         */
+        patch: operations["change_api_v1_dashboards__dashboard_uuid__patch"];
+        trace?: never;
+    };
+    "/api/v1/dashboards/{dashboard_uuid}/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A dashboard with current values
+         * @description Return every widget resolved with current values, in one bounded answer.
+         */
+        get: operations["view_api_v1_dashboards__dashboard_uuid__view_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/device-lookup": {
         parameters: {
             query?: never;
@@ -965,6 +1037,230 @@ export interface components {
             valid: number;
         };
         /**
+         * CriteriaView
+         * @description A widget's filters, with the names they refer to (for headings and kiosk text).
+         *
+         *     Attributes:
+         *         site: Site name, if filtered by site.
+         *         tag: Tag name, if filtered by tag.
+         *         group: Group name, if filtered by group.
+         *         provider: Provider, if filtered by provider.
+         *         wan_only: Only WAN circuits.
+         *         interest: ``primary`` or ``secondary``, if filtered by interest.
+         *         text: The whole filter in words, such as ``site Dallas DC1, WAN only``.
+         */
+        CriteriaView: {
+            /** Group */
+            group: string | null;
+            /** Interest */
+            interest: string | null;
+            /** Provider */
+            provider: string | null;
+            /** Site */
+            site: string | null;
+            /** Tag */
+            tag: string | null;
+            /** Text */
+            text: string;
+            /** Wan Only */
+            wan_only: boolean;
+        };
+        /**
+         * DashboardCreate
+         * @description Body of ``POST /api/v1/dashboards``.
+         */
+        DashboardCreate: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Name */
+            name: string;
+            /**
+             * Refresh S
+             * @default 60
+             */
+            refresh_s: number;
+            /** Widgets */
+            widgets?: (components["schemas"]["PinnedInterfacesIn"] | components["schemas"]["InterfaceSelectionIn"] | components["schemas"]["DeviceSelectionIn"] | components["schemas"]["RankingIn"])[];
+        };
+        /**
+         * DashboardOut
+         * @description A dashboard definition, as ``GET``, ``POST``, and ``PATCH`` answer it.
+         */
+        DashboardOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Managed By
+             * @enum {string}
+             */
+            managed_by: "api" | "file";
+            /** Name */
+            name: string;
+            /** Refresh S */
+            refresh_s: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: string;
+            /** Version */
+            version: number;
+            /**
+             * Visibility
+             * @constant
+             */
+            visibility: "private";
+            /** Widget Schema */
+            widget_schema: number;
+            /** Widgets */
+            widgets: (components["schemas"]["PinnedInterfacesIn"] | components["schemas"]["InterfaceSelectionIn"] | components["schemas"]["DeviceSelectionIn"] | components["schemas"]["RankingIn"])[];
+        };
+        /**
+         * DashboardPage
+         * @description One page of dashboards, by name (API-005).
+         *
+         *     Attributes:
+         *         rows: The dashboards.
+         *         page: Paging facts.
+         */
+        DashboardPage: {
+            page: components["schemas"]["PageInfo"];
+            /** Rows */
+            rows: components["schemas"]["DashboardSummary"][];
+        };
+        /**
+         * DashboardPatch
+         * @description Body of ``PATCH /api/v1/dashboards/{uuid}``: ``version`` plus what changes.
+         */
+        DashboardPatch: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
+            /** Refresh S */
+            refresh_s?: number | null;
+            /**
+             * Version
+             * @description The version this change is based on (DB-003).
+             */
+            version: number;
+            /** Widgets */
+            widgets?: (components["schemas"]["PinnedInterfacesIn"] | components["schemas"]["InterfaceSelectionIn"] | components["schemas"]["DeviceSelectionIn"] | components["schemas"]["RankingIn"])[] | null;
+        };
+        /**
+         * DashboardSummary
+         * @description One dashboard in the list.
+         *
+         *     Attributes:
+         *         id: The dashboard.
+         *         name: Its name.
+         *         description: Its description.
+         *         widgets: How many widgets it has.
+         *         refresh_s: Seconds between refreshes.
+         *         updated_by: Who changed it last.
+         *         updated_at: When (UTC).
+         *         version: Its version.
+         */
+        DashboardSummary: {
+            /** Description */
+            description: string;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Refresh S */
+            refresh_s: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Updated By */
+            updated_by: string;
+            /** Version */
+            version: number;
+            /** Widgets */
+            widgets: number;
+        };
+        /**
+         * DashboardView
+         * @description A custom dashboard with every widget resolved (UI-004, DASH-T06).
+         *
+         *     Attributes:
+         *         dashboard_id: The dashboard.
+         *         name: Its name.
+         *         description: Its description.
+         *         refresh_s: Seconds between refreshes the page should use.
+         *         version: The definition's version (DB-003).
+         *         widgets: One view per widget, in order.
+         *         collector_id: The position whose current values are shown, if any (MPOS-008).
+         *         position: Its label.
+         *         telemetry: ``ok``, or why current values are unavailable (UI-014).
+         *         truncated: True when the inventory was larger than one index reads (E.29).
+         *         generated_at: When the view was computed (UTC).
+         */
+        DashboardView: {
+            /** Collector Id */
+            collector_id: string | null;
+            /**
+             * Dashboard Id
+             * Format: uuid
+             */
+            dashboard_id: string;
+            /** Description */
+            description: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+            /** Name */
+            name: string;
+            /** Position */
+            position: string;
+            /** Refresh S */
+            refresh_s: number;
+            telemetry: components["schemas"]["Reading"];
+            /** Truncated */
+            truncated: boolean;
+            /** Version */
+            version: number;
+            /** Widgets */
+            widgets: components["schemas"]["WidgetView"][];
+        };
+        /**
+         * DeviceCriteriaIn
+         * @description Which devices a device selection covers; absent fields do not filter.
+         */
+        DeviceCriteriaIn: {
+            /** Group Id */
+            group_id?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+            /** Tag Id */
+            tag_id?: string | null;
+        };
+        /**
          * DeviceDetailView
          * @description Everything the device screen and ``vakr status DEVICE`` show (TUI-004..006, 12.4).
          *
@@ -1094,6 +1390,25 @@ export interface components {
             uptime: components["schemas"]["Reading"];
         };
         /**
+         * DeviceSelectionIn
+         * @description Devices matching filters, in status order; at least one filter.
+         */
+        DeviceSelectionIn: {
+            criteria: components["schemas"]["DeviceCriteriaIn"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "device_selection";
+            /**
+             * Limit
+             * @default 25
+             */
+            limit: number;
+            /** Title */
+            title: string;
+        };
+        /**
          * DeviceSort
          * @description Device-list orders (TUI-003).
          * @enum {string}
@@ -1126,6 +1441,37 @@ export interface components {
             total: number;
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * DeviceWidgetView
+         * @description A device-selection widget, in status order (7.7).
+         *
+         *     Attributes:
+         *         title: Heading.
+         *         criteria: The filters in words.
+         *         rows: The first ``limit`` matching devices.
+         *         counts: Attention, Active, and Offline among all matches.
+         *         total: Matches in all.
+         *         more: Matches not shown.
+         *         kind: ``device_selection``.
+         */
+        DeviceWidgetView: {
+            counts: components["schemas"]["BucketCounts"];
+            criteria: components["schemas"]["CriteriaView"];
+            /**
+             * Kind
+             * @default device_selection
+             * @constant
+             */
+            kind: "device_selection";
+            /** More */
+            more: number;
+            /** Rows */
+            rows: components["schemas"]["DeviceRow"][];
+            /** Title */
+            title: string;
+            /** Total */
+            total: number;
         };
         /**
          * ErrorEnvelope
@@ -1481,6 +1827,27 @@ export interface components {
          */
         InterestClass: "primary" | "secondary";
         /**
+         * InterfaceCriteriaIn
+         * @description Which interfaces a selection or ranking covers; absent fields do not filter.
+         */
+        InterfaceCriteriaIn: {
+            /** Group Id */
+            group_id?: string | null;
+            /** Interest */
+            interest?: ("primary" | "secondary") | null;
+            /** Provider */
+            provider?: string | null;
+            /** Site Id */
+            site_id?: string | null;
+            /** Tag Id */
+            tag_id?: string | null;
+            /**
+             * Wan Only
+             * @default false
+             */
+            wan_only: boolean;
+        };
+        /**
          * InterfaceDetail
          * @description ``GET /api/v1/interfaces/{uuid}``: identity plus current values from one position.
          *
@@ -1784,6 +2151,25 @@ export interface components {
             state: components["schemas"]["Reading"];
         };
         /**
+         * InterfaceSelectionIn
+         * @description Interfaces matching filters (UI-004, DASH-006); at least one filter.
+         */
+        InterfaceSelectionIn: {
+            criteria: components["schemas"]["InterfaceCriteriaIn"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "interface_selection";
+            /**
+             * Limit
+             * @default 25
+             */
+            limit: number;
+            /** Title */
+            title: string;
+        };
+        /**
          * InterfaceSort
          * @description Orders of the global interface list.
          * @enum {string}
@@ -2061,6 +2447,71 @@ export interface components {
             total: number | null;
         };
         /**
+         * PinnedEntry
+         * @description One pinned interface in its place.
+         *
+         *     Attributes:
+         *         interface_id: The pinned UUID.
+         *         row: Current values, or ``None`` when retired or gone.
+         *         ref: The interface's names when retired (``None`` when gone or when ``row`` is set).
+         *         note: ``retired`` or ``no longer exists``; ``None`` for a live interface.
+         */
+        PinnedEntry: {
+            /**
+             * Interface Id
+             * Format: uuid
+             */
+            interface_id: string;
+            /** Note */
+            note: string | null;
+            ref: components["schemas"]["InterfaceRef"] | null;
+            row: components["schemas"]["InterfaceListRow"] | null;
+        };
+        /**
+         * PinnedInterfacesIn
+         * @description Interfaces pinned across devices, in this order (UI-004).
+         */
+        PinnedInterfacesIn: {
+            /**
+             * Graphs
+             * @default true
+             */
+            graphs: boolean;
+            /** Interfaces */
+            interfaces: string[];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "pinned_interfaces";
+            /** Title */
+            title: string;
+        };
+        /**
+         * PinnedWidgetView
+         * @description A pinned-interfaces widget (UI-004).
+         *
+         *     Attributes:
+         *         title: Heading.
+         *         graphs: Whether the page shows graph cards (lazy, at most 12 per page, E.31).
+         *         entries: The interfaces in the admin's order.
+         *         kind: ``pinned_interfaces``.
+         */
+        PinnedWidgetView: {
+            /** Entries */
+            entries: components["schemas"]["PinnedEntry"][];
+            /** Graphs */
+            graphs: boolean;
+            /**
+             * Kind
+             * @default pinned_interfaces
+             * @constant
+             */
+            kind: "pinned_interfaces";
+            /** Title */
+            title: string;
+        };
+        /**
          * PointView
          * @description One point: a value or a gap, with its envelope and quality flags.
          *
@@ -2147,6 +2598,36 @@ export interface components {
          * @enum {string}
          */
         RangePreset: "1h" | "6h" | "24h" | "7d" | "30d" | "90d" | "400d";
+        /**
+         * RankingIn
+         * @description Top utilization or top errors within filters (DASH-003, DASH-004).
+         */
+        RankingIn: {
+            criteria?: components["schemas"]["InterfaceCriteriaIn"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "ranking";
+            /**
+             * Limit
+             * @default 10
+             */
+            limit: number;
+            /**
+             * Ranking
+             * @enum {string}
+             */
+            ranking: "utilization" | "errors";
+            /** Title */
+            title: string;
+            /**
+             * Window
+             * @default 15m
+             * @enum {string}
+             */
+            window: "15m" | "1h" | "6h" | "24h";
+        };
         /**
          * RankingView
          * @description A ranking over one window from one collector.
@@ -2262,6 +2743,33 @@ export interface components {
             window: components["schemas"]["WindowView"];
             /** Window Name */
             window_name: string;
+        };
+        /**
+         * RankingWidgetView
+         * @description A ranking widget: one of ``utilization`` and ``errors`` is set (DASH-003, DASH-004).
+         *
+         *     Attributes:
+         *         title: Heading.
+         *         ranking: ``utilization`` or ``errors``.
+         *         criteria: Which interfaces could rank, in words.
+         *         utilization: The top-utilization ranking, for ``utilization``.
+         *         errors: The top-errors ranking, for ``errors``.
+         *         kind: ``ranking``.
+         */
+        RankingWidgetView: {
+            criteria: components["schemas"]["CriteriaView"];
+            errors: components["schemas"]["RankingView_ErrorRow_"] | null;
+            /**
+             * Kind
+             * @default ranking
+             * @constant
+             */
+            kind: "ranking";
+            /** Ranking */
+            ranking: string;
+            /** Title */
+            title: string;
+            utilization: components["schemas"]["RankingView_UtilizationRow_"] | null;
         };
         /**
          * RankingWindow
@@ -2513,6 +3021,35 @@ export interface components {
             ][];
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * SelectionWidgetView
+         * @description An interface-selection widget (UI-004, DASH-006).
+         *
+         *     Attributes:
+         *         title: Heading.
+         *         criteria: The filters in words.
+         *         rows: The first ``limit`` matches, in priority order.
+         *         total: Matches in all.
+         *         more: Matches not shown (``total - len(rows)``).
+         *         kind: ``interface_selection``.
+         */
+        SelectionWidgetView: {
+            criteria: components["schemas"]["CriteriaView"];
+            /**
+             * Kind
+             * @default interface_selection
+             * @constant
+             */
+            kind: "interface_selection";
+            /** More */
+            more: number;
+            /** Rows */
+            rows: components["schemas"]["InterfaceListRow"][];
+            /** Title */
+            title: string;
+            /** Total */
+            total: number;
         };
         /**
          * SeriesView
@@ -2875,6 +3412,7 @@ export interface components {
             /** Version */
             version: string;
         };
+        WidgetView: components["schemas"]["PinnedWidgetView"] | components["schemas"]["SelectionWidgetView"] | components["schemas"]["DeviceWidgetView"] | components["schemas"]["RankingWidgetView"];
         /**
          * WindowView
          * @description The time window a view covers and the zone to show it in (12.6, API-006).
@@ -3315,6 +3853,427 @@ export interface operations {
                 };
             };
             /** @description no such collector */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboards_api_v1_dashboards_get: {
+        parameters: {
+            query?: {
+                /** @description Page size, 1 to 500. */
+                limit?: number;
+                /** @description `page.next_cursor` of the previous page. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardPage"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    create_api_v1_dashboards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such dashboard */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description the name is taken, or a stale version */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    dashboard_api_v1_dashboards__dashboard_uuid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such dashboard */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    delete_api_v1_dashboards__dashboard_uuid__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such dashboard */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    change_api_v1_dashboards__dashboard_uuid__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dashboard_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such dashboard */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description the name is taken, or a stale version */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    view_api_v1_dashboards__dashboard_uuid__view_get: {
+        parameters: {
+            query?: {
+                /** @description Show this collector's (position's) values. */
+                collector?: string | null;
+            };
+            header?: never;
+            path: {
+                dashboard_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardView"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such dashboard */
             404: {
                 headers: {
                     [name: string]: unknown;

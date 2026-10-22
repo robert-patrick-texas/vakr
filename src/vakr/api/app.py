@@ -34,6 +34,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from vakr.api import (
     routes_auth,
     routes_catalog,
+    routes_dashboards,
     routes_devices,
     routes_export,
     routes_health,
@@ -86,7 +87,8 @@ COMMON_ERRORS: Responses = {
     503: {"model": ErrorEnvelope, "description": "metadata database unavailable"},
 }
 _ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_interfaces,
-            routes_identity, routes_catalog, routes_views, routes_export)  # fmt: skip
+            routes_identity, routes_catalog, routes_views, routes_export,
+            routes_dashboards)  # fmt: skip
 
 
 def create_app(context: ApiContext | None = None, *, web: WebMount | None = None) -> FastAPI:

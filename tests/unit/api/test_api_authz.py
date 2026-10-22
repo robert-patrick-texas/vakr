@@ -66,16 +66,24 @@ LEVELS = {
     ("GET", "/api/v1/exports/interfaces/{interface_uuid}/history/{kind}"): VIEW,
     ("GET", "/api/v1/exports/devices/{device_uuid}/history/reachability"): VIEW,
     ("GET", "/api/v1/exports/rankings/{kind}"): VIEW,
+    ("GET", "/api/v1/dashboards"): VIEW,
+    ("POST", "/api/v1/dashboards"): ADMIN,
+    ("GET", "/api/v1/dashboards/{dashboard_uuid}"): VIEW,
+    ("PATCH", "/api/v1/dashboards/{dashboard_uuid}"): ADMIN,
+    ("DELETE", "/api/v1/dashboards/{dashboard_uuid}"): ADMIN,
+    ("GET", "/api/v1/dashboards/{dashboard_uuid}/view"): VIEW,
 }
 """Every route and the least role it needs; the session route needs any caller."""
 FILL = {"{kind}": "errors", "{device_uuid}": str(uuid.uuid4()),
         "{interface_uuid}": str(uuid.uuid4()), "{collector_uuid}": str(uuid.uuid4()),
-        "{kiosk_uuid}": str(uuid.uuid4())}  # fmt: skip
+        "{kiosk_uuid}": str(uuid.uuid4()), "{dashboard_uuid}": str(uuid.uuid4())}  # fmt: skip
 QUERY = {"/api/v1/search": {"q": "core"}, "/api/v1/device-lookup": {"key": "core"}}
 BODY = {"/api/v1/interfaces/{interface_uuid}/identity-resolution":
         {"review_id": str(uuid.uuid4()), "decision": "map"},
         "/api/v1/auth/login": {"username": "nobody", "password": new_password()},
-        "/api/v1/kiosk-tokens": {"label": "matrix-wall"}}  # fmt: skip
+        "/api/v1/kiosk-tokens": {"label": "matrix-wall"},
+        "/api/v1/dashboards": {"name": "matrix board"},
+        "/api/v1/dashboards/{dashboard_uuid}": {"version": 1}}  # fmt: skip
 OWN_SESSION = ("/api/v1/auth/logout", "/api/v1/auth/login", "/api/v1/auth/kiosk",
                "/api/v1/auth/kiosk/forget")  # fmt: skip
 CALLERS = ("anonymous", "operator", "admin", "kiosk", "socket-admin", "socket-operator",

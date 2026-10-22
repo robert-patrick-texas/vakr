@@ -14,7 +14,7 @@ Example: `<KioskOverview settings={{ refreshMs: null, window: '15m' }} />`
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
 	import { overviewRead, type BoardSettings } from './boards.ts';
-	import type { RotationPosition } from '#lib/state/kiosk.ts';
+	import { BOARD_TITLES, type RotationPosition } from '#lib/state/kiosk.ts';
 	import { completenessNotes, healthNotes, pageState } from '#lib/state/page-state.ts';
 	import HealthPanel from '#lib/components/HealthPanel.svelte';
 	import InterfaceTable from '#lib/components/InterfaceTable.svelte';
@@ -44,7 +44,7 @@ Example: `<KioskOverview settings={{ refreshMs: null, window: '15m' }} />`
 </script>
 
 <KioskHeader
-	board="overview"
+	title={BOARD_TITLES.overview}
 	updatedAt={query.dataUpdatedAt}
 	refreshMs={overviewRead(settings).refetchInterval}
 	{position}

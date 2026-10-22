@@ -15,6 +15,7 @@ Example:
     False
 """
 
+from vakr.ports.metadata.dashboards import DashboardRepository
 from vakr.ports.metadata.filters import AuditFilter, DeviceFilter, InterfaceFilter, NoFilter
 from vakr.ports.metadata.repository import (
     AuditRepository,
@@ -37,6 +38,7 @@ __all__ = [
     "AuditFilter",
     "AuditRepository",
     "CollectorRepository",
+    "DashboardRepository",
     "DeviceFilter",
     "DeviceRepository",
     "EntityRepository",

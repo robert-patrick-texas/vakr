@@ -12,6 +12,7 @@ Example:
 
 from tests.contract.contract_auth_sessions import AuthSessionsContract
 from tests.contract.contract_auth_users import AuthUsersContract
+from tests.contract.contract_dashboards import DashboardsContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
@@ -35,3 +36,7 @@ class TestSqliteAuthUsers(AuthUsersContract):
 
 class TestSqliteAuthSessions(AuthSessionsContract):
     """SEC-010, AUTH-002: sessions and kiosk tokens on a SQLite metadata file."""
+
+
+class TestSqliteDashboards(DashboardsContract):
+    """UI-004, DASH-007, DB-003: custom dashboards on a SQLite metadata file."""

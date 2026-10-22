@@ -12,7 +12,9 @@ A link back keeps the list's filters when the user came from a list.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
+	import { isAdmin } from '#lib/api/session.svelte.ts';
 	import StatusTimeline from '#lib/charts/StatusTimeline.svelte';
+	import PinToDashboard from '#lib/dashboards/PinToDashboard.svelte';
 	import { deviceHref, query as qs } from '#lib/links.ts';
 	import { interfaceQuery } from '#lib/query/reads.ts';
 	import { interfaceGraphQuery, timelineQuery } from '#lib/query/reads-history.ts';
@@ -71,6 +73,7 @@ A link back keeps the list's filters when the user came from a list.
 		</h1>
 		{#if d.interface.if_alias}<p class="muted">{d.interface.if_alias}</p>{/if}
 		<InterfaceFacts detail={d} />
+		{#if isAdmin()}<PinToDashboard interfaceId={id} />{/if}
 
 		<section aria-labelledby="graphs-h">
 			<h2 id="graphs-h">History</h2>

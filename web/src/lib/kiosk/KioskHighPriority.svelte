@@ -11,7 +11,7 @@ Example: `<KioskHighPriority settings={{ refreshMs: null, window: '15m' }} />`
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
 	import { highPriorityRead, type BoardSettings } from './boards.ts';
-	import type { RotationPosition } from '#lib/state/kiosk.ts';
+	import { BOARD_TITLES, type RotationPosition } from '#lib/state/kiosk.ts';
 	import { pageState } from '#lib/state/page-state.ts';
 	import InterfaceTable from '#lib/components/InterfaceTable.svelte';
 	import PageStatus from '#lib/components/PageStatus.svelte';
@@ -40,7 +40,7 @@ Example: `<KioskHighPriority settings={{ refreshMs: null, window: '15m' }} />`
 </script>
 
 <KioskHeader
-	board="high-priority"
+	title={BOARD_TITLES['high-priority']}
 	updatedAt={query.dataUpdatedAt}
 	refreshMs={highPriorityRead(settings).refetchInterval}
 	{position}

@@ -9,14 +9,15 @@ rotation, "2 of 3 · next: WAN circuits in 40 s" and a pause button follow.
 None of this is a live region: it changes every second, and screen
 readers hear only the switch to another dashboard.
 
-Example: `<KioskHeader board="wan" updatedAt={query.dataUpdatedAt} refreshMs={30000} />`
+Example: `<KioskHeader title="WAN circuits" updatedAt={query.dataUpdatedAt} refreshMs={30000} />`
 -->
 <script lang="ts">
 	import { fetchedAt } from '#lib/state/page-state.ts';
-	import { BOARD_TITLES, type KioskBoard, type RotationPosition } from '#lib/state/kiosk.ts';
+	import type { RotationPosition } from '#lib/state/kiosk.ts';
 
 	interface Props {
-		board: KioskBoard;
+		/** The dashboard's title: a built-in one's, or a custom dashboard's name. */
+		title: string;
 		/** When the shown answer arrived (ms since the epoch); 0 before the first one. */
 		updatedAt: number;
 		/** The dashboard's refresh interval. */
@@ -29,19 +30,19 @@ Example: `<KioskHeader board="wan" updatedAt={query.dataUpdatedAt} refreshMs={30
 		onPause?: () => void;
 	}
 
-	const { board, updatedAt, refreshMs, position = null, paused = false, onPause }: Props = $props();
+	const { title, updatedAt, refreshMs, position = null, paused = false, onPause }: Props = $props();
 	const every = $derived(Math.round(refreshMs / 1000));
 </script>
 
 <header class="kiosk-head">
-	<h1>{BOARD_TITLES[board]}</h1>
+	<h1>{title}</h1>
 	<p class="fresh" data-testid="kiosk-freshness">
 		{updatedAt > 0 ? `Data as of ${fetchedAt(updatedAt)}` : 'Waiting for the first answer'}
 		· refreshes every {every} s
 	</p>
 	{#if position}
 		<p class="position" data-testid="kiosk-position">
-			{position.current} of {position.total} · next: {BOARD_TITLES[position.next]}
+			{position.current} of {position.total} · next: {position.nextTitle}
 			{paused ? '(paused)' : `in ${position.nextInS} s`}
 			{#if onPause}
 				<button type="button" onclick={onPause} aria-pressed={paused}

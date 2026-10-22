@@ -31,7 +31,8 @@ operators anyway.
 	<p class="muted">
 		Accounts (<code>vakr user</code>), inventory (<code>/etc/vakr/inventory.toml</code> and
 		<code>vakr inventory apply</code>), and configuration are managed on the node; rediscovery
-		requests, metadata editing, and your own dashboards are not in this release.
+		requests and metadata editing are not in this release. Custom dashboards are built on the
+		<a href="/dashboards">dashboards</a> page.
 	</p>
 	<KioskTokens />
 {/if}

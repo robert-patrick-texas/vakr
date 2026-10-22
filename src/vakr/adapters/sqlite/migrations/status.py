@@ -9,6 +9,10 @@ actionable sentence. Checks run from the most to the least serious:
 3. another kind of file: ``MISMATCH``;
 4. any journal row above this release's newest version: ``TOO_NEW``, even
    an unfinished one, because a newer release has touched the schema;
+   except that a family with read-compatible versioning (E.14) runs as
+   ``CURRENT`` on a newer schema whose reader floor (the newest breaking
+   migration applied) it supports, when every newer migration finished and
+   its own history matches;
 5. a history this release did not write (gaps, other checksums): ``MISMATCH``;
 6. an ``in_progress`` row: ``INTERRUPTED``;
 7. otherwise ``PENDING`` or ``CURRENT``.
@@ -85,12 +89,7 @@ def _from_journal(location: str, family: SchemaFamily, facts: DatabaseFacts) -> 
     version = max((e.version for e in facts.entries if e.applied), default=0)
     seen = max((e.version for e in facts.entries), default=0)
     if seen > newest:
-        detail = (
-            f"schema {seen} was written by a newer vakr release; this release supports up "
-            f"to {newest}. Do not run this release on it: reinstall the newer release, or "
-            f"restore the backup taken before the upgrade ({DOC_HINT})"
-        )
-        return _status(location, family, SchemaState.TOO_NEW, version, detail, facts)
+        return _newer(location, family, facts, version, seen)
     problem = _history_problem(family, facts.entries)
     if problem is not None:
         detail = f"{problem}; this release's migrations did not build this database ({DOC_HINT})"
@@ -106,12 +105,57 @@ def _from_journal(location: str, family: SchemaFamily, facts: DatabaseFacts) -> 
     return _status(location, family, SchemaState.CURRENT, version, detail, facts)
 
 
+def _newer(
+    location: str, family: SchemaFamily, facts: DatabaseFacts, version: int, seen: int
+) -> SchemaStatus:
+    """Decide a schema a newer release wrote: read-compatible (E.14) or refused (MIG-004).
+
+    Args:
+        location: Database path, for messages.
+        family: The migrations this release ships.
+        facts: The file's facts, with journal entries above ``newest``.
+        version: Highest applied version.
+        seen: Highest journalled version, finished or not.
+
+    Returns:
+        SchemaStatus: ``CURRENT`` when this release may run on it, ``MISMATCH``
+        when its own part of the history differs, else ``TOO_NEW``.
+
+    Raises:
+        StorageError: If a journal timestamp is not valid.
+    """
+    newest, floor = family.supported.newest, facts.floor
+    finished = all(e.applied for e in facts.entries)
+    versioned = family.compat_from is not None
+    if versioned and finished and floor <= newest:
+        problem = _history_problem(family, facts.entries)
+        if problem is not None:
+            detail = (
+                f"{problem}; this release's migrations did not build this database ({DOC_HINT})"
+            )
+            return _status(location, family, SchemaState.MISMATCH, version, detail, facts)
+        detail = (
+            f"schema {version} (readable by schema {floor} and later) was written by a newer "
+            f"vakr release; its later changes are additive, so this release, which runs "
+            f"schema {newest}, uses it as it is (E.14)"
+        )
+        return _status(location, family, SchemaState.CURRENT, version, detail, facts)
+    why = f": its migration {floor:04d} is breaking" if versioned and finished else ""
+    detail = (
+        f"schema {seen} was written by a newer vakr release{why}; this release supports up "
+        f"to {newest}. Do not run this release on it: reinstall the newer release, or "
+        f"restore the backup taken before the upgrade ({DOC_HINT})"
+    )
+    return _status(location, family, SchemaState.TOO_NEW, version, detail, facts)
+
+
 def _history_problem(family: SchemaFamily, entries: tuple[JournalEntry, ...]) -> str | None:
     """Explain how the journal differs from this release's migrations, if it does.
 
     Args:
         family: The migrations this release ships.
-        entries: Journal rows by version, none above the newest.
+        entries: Journal rows by version; rows above the newest (a newer,
+            read-compatible release's) are checked for gaps only.
 
     Returns:
         str | None: The first difference, or ``None`` when the history matches.
@@ -123,7 +167,7 @@ def _history_problem(family: SchemaFamily, entries: tuple[JournalEntry, ...]) ->
         known = family.migration(entry.version)
         if entry.version != position:
             return f"the journal has no migration {position:04d}"
-        if known is None or entry.checksum != known.checksum:
+        if known is not None and entry.checksum != known.checksum:
             return f"migration {entry.version:04d} in the database differs from this release's"
         if not entry.applied and position != len(entries):
             return f"migration {entry.version:04d} never finished, yet later ones did"

@@ -11,6 +11,11 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - `vakr setup --role --position --primary-url` writes the `[node]` table, asking at a first-install terminal; on a peer it creates no admin. `GET /api/v1/version` and the web and TUI headers show the node's position and role.
 - A `replication` check in `vakr check health` and `vakr doctor` (warning after 5 min, critical after 30 min without a successful pull, E.13), and the metrics `vakr_replication_metadata_age_seconds` and `vakr_replication_metadata_pulls_total`.
 - Metadata schema 6 adds the `replication_token` table. The package runs `vakr db migrate`, which takes a backup first.
+- Read-compatible telemetry versioning (Appendix E.14; [writing migrations](docs/development/migrations.md)). Telemetry migrations from 0003 on declare `compat: additive` or `compat: breaking`, and each telemetry database records a reader floor in a new `schema_compat` table.
+  - This release and later ones keep running on a newer telemetry schema whose later changes were all additive. A self-update rollback, which never restores `telemetry.db`, therefore no longer strands them.
+  - `vakr db status` then reports "schema M (readable by schema F and later)" and exits 0, and `vakr db migrate` does nothing.
+  - A newer schema with a breaking change is still refused, naming the migration.
+  - Older releases refuse every newer telemetry schema, so releases that add telemetry migrations still carry `manual-update-required`.
 
 ### Changed
 

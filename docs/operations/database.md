@@ -121,7 +121,15 @@ Each database records its migrations in its own `schema_migrations` table. A mig
 2. It runs the migration's statements and marks the row `applied`, in one transaction where SQLite allows it.
 3. If anything fails, a transactional migration rolls back completely and the row is removed: the database is exactly as before.
 
-**Telemetry partitions.** A telemetry migration never rewrites day or month tables. A column change updates the partition template; tables created afterwards get the new column, and older tables report it as missing until retention drops them. This keeps upgrades fast on a 40 GB file.
+**Telemetry partitions.** A telemetry migration never rewrites day or month tables. A column change updates the partition template; tables created afterwards get the new column, and older tables report it as missing until retention drops them. This keeps upgrades fast on a 40 GB file. Such a template change is breaking under the rules below.
+
+**Read-compatible telemetry (Appendix E.14, 2026-10-22).** Self-update's rollback never restores `telemetry.db`, so a release may find a schema that a newer release left behind. Every telemetry migration from 0003 on says whether it is `additive` or `breaking`. Additive changes only add tables, views, indexes, or nullable or defaulted columns, and leave every existing table's rows, triggers, and constraints alone. Each database keeps a reader floor: the newest breaking migration applied to it. A release runs on a newer telemetry schema whose floor it supports:
+
+```text
+state:     current: schema 4 (readable by schema 2 and later) was written by a newer vakr release; its later changes are additive, so this release, which runs schema 2, uses it as it is (E.14)
+```
+
+In that state the collector starts and ingests, `vakr db status` exits 0, and `vakr db migrate` does nothing. A newer schema with a breaking migration above this release's is still refused, as below. The metadata database has no such versioning: rollback restores it from the pre-update backup. Releases older than this feature refuse every newer telemetry schema, so releases that add telemetry migrations keep the `manual-update-required` marker for now ([updates](updates.md)). How to write a migration is in [writing migrations](../development/migrations.md).
 
 **Startup check.** Services start only on the schema versions the installed release runs on ([16.3](../../tool-blueprint.md#163-startup-preflight)). After installing a release by hand, for example with `apt install`, run `vakr db migrate` before starting services.
 
@@ -175,7 +183,7 @@ If `quick_check` fails, stop vakr, copy all three files of that database (`.db`,
 schema 2 was written by a newer vakr release; this release supports up to 1. Do not run this release on it: reinstall the newer release, or restore the backup taken before the upgrade
 ```
 
-This happens when an older vakr runs against a database that a newer release has already migrated. Common causes are a manual downgrade, a rollback that skipped the database, or a database copied from a newer node. The older release cannot know what the newer migration changed, so it does not touch the file (MIG-004). Do one of the following:
+This happens when an older vakr runs against a database that a newer release has already migrated. Common causes are a manual downgrade, a rollback that skipped the database, or a database copied from a newer node. The older release cannot know what the newer migration changed, so it does not touch the file (MIG-004). For telemetry, the message says "its migration NNNN is breaking" when that is the reason; a newer telemetry schema with only additive changes is not refused at all (see [read-compatible telemetry](#migrations)). Do one of the following:
 
 - **Go forward.** Reinstall the newer release, for example with `vakr self-update --version <newer>`.
 - **Go back.** Restore the backup from before the upgrade. `vakr self-update --rollback` restores self-update's pre-update archive (UPD-005). Otherwise use the `<name>-<time>.db` that `vakr db migrate` wrote before it migrated (see [restore](#restore)). Changes made after the upgrade are lost.

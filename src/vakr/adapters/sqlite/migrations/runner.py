@@ -134,6 +134,9 @@ class MigrationRunner:
                 begin(conn, immediate=True)
             finished = encode_time(self._clock.now_utc())
             journal.mark_applied(conn, migration.version, at_us=finished)
+            start = self._family.compat_from
+            if migration.compat and start is not None and migration.version >= start:
+                journal.record_compat(conn, migration.version, migration.compat)
             conn.execute("COMMIT")
         except sqlite3.Error as exc:
             raise self._failed(conn, migration, exc) from None

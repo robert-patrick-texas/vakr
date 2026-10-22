@@ -11,8 +11,10 @@ Example:
 """
 
 import dataclasses
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -49,6 +51,47 @@ def pair(tmp_path: Path):
     yield pf, qf, ids, tmp_path / "pull.json"
     primary.close()
     peer.close()
+
+
+def _record(path: Path) -> status.PullStatus:
+    """Read a pull record that must exist.
+
+    Args:
+        path: The record file.
+
+    Returns:
+        status.PullStatus: The record.
+
+    Raises:
+        AssertionError: If there is none.
+    """
+    found = status.read_status(path)
+    assert found is not None
+    return found
+
+
+class _Shifted(FakePrimary):
+    """A partner whose state reports a schema moved by ``shift``."""
+
+    shift = 0
+
+    def get_json(self, path: str, query: Mapping[str, str | int] | None = None) -> Any:
+        """Answer, with the schema moved on the state.
+
+        Args:
+            path: The endpoint.
+            query: Its parameters.
+
+        Returns:
+            Any: The answer.
+
+        Raises:
+            None
+        """
+        doc = super().get_json(path, query)
+        if path == "metadata/state":
+            doc["schema"] += self.shift
+        return doc
 
 
 def _digest(factory) -> str:
@@ -91,7 +134,7 @@ def test_mpos003_a_peer_copies_the_primary_exactly(pair) -> None:
     fake.calls.clear()
     assert puller(fake, qf, record).pull_once() == "unchanged"
     assert fake.calls == ["metadata/state"]  # no pages when nothing changed
-    assert status.read_status(record).pulls == {"applied": 1, "unchanged": 1, "failed": 0}
+    assert _record(record).pulls == {"applied": 1, "unchanged": 1, "failed": 0}
 
 
 def test_mpos003_changes_and_removals_follow_the_primary(pair) -> None:
@@ -138,7 +181,17 @@ def test_mpos003_a_snapshot_torn_by_an_edit_is_never_applied(pair) -> None:
     fake = FakePrimary(pf)
 
     def edit() -> None:
-        """Change the primary between the state answer and the pages."""
+        """Change the primary between the state answer and the pages.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         with pf() as uow:
             uow.tags.add(samples.tag("late"))
             uow.commit()
@@ -148,7 +201,7 @@ def test_mpos003_a_snapshot_torn_by_an_edit_is_never_applied(pair) -> None:
     with pytest.raises(PullError, match="does not match the primary's digest"):
         puller(fake, qf, record).pull_once()
     assert _digest(qf) == before
-    assert "digest" in (status.read_status(record).last_error or "")
+    assert "digest" in (_record(record).last_error or "")
     assert puller(fake, qf, record).pull_once() == "applied"  # the next pull is whole
 
 
@@ -172,7 +225,7 @@ def test_mpos002_an_unreachable_primary_keeps_last_known_metadata(pair) -> None:
         puller(fake, qf, record).pull_once()
     with qf() as uow:
         assert uow.devices.get(ids["device"]) is not None
-    found = status.read_status(record)
+    found = _record(record)
     assert found.last_error
     assert found.last_success_at
     assert judge(found, 60).status is Status.OK
@@ -204,17 +257,8 @@ def test_mpos003_wrong_partner_or_schema_is_refused(
         None
     """
     pf, qf, _, record = pair
-    fake = FakePrimary(pf, role=role)
-    real = fake.get_json
-
-    def shifted(path, query=None):
-        """Answer with the schema moved by ``schema``."""
-        doc = real(path, query)
-        if path == "metadata/state":
-            doc["schema"] += schema
-        return doc
-
-    fake.get_json = shifted
+    fake = _Shifted(pf, role=role)
+    fake.shift = schema
     with pytest.raises(PullError, match=says):
         puller(fake, qf, record).pull_once()
 
@@ -293,7 +337,7 @@ def test_the_record_ages_and_survives_garbage(tmp_path: Path) -> None:
     """
     path = tmp_path / "replication" / "metadata-pull.json"
     status.record(path, "applied", NOW, digest="a" * 64, position="east")
-    found = status.read_status(path)
+    found = _record(path)
     assert found.success_age_s(NOW + timedelta(seconds=90)) == 90
     assert (path.stat().st_mode & 0o777, found.primary_position) == (0o640, "east")
     path.write_text("{not json")

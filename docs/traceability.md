@@ -545,7 +545,7 @@ The web UI is the static SvelteKit app in `web/` (ADR-035): pages in `web/src/ro
 |---|---|---|---|---|---|
 | MPOS-T01 | In progress (harness in place) | `tests/system/mpos/{run,lib,phases}.sh`, `probe.py`, `simdata.py` | `mpos_t01`: east keeps every device Active, west sees the cut devices down from west, both keep polling | `development/two-position-tests.md` | The composite "Reachable from east only" waits for part B. It is checked after east-west heals, with west's device cut kept (decision 4: evidence cannot cross the cut). |
 | MPOS-T02 | In progress (harness in place) | as above | `mpos_t02`: no duplicate observation UUIDs on either node | `development/two-position-tests.md` | Per-collector coverage of the source's rows waits for part B (decision 5); "oldest first" is written with part B. |
-| MPOS-T03 | In progress (harness in place) | as above | `mpos_t03`: west keeps polling with its last-known inventory while east is cut off | `development/two-position-tests.md` | The peer's refusal naming the primary waits for part A (`configure_roles`). |
+| MPOS-T03 | In progress (harness in place; `roles` passes) | as above | `mpos_t03`: west keeps polling with its last-known inventory while east is cut off | `development/two-position-tests.md` | The peer's refusal naming the primary waits for part A (`configure_roles`). |
 | MPOS-T04 | In progress (harness in place) | as above | `mpos_t04`: east under 15 ms and west 45 to 90 ms to the same device, one series per position | `development/two-position-tests.md` | Each node showing the other's series, each with its own RTT, waits for part B. 60 ms between positions and on west's device path (decision 3). |
 
 ## Field data

@@ -5,6 +5,9 @@ primary's metadata (``metadata_pull``); both pull each other's observations
 (part B, MPOS-004), through the same ``client.PartnerClient``, which carries
 the partner's replication token (``token_file``) over strict HTTPS.
 
+Dependencies:
+    vakr.lifecycle.egress, vakr.credentials: Strict TLS and the strict token-file read.
+
 Modules:
     client: Bounded GETs to the partner node, with the bearer token.
     token_file: Reads ``/etc/vakr/secrets/replication.token`` in strict mode.

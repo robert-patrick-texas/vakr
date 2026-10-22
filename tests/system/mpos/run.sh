@@ -110,6 +110,8 @@ start_node() {
         on "$node" install -m 0640 -o root -g vakr /work/fleet/credentials.toml \
             /etc/vakr/secrets/credentials.toml &&
         on "$node" install -m 0644 /work/fleet/inventory.toml /etc/vakr/inventory.toml &&
+        # With roles, west is a peer: it starts empty and copies east's inventory.
+        if has_feature roles && [ "$node" = west ]; then return 0; fi &&
         on "$node" vakr inventory apply >/dev/null
 }
 for node in east west; do

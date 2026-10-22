@@ -20,8 +20,8 @@ Example:
     ...                                  "primary_url": "https://vakr-east.example.net"}})
     >>> node_problems(peer), node_settings(peer).is_peer
     ([], True)
-    >>> node_settings(peer).refusal()
-    'this node is a peer of https://vakr-east.example.net; change metadata there (MPOS-003)'
+    >>> node_settings(peer).refusal().split(": ")[0]
+    'this node is a peer; its primary is https://vakr-east.example.net'
 """
 
 import re
@@ -98,7 +98,8 @@ class NodeSettings:
         """
         if not self.is_peer:
             return None
-        return f"this node is a peer of {self.primary_url}; change metadata there (MPOS-003)"
+        where = self.primary_url
+        return f"this node is a peer; its primary is {where}: change metadata there (MPOS-003)"
 
 
 def _get(config: EffectiveConfig, key: str) -> Any:

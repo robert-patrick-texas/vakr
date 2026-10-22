@@ -10,8 +10,10 @@ Example:
 import json
 import os
 import ssl
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -21,6 +23,7 @@ from vakr.config.loader import EffectiveConfig
 from vakr.config.node import node_problems, node_settings
 from vakr.credentials.policy import FilePolicy
 from vakr.credentials.secret import Secret
+from vakr.domain.ids import DeviceId, new_id
 from vakr.lifecycle.egress.client import EgressSettings
 from vakr.lifecycle.egress.errors import EgressError, ResponseTooLargeError
 from vakr.replication import client as client_module
@@ -195,6 +198,9 @@ def test_adr024_a_peer_inventory_never_writes_discovery() -> None:
     inner = SimpleNamespace(poll_plan=lambda _d: plan, devices=lambda: ("core1",),
                             record_discovery_report=lambda *_a: pytest.fail("wrote"))  # fmt: skip
     peer = PeerInventory(inner)
-    assert peer.record_discovery("d", object(), None) is plan
+    assert (
+        peer.record_discovery(DeviceId(new_id(DeviceId)), cast(Any, None), datetime.now(UTC))
+        is plan
+    )
     assert peer.devices() == ("core1",)
     assert not hasattr(peer, "record_discovery_report")

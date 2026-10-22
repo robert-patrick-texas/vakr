@@ -121,7 +121,7 @@ def test_mpos_t03_cli_metadata_edits_are_refused_on_a_peer(
         handle.write(PEER_TABLE)
     code, _, err = _run(capsys, *argv)
     assert code == 1, err
-    assert f"peer of {PRIMARY}" in err, err
+    assert f"its primary is {PRIMARY}" in err, err
 
 
 def test_mpos001_setup_writes_the_node_table_and_a_peer_creates_no_admin(

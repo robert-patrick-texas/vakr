@@ -157,8 +157,10 @@ configure_roles() {
     # The contract part A builds to (ADR-024): east is the metadata primary and
     # west the peer; each node pulls the other with a replication token that the
     # node it pulls from issued, kept in /etc/vakr/secrets/replication.token.
-    # Adjust here when part A's operator guide lands (how vakr-api is reached
-    # over HTTPS between nodes, and the token command's exact output).
+    # Each node's vakr-api is reached over HTTPS on port 443 through tlsproxy.py,
+    # a test-only TLS terminator whose test CA each node trusts in
+    # /etc/vakr/tls/ca.d (docs/operations/two-positions.md; nothing weakens TLS).
+    tls_terminators || return 1
     printf '[node]\nrole = "primary"\nposition = "east"\n' >dist/mpos-test/east-role.toml
     printf '[node]\nrole = "peer"\nposition = "west"\nprimary_url = "https://%s"\n' "$EAST_INTER" \
         >dist/mpos-test/west-role.toml
@@ -166,10 +168,26 @@ configure_roles() {
         on west install -D -m 0644 /work/west-role.toml /etc/vakr/conf.d/50-mpos-role.toml || return 1
     issue_token east west && issue_token west east
 }
+tls_terminators() {
+    # A test CA and one server certificate per position (SAN = its inter-node
+    # address), made on the host into /work/tls, then a TLS terminator on :443
+    # in each node in front of vakr-api on 127.0.0.1:8080.
+    uv run --quiet python tests/system/mpos/tlsproxy.py gen dist/mpos-test/tls \
+        "$EAST_INTER" "$WEST_INTER" || return 1
+    local node addr
+    for node in east west; do
+        addr=$EAST_INTER
+        [ "$node" = west ] && addr=$WEST_INTER
+        on "$node" install -D -m 0644 /work/tls/mpos-test-ca.pem /etc/vakr/tls/ca.d/mpos-test.pem &&
+            on "$node" systemd-run --unit mpos-tls --property=Restart=always \
+                /opt/vakr/venv/bin/python3 /mpos/tlsproxy.py serve "/work/tls/$addr.pem" \
+                "/work/tls/$addr.key" "$addr" 443 8080 >/dev/null || return 1
+    done
+}
 issue_token() {
     # issue_token ISSUER HOLDER: a token from ISSUER, installed on HOLDER, never printed.
     local token
-    token=$(on "$1" vakr replication token create --label "mpos-$2" | grep -o 'vkr_[A-Za-z0-9_-]*' | head -1)
+    token=$(on "$1" vakr replication token create "mpos-$2" | grep -o 'vkr_[A-Za-z0-9_-]*' | head -1)
     [ -n "$token" ] || return 1
     printf '%s\n' "$token" |
         on_in "$2" install -m 0640 -o root -g vakr /dev/stdin /etc/vakr/secrets/replication.token

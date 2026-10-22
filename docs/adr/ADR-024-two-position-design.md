@@ -56,7 +56,7 @@ Blueprint 27.5 sketches the design: one metadata primary, a peer that pulls meta
 
 ### The peer is read-only for metadata (MPOS-003, MPOS-T03)
 
-13. **Every metadata write on a peer is refused, naming the primary:** "this node is a peer of `<primary_url>`; change metadata there".
+13. **Every metadata write on a peer is refused, naming the primary:** "this node is a peer; its primary is `<primary_url>`: change metadata there".
     * In the API, `peer_guard` runs beside `csrf_guard` on every `/api/v1` route and answers 409 `peer_read_only` to any state-changing request outside `PEER_WRITES` (sign-in, sign-out, kiosk setup, and kiosk tokens, which are node-local). A new write endpoint is therefore refused on a peer until someone decides otherwise.
     * In the CLI, `refused_on_peer` wraps `vakr user add|passwd|disable|enable|role`, `vakr inventory apply`, `vakr interface claim`, `vakr interface review map|new`, and `vakr inventory rediscover`.
     * `vakr user revoke-sessions` stays allowed, because sessions are node-local.

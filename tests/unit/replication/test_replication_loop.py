@@ -60,7 +60,17 @@ def test_mpos002_a_primary_idles_and_a_peer_without_a_token_records_why(tmp_path
     primary = _service(paths, {})
 
     async def idle() -> None:
-        """Run the primary's loop until it is told to stop."""
+        """Run the primary's loop until it is told to stop.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
         task = asyncio.create_task(replication_loop.metadata_pull_loop(primary))
         await asyncio.sleep(0)
         primary.loops_stop.set()

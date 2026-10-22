@@ -525,6 +525,17 @@ The web UI is the static SvelteKit app in `web/` (ADR-035): pages in `web/src/ro
 | 12.3 filters (API) | Implemented | `query/listing.py` (`FreshnessFilter`), `api/params_devices.py` | `test_api_device_filters.py` | `api.md` | E.31 #6. |
 | ADR-035 #16–#18 (supply chain) | Implemented | `web/package-lock.json`, `web/.node-version`, `web/.npmrc`, `Makefile` (`web-audit`), `web/scripts/check-licenses.js`, `tools/check-updates/updates_npm.py`, `updates_node.py` | `build-scripts.test.js`, `tools/check-updates/test_updates_npm.py`, `test_updates_node.py`, CI `audit` job | `development/web.md` | `npm ci --ignore-scripts` everywhere. |
 
+## Two positions (M5): system tests
+
+`make mpos-test` ([two-position tests](development/two-position-tests.md)): two systemd nodes and a simulated fleet in containers, with nftables partitions and netem. The checks that need node roles (part A) or observation replication (part B) print SKIP until `MPOS_FEATURES` names them.
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| MPOS-T01 | In progress (harness in place) | `tests/system/mpos/{run,lib,phases}.sh`, `probe.py`, `simdata.py` | `mpos_t01`: east keeps every device Active, west sees the cut devices down from west, both keep polling | `development/two-position-tests.md` | The composite "Reachable from east only" waits for part B. It is checked after east-west heals, with west's device cut kept (decision 4: evidence cannot cross the cut). |
+| MPOS-T02 | In progress (harness in place) | as above | `mpos_t02`: no duplicate observation UUIDs on either node | `development/two-position-tests.md` | Per-collector coverage of the source's rows waits for part B (decision 5); "oldest first" is written with part B. |
+| MPOS-T03 | In progress (harness in place) | as above | `mpos_t03`: west keeps polling with its last-known inventory while east is cut off | `development/two-position-tests.md` | The peer's refusal naming the primary waits for part A (`configure_roles`). |
+| MPOS-T04 | In progress (harness in place) | as above | `mpos_t04`: east under 15 ms and west 45 to 90 ms to the same device, one series per position | `development/two-position-tests.md` | Each node showing the other's series, each with its own RTT, waits for part B. 60 ms between positions and on west's device path (decision 3). |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

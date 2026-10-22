@@ -247,6 +247,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/devices/{device_uuid}/rediscovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rediscover a device now (admin; asynchronous)
+         * @description Queue a manual rediscovery and answer at once with the operation (DISC-003, DISC-010).
+         */
+        post: operations["rediscovery_api_v1_devices__device_uuid__rediscovery_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/exports/devices/{device_uuid}/history/reachability": {
         parameters: {
             query?: never;
@@ -646,6 +666,46 @@ export interface paths {
          * @description Revoke a kiosk token; displays holding it are refused from their next request.
          */
         delete: operations["revoke_api_v1_kiosk_tokens__kiosk_uuid__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin operations, newest first
+         * @description List operations newest first.
+         */
+        get: operations["operations_api_v1_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/operations/{operation_uuid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One admin operation: progress and result
+         * @description Return one operation.
+         */
+        get: operations["operation_api_v1_operations__operation_uuid__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1206,7 +1266,7 @@ export interface components {
          * @description One recent event.
          *
          *     Attributes:
-         *         kind: ``restart``, ``identity_review``, or ``telemetry_loss``.
+         *         kind: ``restart``, ``rediscovery``, ``identity_review``, or ``telemetry_loss``.
          *         at: When it happened or was detected (UTC).
          *         subject: What it concerns, such as a device name or a spool.
          *         device_id: The device, when the event concerns one.
@@ -2012,6 +2072,130 @@ export interface components {
             /** Text */
             text: string;
         };
+        /**
+         * OperationOut
+         * @description One admin operation (API-011).
+         *
+         *     Attributes:
+         *         id: Operation UUID; ``GET /api/v1/operations/{id}`` follows it.
+         *         kind: ``rediscovery``.
+         *         device_id: The device.
+         *         device_name: Its current display name; ``null`` if it cannot be read.
+         *         state: ``queued``, ``running``, ``succeeded``, ``failed``, or ``expired``.
+         *         requested_by: Username, ``local:<account>``, or ``cli:<login>``.
+         *         requested_at: When it was asked for (UTC).
+         *         started_at: When a collector claimed it.
+         *         finished_at: When it ended.
+         *         collector_id: The collector that ran it.
+         *         result: What a succeeded rediscovery found and changed.
+         *         error: Why a failed or expired operation did not succeed.
+         */
+        OperationOut: {
+            /** Collector Id */
+            collector_id: string | null;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Device Name */
+            device_name: string | null;
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /** Requested By */
+            requested_by: string;
+            result: components["schemas"]["OperationResult"] | null;
+            /** Started At */
+            started_at: string | null;
+            /** State */
+            state: string;
+        };
+        /**
+         * OperationPage
+         * @description One page of operations, newest first (API-005).
+         *
+         *     Attributes:
+         *         rows: The operations.
+         *         page: Paging facts.
+         */
+        OperationPage: {
+            page: components["schemas"]["PageInfo"];
+            /** Rows */
+            rows: components["schemas"]["OperationOut"][];
+        };
+        /**
+         * OperationResult
+         * @description What a finished rediscovery found and changed (DISC-T03).
+         *
+         *     Attributes:
+         *         interfaces: Interfaces the agent reported.
+         *         new: Interfaces that got a new identity.
+         *         renumbered: Known interfaces matched at another ``ifIndex``.
+         *         missing: Known interfaces the agent no longer reported.
+         *         reviews_opened: Identity cases left for an administrator (IFID-007).
+         *         capability_changes: Interfaces whose counter capabilities changed (DISC-009).
+         *         partial: Whether some table came back incomplete.
+         *         duration_ms: How long the discovery took.
+         */
+        OperationResult: {
+            /**
+             * Capability Changes
+             * @default 0
+             */
+            capability_changes: number;
+            /**
+             * Duration Ms
+             * @default 0
+             */
+            duration_ms: number;
+            /** Interfaces */
+            interfaces: number;
+            /**
+             * Missing
+             * @default 0
+             */
+            missing: number;
+            /**
+             * New
+             * @default 0
+             */
+            new: number;
+            /**
+             * Partial
+             * @default false
+             */
+            partial: boolean;
+            /**
+             * Renumbered
+             * @default 0
+             */
+            renumbered: number;
+            /**
+             * Reviews Opened
+             * @default 0
+             */
+            reviews_opened: number;
+        };
+        /**
+         * OperationState
+         * @description Where an operation is; see the module docstring for the transitions.
+         * @enum {string}
+         */
+        OperationState: "queued" | "running" | "succeeded" | "failed" | "expired";
         /**
          * OverviewView
          * @description The authenticated overview (12.2).
@@ -3714,6 +3898,91 @@ export interface operations {
             };
         };
     };
+    rediscovery_api_v1_devices__device_uuid__rediscovery_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description the operation already queued or running */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such device */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no collector would rediscover it, or full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     export_reachability_api_v1_exports_devices__device_uuid__history_reachability_get: {
         parameters: {
             query?: {
@@ -5185,6 +5454,138 @@ export interface operations {
                 };
             };
             /** @description no such kiosk token */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    operations_api_v1_operations_get: {
+        parameters: {
+            query?: {
+                /** @description Only this device's. */
+                device?: string | null;
+                /** @description Repeatable. */
+                state?: components["schemas"]["OperationState"][];
+                /** @description Page size, 1 to 500. */
+                limit?: number;
+                /** @description `page.next_cursor` of the previous page. */
+                cursor?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationPage"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    operation_api_v1_operations__operation_uuid__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such operation */
             404: {
                 headers: {
                     [name: string]: unknown;

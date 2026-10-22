@@ -13,8 +13,7 @@ meanwhile; the next re-plan drops it, and it is not logged as a failure.
 
 Dependencies:
     asyncio: Tasks and the wake event.
-    vakr.discovery: The discovery run.
-    vakr.app.collector: Plans, due times, the inventory contract.
+    vakr.app.collector: Plans, due times, the inventory contract, one attempt.
 
 Safety:
     Bounded by ``discovery_concurrency``; ``stop`` cancels running walks,
@@ -31,21 +30,18 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable
 
 from vakr.app.collector import discovery_due as due_rules
+from vakr.app.collector.discovery_attempt import FAILED, GONE, OK, Attempt, attempt
 from vakr.app.collector.discovery_due import Outcome, discoverable
 from vakr.app.collector.inventory import InventorySource
 from vakr.app.collector.plans import PlanBook
-from vakr.app.collector.snmp_parts import snmp_target
 from vakr.app.collector.timings import ServiceTimings
 from vakr.collectors.snmp.config import SnmpConfig
-from vakr.discovery import discover
-from vakr.domain.errors import NotFoundError
 from vakr.domain.ids import DeviceId
 from vakr.ports.clock import Clock
-from vakr.ports.snmp import SnmpSessionError, SnmpSessionFactory
+from vakr.ports.snmp import SnmpSessionFactory
 from vakr.scheduler.targets import PollTarget
 
 _LOG = logging.getLogger(__name__)
-_OK, _FAILED, _GONE = "ok", "failed", "gone"
 
 
 class DiscoveryRunner:
@@ -86,7 +82,7 @@ class DiscoveryRunner:
         self._targets: dict[DeviceId, PollTarget] = {}
         self._due: dict[DeviceId, float] = {}
         self._outcomes: dict[DeviceId, Outcome] = {}
-        self._running: dict[DeviceId, asyncio.Task[None]] = {}
+        self._running: dict[DeviceId, asyncio.Task[Attempt]] = {}
         self._wake = asyncio.Event()
         self._stopping = False
 
@@ -208,27 +204,28 @@ class DiscoveryRunner:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _discover(self, target: PollTarget) -> None:
+    async def _discover(self, target: PollTarget) -> Attempt:
         """Discover one device, then record the outcome and the next due time.
 
         Args:
             target: The device.
 
         Returns:
-            None
+            Attempt: How it ended.
 
         Raises:
             asyncio.CancelledError: When ``stop`` cancels it.
         """
-        status, why = _FAILED, "an error inside the collector"
+        done = Attempt(FAILED, "an error inside the collector")
         try:
-            status, why = await self._attempt(target)
+            done = await self._attempt(target)
         except Exception as exc:  # noqa: BLE001 - one device's failure must not stop discovery
-            why = f"an error inside the collector ({type(exc).__name__})"
+            done = Attempt(FAILED, f"an error inside the collector ({type(exc).__name__})")
         finally:
             self._running.pop(target.device_id, None)
-            self._settle(target, status, why)
+            self._settle(target, done.status, done.why)
             self._wake.set()
+        return done
 
     def _settle(self, target: PollTarget, status: str, why: str) -> None:
         """Record an outcome, log a change of state once, and schedule the next attempt.
@@ -245,18 +242,18 @@ class DiscoveryRunner:
             None
         """
         device_id, name = target.device_id, target.device.name
-        if status == _GONE:  # removed meanwhile: never retried, and the re-plan agrees
+        if status == GONE:  # removed meanwhile: never retried, and the re-plan agrees
             self._due.pop(device_id, None)
             self._targets.pop(device_id, None)
             return
         outcome = self._outcomes.setdefault(device_id, Outcome())
-        if status == _OK:
+        if status == OK:
             if outcome.failures:
                 _LOG.info("discovery of %s works again", name,
                           extra={"event_id": "discovery.recovered"})  # fmt: skip
             outcome.failures, outcome.succeeded = 0, True
             self.completed += 1
-        elif status == _FAILED:
+        elif status == FAILED:
             outcome.failures += 1
             self.failed += 1
             if outcome.failures == 1:
@@ -266,35 +263,22 @@ class DiscoveryRunner:
         if device_id in self._targets:
             self._due[device_id] = self._schedule(target)
 
-    async def _attempt(self, target: PollTarget) -> tuple[str, str]:
-        """Walk the device and hand an answered result to inventory.
+    async def _attempt(self, target: PollTarget) -> Attempt:
+        """Walk the device, record an answered result, and adopt the new plan.
 
         Args:
             target: The device.
 
         Returns:
-            tuple[str, str]: ``ok``, ``failed``, or ``gone`` (inventory no
-            longer knows the device), and why it failed.
+            Attempt: ``ok``, ``failed``, or ``gone`` (inventory no longer knows it).
 
         Raises:
             StorageError: If inventory cannot store the result.
         """
-        config, device = self.config, target.device
-        if config is None:
-            return _FAILED, "no SNMP settings loaded"
-        try:
-            async with self._factory.open(snmp_target(device, config.port), config.settings) as s:
-                result = await discover(s, self._clock, config.settings.abandon_after)
-        except SnmpSessionError as exc:
-            return _FAILED, exc.error.message
-        if not result.answered:
-            return _FAILED, "the agent did not answer"
-        now = self._clock.now_utc()
-        try:
-            plan = await asyncio.to_thread(self._inventory.record_discovery, device.id, result, now)
-        except NotFoundError:
-            return _GONE, "removed from inventory"
-        self._plans.adopt(device.id, plan, now)
-        if self.on_plan is not None:
-            await self.on_plan(device.id)
-        return _OK, ""
+        device = target.device
+        done = await attempt(self._inventory, self._factory, self._clock, self.config, device)
+        if done.report is not None and done.at is not None:
+            self._plans.adopt(device.id, done.report.plan, done.at)
+            if self.on_plan is not None:
+                await self.on_plan(device.id)
+        return done

@@ -36,6 +36,7 @@ from fastapi import Request
 from vakr.api.errors import ApiError
 from vakr.api.settings import ApiSettings
 from vakr.auth import AuthServices
+from vakr.operations import OperationService
 from vakr.ports.clock import Clock
 from vakr.ports.metadata import MetadataUnitOfWorkFactory
 from vakr.query import HistoryQueries, OverviewQueries
@@ -134,6 +135,8 @@ class ApiContext:
         logins: Bounds password logins in progress (``LoginGate``).
         kiosk_exchanges: Bounds kiosk token exchanges in progress, apart from
             logins so neither can crowd out the other.
+        operations: Admin operations (manual rediscovery, E.32); ``None``
+            builds one with the default reachability strategy (tests).
     """
 
     auth: AuthServices
@@ -149,6 +152,7 @@ class ApiContext:
     kiosk_exchanges: LoginGate = field(
         default_factory=lambda: LoginGate(KIOSK_ACTIVE, KIOSK_WAITING)
     )
+    operations: OperationService | None = None
 
 
 def get_context(request: Request) -> ApiContext:

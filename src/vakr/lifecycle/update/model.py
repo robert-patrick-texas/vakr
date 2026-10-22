@@ -55,7 +55,7 @@ class Layout:
         cache_root: Package cache (``<cache_dir>/updates``).
         backups_dir: Pre-update backups.
         state_file: ``update-state.json``.
-        lock_file: Update lock in the runtime directory.
+        lock_file: Update lock, in the root-only update directory (UPD-005).
         config_dir: Configuration directory to back up and restore.
         db_dir: Directory whose databases are backed up.
         db_names: Database file names to back up; empty means every ``*.db``.

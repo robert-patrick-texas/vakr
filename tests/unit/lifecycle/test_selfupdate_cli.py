@@ -214,7 +214,7 @@ def test_usage_and_environment_errors(
     captured = capsys.readouterr()
     assert "[FAIL] tcp" in captured.out
     assert "cannot connect" in captured.err
-    with exclusive_lock(paths.run_dir / "self-update.lock"):
+    with exclusive_lock(paths.update_dir / "self-update.lock"):
         assert main(["self-update", "--yes", "--rollback"]) == 1
     assert "already running" in capsys.readouterr().err
     assert main(["self-update", "--rollback", "--yes"]) == 1

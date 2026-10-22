@@ -24,6 +24,7 @@ import pytest
 from tests.unit.lifecycle.helpers import Harness
 from vakr.health.lifecycle_checks import check_update
 from vakr.lifecycle.update import private
+from vakr.lifecycle.update.lock import exclusive_lock
 from vakr.lifecycle.update.model import Layout
 from vakr.lifecycle.update.policy import Request
 from vakr.lifecycle.update.state import UpdateState, load_state, save_state
@@ -292,3 +293,34 @@ def test_upd005_health_reads_the_new_record_and_shows_an_older_one_until_it_move
     new = tmp_path / "var/lib/vakr-update/update-state.json"
     save_state(new, UpdateState("success", "t", "7.2.0", "7.3.1", "ok"))
     assert check_update().summary.startswith("last update success 7.2.0 -> 7.3.1")
+
+
+def test_upd005_the_update_lock_never_follows_a_link_or_lives_in_a_shared_directory(
+    tmp_path: Path,
+) -> None:
+    """UPD-005, UPD-007: a link in the lock's place, or a shared directory, stops the update.
+
+    Args:
+        tmp_path: Test directory.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    target = tmp_path / "elsewhere"
+    lock_dir = tmp_path / "update"
+    private.ensure_private_dir(lock_dir, mode=0o755)
+    (lock_dir / "self-update.lock").symlink_to(target)
+    with (
+        pytest.raises(OSError, match="symbolic links"),
+        exclusive_lock(lock_dir / "self-update.lock"),
+    ):
+        pass
+    assert not target.exists()
+    shared = tmp_path / "shared"
+    shared.mkdir()
+    shared.chmod(0o777)
+    with pytest.raises(private.PrivateStorageError), exclusive_lock(shared / "self-update.lock"):
+        pass

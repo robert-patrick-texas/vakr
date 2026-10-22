@@ -226,7 +226,7 @@ def _updater(
         # Root's own directory: rollback restores what is kept here (UPD-005).
         backups_dir=paths.update_dir / "backups",
         state_file=paths.update_dir / "update-state.json",
-        lock_file=paths.run_dir / "self-update.lock",
+        lock_file=paths.update_dir / "self-update.lock",
         config_dir=paths.config_dir,
         db_dir=paths.state_dir,
         # Not telemetry.db: it reaches about 40 GB per node, too much to copy per update (E.14).

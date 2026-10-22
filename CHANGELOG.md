@@ -2,6 +2,12 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## Unreleased
+
+### Changed
+
+- Developers: `make github-update-test` reads the update timer's log from a whole-journal cursor, because the unit has none before its first run. For a `manual-update-required` release, it accepts either answer from the rolled-back release: it may refuse the new telemetry schema, or, when FROM already has that migration, accept it. Verified against the published releases, 0.2.1 → 0.3.1 and 0.3.0 → 0.3.1.
+
 ## 0.3.1 - 2026-10-22
 
 Fixes the update from 0.2.x. `vakr self-update` to 0.3.0 failed, and rolled itself back to 0.2.x, on a node where an earlier self-update had created `/var/lib/vakr/backups`. Install 0.3.1 instead of 0.3.0.

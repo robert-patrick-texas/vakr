@@ -74,17 +74,22 @@ check "rolled back to $FROM" equals "$(vakr --version)" "vakr $FROM"
 if has_db_command; then
     # A rollback never restores telemetry.db (E.14). An unmarked release must
     # leave it readable by the older one (exit 2 is "schema newer than I
-    # support"); a manual-update-required release is marked because it doesn't.
+    # support"). A manual-update-required release may not: the marker can come
+    # from a migration FROM already has (0.3.0 -> 0.3.1), so either answer is
+    # allowed then, and the log says which.
     vakr db status >/tmp/db.log 2>&1
     db=$?
     if [ "$marked" = yes ]; then
-        check "the older release refuses $TO's telemetry schema, as the marker warns" test "$db" -eq 2
+        echo "the older release's vakr db status exits $db (2: a schema newer than it supports)"
+        check "the older release accepts the databases or refuses only a newer schema" \
+            test "$db" -eq 0 -o "$db" -eq 2
     else
         check "the older release accepts both databases" test "$db" -ne 2
     fi
 fi
 
-journal_cursor() { journalctl -u vakr-update.service -n 0 --show-cursor --no-pager | sed -n 's/^-- cursor: //p'; }
+# The whole journal's cursor: the unit's own has none before its first run.
+journal_cursor() { journalctl -n 0 --show-cursor --no-pager | sed -n 's/^-- cursor: //p'; }
 if [ "$TO" != "$newest" ]; then
     section "the timer's checks need v$TO to be the newest release (it is v$newest); updating by hand"
     vakr self-update --yes --version "$TO" 2>&1 | grep '^vakr self-update:'

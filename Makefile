@@ -139,3 +139,13 @@ release-dry-run:
 # FROM and TO select other releases, e.g. make github-update-test FROM=0.1.1.
 github-update-test:
 	FROM=$(FROM) TO=$(TO) packaging/github-update-test.sh
+
+# Opt-in two-position system tests, MPOS-T01..T04 (blueprint 27.5): two systemd
+# nodes and a simulated fleet in privileged containers, with partitions and netem.
+# MPOS_QUICK=1 takes about 7 minutes with DEB given; the full run holds a 30-minute partition.
+# See docs/development/two-position-tests.md. Not part of `make check`.
+.PHONY: mpos-test
+mpos-test:
+	DEB=$(DEB) MPOS_QUICK=$(MPOS_QUICK) MPOS_FEATURES=$(MPOS_FEATURES) MPOS_DEVICES=$(MPOS_DEVICES) \
+	MPOS_PARTITION_SECONDS=$(MPOS_PARTITION_SECONDS) MPOS_HOLD_SECONDS=$(MPOS_HOLD_SECONDS) \
+	MPOS_KEEP=$(MPOS_KEEP) tests/system/mpos/run.sh

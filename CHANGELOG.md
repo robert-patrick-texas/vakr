@@ -14,6 +14,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ### Changed
 
+- Developers: `make mpos-test` runs the two-position system tests, MPOS-T01 to MPOS-T04 ([two-position tests](docs/development/two-position-tests.md)). It starts two systemd nodes, `east` and `west`, and a simulated fleet in privileged containers, and applies nftables partitions and netem delays. `MPOS_QUICK=1` takes about 7 minutes with a prebuilt package; the full run holds a 30-minute partition. The checks that need node roles or observation replication (M5 parts A and B) print SKIP until `MPOS_FEATURES` names them. A manual GitHub workflow, **Two positions**, runs quick mode. Not part of `make check`.
 - Developers: `make github-update-test` reads the update timer's log from a whole-journal cursor, because the unit has none before its first run. For a `manual-update-required` release, it accepts either answer from the rolled-back release: it may refuse the new telemetry schema, or, when FROM already has that migration, accept it. Verified against the published releases, 0.2.1 → 0.3.1 and 0.3.0 → 0.3.1.
 
 ## 0.3.1 - 2026-10-22

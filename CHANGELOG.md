@@ -6,6 +6,12 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ### Added
 
+- Custom dashboards (UI-004, DASH-006, DASH-007, Appendix E.31 #17; [dashboards](docs/operations/dashboards.md)). Admins build them under **Dashboards** → **New dashboard**, or pin an interface from its page with **Pin to dashboard**; everyone signed in views them, and kiosk displays show them at `/kiosk/dashboard/<uuid>` or as `dashboard:<uuid>` in a rotation.
+  - Widgets: pinned interfaces across devices (up to 50, in your order, with optional graph cards), interfaces or devices selected by site, tag, group, provider, WAN, or interest, and top utilization or errors within a selection.
+  - A dashboard refresh is one bounded request (`GET /api/v1/dashboards/{uuid}/view`); every bound is in E.31.
+  - A pinned interface that is retired or gone keeps its place with a note. Saving over someone else's change is refused (409) with an offer to reload. Creates, changes, and deletes are audited.
+  - API: `GET`/`POST /api/v1/dashboards`, `GET`/`PATCH`/`DELETE /api/v1/dashboards/{uuid}`, and `/view`.
+  - Metadata schema 5 adds the `dashboard` table (`0005_dashboards`; the package runs `vakr db migrate`, which takes a backup first). Not yet: dashboards from `/etc/vakr/dashboards.toml`, public publication, and a `vakr dashboard` command.
 - Manual rediscovery (DISC-003, DISC-010, API-011, Appendix E.32): **Rediscover now** on a device's page (admins), `POST /api/v1/devices/{uuid}/rediscovery`, and `sudo vakr inventory rediscover DEVICE [--wait]` queue an operation and answer at once; `vakr-collector` picks it up within about 5 seconds, runs the same discovery as a scheduled one, and records the counts (interfaces, new, renumbered, missing, identity reviews opened) or the reason. `GET /api/v1/operations[/{uuid}]` and `vakr inventory operations` follow them, the overview's rediscovery events list them, and every request is audited. One active operation per device, 1,000 in all; unclaimed requests expire after 1 hour; finished ones are kept 30 days.
 - Metadata schema 4 adds the `operation` table. The package runs `vakr db migrate`, which takes a backup first.
 

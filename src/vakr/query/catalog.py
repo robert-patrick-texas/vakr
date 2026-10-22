@@ -15,6 +15,7 @@ position is the requested collector, else the local one, else the first
 Paging is by offset over the ordered list with ``total`` and
 ``next_offset``; pages are 1 to 500 rows (E.19). Current values are read
 only for the devices on the page unless the order needs them all.
+``pinned`` answers chosen interfaces in a dashboard's order (UI-004).
 
 Dependencies:
     vakr.ports.telemetry: Current interface state.
@@ -30,17 +31,19 @@ Example:
     0
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from vakr.domain.checks import require_int
-from vakr.domain.enums import InterestClass
-from vakr.domain.ids import CollectorId
+from vakr.domain.enums import AdminState, InterestClass, InterfaceLifecycle
+from vakr.domain.ids import CollectorId, InterfaceId
+from vakr.domain.interfaces import Interface
 from vakr.domain.paging import MAX_PAGE_LIMIT
 from vakr.ports.clock import Clock, SystemClock
 from vakr.ports.metadata import MetadataUnitOfWorkFactory
 from vakr.ports.telemetry import TelemetryBackend
-from vakr.query.catalog_index import IndexCache
+from vakr.query.catalog_index import CatalogIndex, IndexCache
 from vakr.query.catalog_order import (
+    OK,
     InterfaceListRequest,
     InterfaceSort,
     check_text,
@@ -48,12 +51,31 @@ from vakr.query.catalog_order import (
     matches_text,
     ordered,
 )
-from vakr.query.catalog_scope import InterfaceScope
+from vakr.query.catalog_scope import InterfaceScope, interface_ref
 from vakr.query.catalog_views import InterfaceListView, SearchView
+from vakr.query.dashboard_views import GONE, RETIRED, PinnedEntry, PinnedRows
 from vakr.query.history_context import pick_collector
 from vakr.query.history_limits import OVERVIEW_ROWS, SEARCH_HITS_PER_KIND
 from vakr.query.search import search_index
 from vakr.query.settings import QuerySettings
+
+
+def _retired(index: CatalogIndex, iface: Interface) -> bool:
+    """Tell whether an interface, or its device, is retired.
+
+    Args:
+        index: The inventory.
+        iface: The interface.
+
+    Returns:
+        bool: True when either is retired, or the device is unknown.
+
+    Raises:
+        None
+    """
+    device = index.devices.get(iface.device_id)
+    return (iface.lifecycle is InterfaceLifecycle.RETIRED or device is None
+            or device.admin_state is AdminState.RETIRED)  # fmt: skip
 
 
 class CatalogQueries:
@@ -194,6 +216,55 @@ class CatalogQueries:
                 scope=wan, sort=InterfaceSort.NAME, limit=limit, collector_id=collector_id
             )
         )
+
+    def inventory(self) -> CatalogIndex:
+        """Return the shared bounded inventory index (for names and filters).
+
+        Args:
+            None
+
+        Returns:
+            CatalogIndex: The index, reread only after a metadata change.
+
+        Raises:
+            StorageError: If the metadata store cannot be read.
+        """
+        return self._index.get()
+
+    def pinned(
+        self, ids: Sequence[InterfaceId], collector_id: CollectorId | None = None
+    ) -> PinnedRows:
+        """Return chosen interfaces in the order given, with current values (UI-004).
+
+        A retired interface (or one on a retired device) keeps its place with
+        its names and the note ``retired``; one the index does not hold keeps
+        it with ``no longer exists``. Neither has values.
+
+        Args:
+            ids: Interface UUIDs, in display order (at most a widget's 50).
+            collector_id: Position whose current values to show.
+
+        Returns:
+            PinnedRows: One entry per UUID, the telemetry state, and the position.
+
+        Raises:
+            StorageError: If the metadata store cannot be read.
+        """
+        index = self._index.get()
+        by_id = {i.id: i for i in index.interfaces}
+        collector = pick_collector(index.collectors, collector_id, self._settings.local_collector)
+        live = [by_id[i] for i in ids if i in by_id and not _retired(index, by_id[i])]
+        reader = list_rows(self._telemetry, collector, self._clock.now_utc(), self._settings)
+        rows, telemetry = reader(index, live) if live else ([], OK)
+        found = {r.ref.interface_id: r for r in rows}
+        entries = tuple(
+            PinnedEntry(i, found[i], None, None) if i in found
+            else PinnedEntry(i, None, interface_ref(index, by_id[i]), RETIRED) if i in by_id
+            else PinnedEntry(i, None, None, GONE)
+            for i in ids
+        )  # fmt: skip
+        return PinnedRows(entries, telemetry, collector.id if collector else None,
+                          collector.position if collector else "")  # fmt: skip
 
     def search(self, text: str, per_kind: int = SEARCH_HITS_PER_KIND) -> SearchView:
         """Search devices, interfaces, sites, providers, circuits, tags, and groups (12.1).

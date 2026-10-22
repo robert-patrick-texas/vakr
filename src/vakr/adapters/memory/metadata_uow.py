@@ -7,8 +7,8 @@ discards the transaction, so a failed operation commits nothing.
 Dependencies:
     vakr.adapters.memory.metadata_store, metadata_repos, metadata_interfaces,
     metadata_reviews, metadata_specs, metadata_users, metadata_failures,
-    metadata_sessions, metadata_kiosk, metadata_operations: Storage, repositories, and
-    table rules.
+    metadata_sessions, metadata_kiosk, metadata_operations, metadata_dashboards:
+    Storage, repositories, and table rules.
 
 Safety:
     Uncommitted changes are visible only to their own unit of work.
@@ -22,6 +22,7 @@ Example:
 from types import TracebackType
 
 from vakr.adapters.memory import metadata_specs as specs
+from vakr.adapters.memory.metadata_dashboards import MemoryDashboardRepository
 from vakr.adapters.memory.metadata_failures import MemoryLoginFailureRepository
 from vakr.adapters.memory.metadata_interfaces import (
     MemoryAuditRepository,
@@ -58,6 +59,7 @@ class MemoryUnitOfWork:
         login_failures: Login throttle state.
         sessions: Login sessions.
         kiosk_tokens: Kiosk display tokens.
+        dashboards: Custom dashboards.
         operations: Admin operations (E.32).
     """
 
@@ -91,6 +93,7 @@ class MemoryUnitOfWork:
         self.login_failures = MemoryLoginFailureRepository(self._tx)
         self.sessions = MemorySessionRepository(self._tx)
         self.kiosk_tokens = MemoryKioskTokenRepository(self._tx)
+        self.dashboards = MemoryDashboardRepository(self._tx)
         self.operations = MemoryOperationRepository(self._tx)
 
     def change_counter(self) -> int:

@@ -14,6 +14,7 @@ Example: `<DeviceTable rows={page.rows} sort="status" onSort={setSort} />`
 	import type { DeviceRow } from '#lib/api/types.ts';
 	import { deviceHref } from '#lib/links.ts';
 	import DataTable from './DataTable.svelte';
+	import Link from './Link.svelte';
 	import ReadingText from './ReadingText.svelte';
 	import StatusBadge from './StatusBadge.svelte';
 	import type { Column } from './table.ts';
@@ -40,7 +41,7 @@ Example: `<DeviceTable rows={page.rows} sort="status" onSort={setSort} />`
 		</div>
 	{/if}
 {/snippet}
-{#snippet name(r: DeviceRow)}<a href={deviceHref(r.device_id)}>{r.name}</a>{/snippet}
+{#snippet name(r: DeviceRow)}<Link href={deviceHref(r.device_id)}>{r.name}</Link>{/snippet}
 {#snippet address(r: DeviceRow)}<span class="mono">{r.address}</span>{/snippet}
 {#snippet site(r: DeviceRow)}<ReadingText reading={r.site} compact />{/snippet}
 {#snippet icmp(r: DeviceRow)}

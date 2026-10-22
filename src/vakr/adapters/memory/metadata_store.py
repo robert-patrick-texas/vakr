@@ -37,11 +37,12 @@ from vakr.domain.errors import ConflictError, DuplicateError
 TABLES = (
     "device", "interface", "site", "tag", "group", "policy", "collector",
     "identity_history", "audit", "review", "user", "session", "kiosk_token", "login_failure",
+    "dashboard",
     "operation",
 )  # fmt: skip
 UNIQUE = {
     "device": "name", "site": "name", "tag": "name", "group": "name", "policy": "name",
-    "collector": "name", "user": "username",
+    "collector": "name", "user": "username", "dashboard": "name",
 }  # fmt: skip
 """Tables with a natural key besides the ID, and the attribute that holds it."""
 UNVERSIONED = frozenset({"session", "kiosk_token", "login_failure"})
@@ -146,10 +147,10 @@ class Transaction:
         self.pending[table][record.id] = record
 
     def delete(self, table: str, key: UUID) -> None:
-        """Stage the removal of a row from an unversioned table.
+        """Stage the removal of a row from an unversioned table or of a dashboard.
 
         Args:
-            table: Table name; one of ``UNVERSIONED``.
+            table: Table name; one of ``UNVERSIONED``, or ``dashboard``.
             key: Record ID.
 
         Returns:
@@ -226,8 +227,11 @@ class Transaction:
             raise ConflictError(
                 table, key, expected_version=based_on, actual_version=committed.version
             )
+        staged = self.pending[table].get(key)
+        if staged is TOMBSTONE:
+            return  # a deletion frees its name; there is nothing to compare
         if (attribute := UNIQUE.get(table)) is not None:
-            name = getattr(self.pending[table][key], attribute)
+            name = getattr(staged, attribute)
             for other in self.store.tables[table].values():
                 if (
                     getattr(other, attribute) == name

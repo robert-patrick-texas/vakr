@@ -9,11 +9,14 @@ import {
 	PREFETCH_MS,
 	REFRESH_MIN_S,
 	RotationSchedule,
+	dashboardIdOf,
 	kioskOptions,
+	pageTitle,
 	rotationOptions
 } from './kiosk.ts';
 
 const q = (text: string) => new URLSearchParams(text);
+const BOARD = '0190a3c4-0000-7000-8000-00000000dddd';
 
 describe('kioskOptions (DASH-T06: refresh never below the minimum)', () => {
 	it('defaults to each dashboard’s own interval and the 15 m window', () => {
@@ -46,6 +49,24 @@ describe('rotationOptions', () => {
 			dwellMs: 15_000
 		});
 	});
+	it('takes custom dashboards as dashboard:<uuid>, in lower case (UI-004)', () => {
+		const result = rotationOptions(q(`pages=overview,dashboard:${BOARD.toUpperCase()}`));
+		expect(result).toEqual({ pages: ['overview', `dashboard:${BOARD}`], dwellMs: 60_000 });
+		expect(dashboardIdOf(`dashboard:${BOARD}`)).toBe(BOARD);
+		expect(rotationOptions(q('pages=overview,dashboard:nope'))).toEqual({
+			error: expect.stringContaining('no kiosk dashboard named "dashboard:nope"')
+		});
+	});
+	it('names custom dashboards from the list, with a fallback before it arrives', () => {
+		const names = new Map([[BOARD, 'Core WAN']]);
+		const s = new RotationSchedule(['wan', `dashboard:${BOARD}`], 30_000, (p) =>
+			pageTitle(p, names)
+		);
+		s.update(0, true);
+		expect(s.position().nextTitle).toBe('Core WAN');
+		expect(pageTitle(`dashboard:${BOARD}`)).toBe('Custom dashboard');
+		expect(pageTitle('wan')).toBe('WAN circuits');
+	});
 	it('names an unknown dashboard instead of skipping it', () => {
 		const result = rotationOptions(q('pages=overview,weather'));
 		expect(result).toEqual({
@@ -68,7 +89,13 @@ describe('RotationSchedule (UI-013)', () => {
 		const s = new RotationSchedule(['overview', 'wan', 'rankings'], 60_000);
 		s.update(0, true);
 		expect(s.board).toBe('overview');
-		expect(s.position()).toEqual({ current: 1, total: 3, next: 'wan', nextInS: 60 });
+		expect(s.position()).toEqual({
+			current: 1,
+			total: 3,
+			next: 'wan',
+			nextTitle: 'WAN circuits',
+			nextInS: 60
+		});
 		expect(s.update(20_000, true)).toBe(false);
 		expect(s.position().nextInS).toBe(40);
 		expect(s.update(60_000, true)).toBe(true);

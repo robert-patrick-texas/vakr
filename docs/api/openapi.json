@@ -214,6 +214,536 @@
         "title": "CoverageView",
         "type": "object"
       },
+      "CriteriaView": {
+        "description": "A widget's filters, with the names they refer to (for headings and kiosk text).\n\nAttributes:\n    site: Site name, if filtered by site.\n    tag: Tag name, if filtered by tag.\n    group: Group name, if filtered by group.\n    provider: Provider, if filtered by provider.\n    wan_only: Only WAN circuits.\n    interest: ``primary`` or ``secondary``, if filtered by interest.\n    text: The whole filter in words, such as ``site Dallas DC1, WAN only``.",
+        "properties": {
+          "group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "interest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interest"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "wan_only": {
+            "title": "Wan Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "site",
+          "tag",
+          "group",
+          "provider",
+          "wan_only",
+          "interest",
+          "text"
+        ],
+        "title": "CriteriaView",
+        "type": "object"
+      },
+      "DashboardCreate": {
+        "additionalProperties": false,
+        "description": "Body of ``POST /api/v1/dashboards``.",
+        "properties": {
+          "description": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "refresh_s": {
+            "default": 60,
+            "maximum": 3600.0,
+            "minimum": 15.0,
+            "title": "Refresh S",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "device_selection": "#/components/schemas/DeviceSelectionIn",
+                  "interface_selection": "#/components/schemas/InterfaceSelectionIn",
+                  "pinned_interfaces": "#/components/schemas/PinnedInterfacesIn",
+                  "ranking": "#/components/schemas/RankingIn"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PinnedInterfacesIn"
+                },
+                {
+                  "$ref": "#/components/schemas/InterfaceSelectionIn"
+                },
+                {
+                  "$ref": "#/components/schemas/DeviceSelectionIn"
+                },
+                {
+                  "$ref": "#/components/schemas/RankingIn"
+                }
+              ]
+            },
+            "maxItems": 12,
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DashboardCreate",
+        "type": "object"
+      },
+      "DashboardOut": {
+        "description": "A dashboard definition, as ``GET``, ``POST``, and ``PATCH`` answer it.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "managed_by": {
+            "enum": [
+              "api",
+              "file"
+            ],
+            "title": "Managed By",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refresh_s": {
+            "title": "Refresh S",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "visibility": {
+            "const": "private",
+            "title": "Visibility",
+            "type": "string"
+          },
+          "widget_schema": {
+            "title": "Widget Schema",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "device_selection": "#/components/schemas/DeviceSelectionIn",
+                  "interface_selection": "#/components/schemas/InterfaceSelectionIn",
+                  "pinned_interfaces": "#/components/schemas/PinnedInterfacesIn",
+                  "ranking": "#/components/schemas/RankingIn"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/PinnedInterfacesIn"
+                },
+                {
+                  "$ref": "#/components/schemas/InterfaceSelectionIn"
+                },
+                {
+                  "$ref": "#/components/schemas/DeviceSelectionIn"
+                },
+                {
+                  "$ref": "#/components/schemas/RankingIn"
+                }
+              ]
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "refresh_s",
+          "widgets",
+          "widget_schema",
+          "managed_by",
+          "visibility",
+          "created_by",
+          "created_at",
+          "updated_by",
+          "updated_at",
+          "version"
+        ],
+        "title": "DashboardOut",
+        "type": "object"
+      },
+      "DashboardPage": {
+        "description": "One page of dashboards, by name (API-005).\n\nAttributes:\n    rows: The dashboards.\n    page: Paging facts.",
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DashboardSummary"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "page"
+        ],
+        "title": "DashboardPage",
+        "type": "object"
+      },
+      "DashboardPatch": {
+        "additionalProperties": false,
+        "description": "Body of ``PATCH /api/v1/dashboards/{uuid}``: ``version`` plus what changes.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "refresh_s": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 15.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refresh S"
+          },
+          "version": {
+            "description": "The version this change is based on (DB-003).",
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          },
+          "widgets": {
+            "anyOf": [
+              {
+                "items": {
+                  "discriminator": {
+                    "mapping": {
+                      "device_selection": "#/components/schemas/DeviceSelectionIn",
+                      "interface_selection": "#/components/schemas/InterfaceSelectionIn",
+                      "pinned_interfaces": "#/components/schemas/PinnedInterfacesIn",
+                      "ranking": "#/components/schemas/RankingIn"
+                    },
+                    "propertyName": "kind"
+                  },
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/PinnedInterfacesIn"
+                    },
+                    {
+                      "$ref": "#/components/schemas/InterfaceSelectionIn"
+                    },
+                    {
+                      "$ref": "#/components/schemas/DeviceSelectionIn"
+                    },
+                    {
+                      "$ref": "#/components/schemas/RankingIn"
+                    }
+                  ]
+                },
+                "maxItems": 12,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Widgets"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "DashboardPatch",
+        "type": "object"
+      },
+      "DashboardSummary": {
+        "description": "One dashboard in the list.\n\nAttributes:\n    id: The dashboard.\n    name: Its name.\n    description: Its description.\n    widgets: How many widgets it has.\n    refresh_s: Seconds between refreshes.\n    updated_by: Who changed it last.\n    updated_at: When (UTC).\n    version: Its version.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refresh_s": {
+            "title": "Refresh S",
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "updated_by": {
+            "title": "Updated By",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "widgets": {
+            "title": "Widgets",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "widgets",
+          "refresh_s",
+          "updated_by",
+          "updated_at",
+          "version"
+        ],
+        "title": "DashboardSummary",
+        "type": "object"
+      },
+      "DashboardView": {
+        "description": "A custom dashboard with every widget resolved (UI-004, DASH-T06).\n\nAttributes:\n    dashboard_id: The dashboard.\n    name: Its name.\n    description: Its description.\n    refresh_s: Seconds between refreshes the page should use.\n    version: The definition's version (DB-003).\n    widgets: One view per widget, in order.\n    collector_id: The position whose current values are shown, if any (MPOS-008).\n    position: Its label.\n    telemetry: ``ok``, or why current values are unavailable (UI-014).\n    truncated: True when the inventory was larger than one index reads (E.29).\n    generated_at: When the view was computed (UTC).",
+        "properties": {
+          "collector_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collector Id"
+          },
+          "dashboard_id": {
+            "format": "uuid",
+            "title": "Dashboard Id",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "string"
+          },
+          "refresh_s": {
+            "title": "Refresh S",
+            "type": "integer"
+          },
+          "telemetry": {
+            "$ref": "#/components/schemas/Reading"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "widgets": {
+            "items": {
+              "$ref": "#/components/schemas/WidgetView"
+            },
+            "title": "Widgets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dashboard_id",
+          "name",
+          "description",
+          "refresh_s",
+          "version",
+          "widgets",
+          "collector_id",
+          "position",
+          "telemetry",
+          "truncated",
+          "generated_at"
+        ],
+        "title": "DashboardView",
+        "type": "object"
+      },
+      "DeviceCriteriaIn": {
+        "additionalProperties": false,
+        "description": "Which devices a device selection covers; absent fields do not filter.",
+        "properties": {
+          "group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          }
+        },
+        "title": "DeviceCriteriaIn",
+        "type": "object"
+      },
       "DeviceDetailView": {
         "description": "Everything the device screen and ``vakr status DEVICE`` show (TUI-004..006, 12.4).\n\nAttributes:\n    row: The device's list row (status, reachability, SNMP, uptime, ...).\n    facts: Labelled summary values in display order.\n    warnings: Quality conditions on the newest evidence, in operator words.\n    interfaces: Interfaces in TUI-006 order (sticky, WAN, primary first).\n    interfaces_total: Interfaces of the device in inventory.\n    interfaces_truncated: True when more interfaces exist than one view reads.\n    generated_at: When the view was computed (UTC).\n    health: Storage and collector health.\n    notes: Standing explanations, such as what ``sysUpTime`` measures.",
         "properties": {
@@ -454,6 +984,40 @@
         "title": "DeviceRow",
         "type": "object"
       },
+      "DeviceSelectionIn": {
+        "additionalProperties": false,
+        "description": "Devices matching filters, in status order; at least one filter.",
+        "properties": {
+          "criteria": {
+            "$ref": "#/components/schemas/DeviceCriteriaIn"
+          },
+          "kind": {
+            "const": "device_selection",
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "default": 25,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "criteria"
+        ],
+        "title": "DeviceSelectionIn",
+        "type": "object"
+      },
       "DeviceSort": {
         "description": "Device-list orders (TUI-003).",
         "enum": [
@@ -509,6 +1073,52 @@
           "truncated"
         ],
         "title": "DeviceSummary",
+        "type": "object"
+      },
+      "DeviceWidgetView": {
+        "description": "A device-selection widget, in status order (7.7).\n\nAttributes:\n    title: Heading.\n    criteria: The filters in words.\n    rows: The first ``limit`` matching devices.\n    counts: Attention, Active, and Offline among all matches.\n    total: Matches in all.\n    more: Matches not shown.\n    kind: ``device_selection``.",
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/BucketCounts"
+          },
+          "criteria": {
+            "$ref": "#/components/schemas/CriteriaView"
+          },
+          "kind": {
+            "const": "device_selection",
+            "default": "device_selection",
+            "title": "Kind",
+            "type": "string"
+          },
+          "more": {
+            "title": "More",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "criteria",
+          "rows",
+          "counts",
+          "total",
+          "more"
+        ],
+        "title": "DeviceWidgetView",
         "type": "object"
       },
       "ErrorEnvelope": {
@@ -1130,6 +1740,83 @@
         "title": "InterestClass",
         "type": "string"
       },
+      "InterfaceCriteriaIn": {
+        "additionalProperties": false,
+        "description": "Which interfaces a selection or ranking covers; absent fields do not filter.",
+        "properties": {
+          "group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group Id"
+          },
+          "interest": {
+            "anyOf": [
+              {
+                "enum": [
+                  "primary",
+                  "secondary"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interest"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          },
+          "wan_only": {
+            "default": false,
+            "title": "Wan Only",
+            "type": "boolean"
+          }
+        },
+        "title": "InterfaceCriteriaIn",
+        "type": "object"
+      },
       "InterfaceDetail": {
         "description": "``GET /api/v1/interfaces/{uuid}``: identity plus current values from one position.\n\nAttributes:\n    interface: Identity and metadata.\n    current: The list row with current values, or ``None`` when not found in the index.\n    position: Position whose values are shown.\n    telemetry: ``ok``, or why current values are unavailable.\n    generated_at: When the answer was computed.",
         "properties": {
@@ -1746,6 +2433,40 @@
           "age"
         ],
         "title": "InterfaceRow",
+        "type": "object"
+      },
+      "InterfaceSelectionIn": {
+        "additionalProperties": false,
+        "description": "Interfaces matching filters (UI-004, DASH-006); at least one filter.",
+        "properties": {
+          "criteria": {
+            "$ref": "#/components/schemas/InterfaceCriteriaIn"
+          },
+          "kind": {
+            "const": "interface_selection",
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "default": 25,
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "criteria"
+        ],
+        "title": "InterfaceSelectionIn",
         "type": "object"
       },
       "InterfaceSort": {
@@ -2387,6 +3108,127 @@
         "title": "PageInfo",
         "type": "object"
       },
+      "PinnedEntry": {
+        "description": "One pinned interface in its place.\n\nAttributes:\n    interface_id: The pinned UUID.\n    row: Current values, or ``None`` when retired or gone.\n    ref: The interface's names when retired (``None`` when gone or when ``row`` is set).\n    note: ``retired`` or ``no longer exists``; ``None`` for a live interface.",
+        "properties": {
+          "interface_id": {
+            "format": "uuid",
+            "title": "Interface Id",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterfaceRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "row": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterfaceListRow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "interface_id",
+          "row",
+          "ref",
+          "note"
+        ],
+        "title": "PinnedEntry",
+        "type": "object"
+      },
+      "PinnedInterfacesIn": {
+        "additionalProperties": false,
+        "description": "Interfaces pinned across devices, in this order (UI-004).",
+        "properties": {
+          "graphs": {
+            "default": true,
+            "title": "Graphs",
+            "type": "boolean"
+          },
+          "interfaces": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Interfaces",
+            "type": "array"
+          },
+          "kind": {
+            "const": "pinned_interfaces",
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "interfaces"
+        ],
+        "title": "PinnedInterfacesIn",
+        "type": "object"
+      },
+      "PinnedWidgetView": {
+        "description": "A pinned-interfaces widget (UI-004).\n\nAttributes:\n    title: Heading.\n    graphs: Whether the page shows graph cards (lazy, at most 12 per page, E.31).\n    entries: The interfaces in the admin's order.\n    kind: ``pinned_interfaces``.",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/PinnedEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "graphs": {
+            "title": "Graphs",
+            "type": "boolean"
+          },
+          "kind": {
+            "const": "pinned_interfaces",
+            "default": "pinned_interfaces",
+            "title": "Kind",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "graphs",
+          "entries"
+        ],
+        "title": "PinnedWidgetView",
+        "type": "object"
+      },
       "PointView": {
         "description": "One point: a value or a gap, with its envelope and quality flags.\n\nAttributes:\n    t: Sample time, or bucket start for bucketed points (UTC).\n    value: The value (bucket mean), or ``None`` for a gap.\n    low: Bucket minimum when bucketed, else ``None``.\n    high: Bucket maximum when bucketed, else ``None``.\n    flags: Quality flag names, such as ``baseline_uptime_reset``.",
         "properties": {
@@ -2534,6 +3376,59 @@
         ],
         "title": "RangePreset",
         "type": "string"
+      },
+      "RankingIn": {
+        "additionalProperties": false,
+        "description": "Top utilization or top errors within filters (DASH-003, DASH-004).",
+        "properties": {
+          "criteria": {
+            "$ref": "#/components/schemas/InterfaceCriteriaIn"
+          },
+          "kind": {
+            "const": "ranking",
+            "title": "Kind",
+            "type": "string"
+          },
+          "limit": {
+            "default": 10,
+            "maximum": 25.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "ranking": {
+            "enum": [
+              "utilization",
+              "errors"
+            ],
+            "title": "Ranking",
+            "type": "string"
+          },
+          "title": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "window": {
+            "default": "15m",
+            "enum": [
+              "15m",
+              "1h",
+              "6h",
+              "24h"
+            ],
+            "title": "Window",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "ranking"
+        ],
+        "title": "RankingIn",
+        "type": "object"
       },
       "RankingView_ErrorRow_": {
         "description": "A ranking over one window from one collector.\n\nAttributes:\n    kind: ``utilization`` or ``errors``.\n    window: Window (aligned to the E.28 step) and zone.\n    window_name: The ranking window, such as ``15m``.\n    collector_id: The collector whose samples were ranked.\n    position: Its label.\n    rows: Ranked rows, at most the requested limit.\n    candidates: Interfaces that matched the filters.\n    excluded: Some excluded interfaces, in natural order (E.28 cap).\n    excluded_total: How many were excluded in all.\n    truncated: True when the inventory or the scan hit a bound.\n    available: False when the ranking could not be computed at all.\n    reason: Why not, in operator words.\n    generated_at: When the view was computed (UTC).\n    computed_at: When the underlying scan ran (it may be reused, E.28).\n    notes: Standing explanations.",
@@ -2765,6 +3660,57 @@
           "computed_at"
         ],
         "title": "RankingView",
+        "type": "object"
+      },
+      "RankingWidgetView": {
+        "description": "A ranking widget: one of ``utilization`` and ``errors`` is set (DASH-003, DASH-004).\n\nAttributes:\n    title: Heading.\n    ranking: ``utilization`` or ``errors``.\n    criteria: Which interfaces could rank, in words.\n    utilization: The top-utilization ranking, for ``utilization``.\n    errors: The top-errors ranking, for ``errors``.\n    kind: ``ranking``.",
+        "properties": {
+          "criteria": {
+            "$ref": "#/components/schemas/CriteriaView"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingView_ErrorRow_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "const": "ranking",
+            "default": "ranking",
+            "title": "Kind",
+            "type": "string"
+          },
+          "ranking": {
+            "title": "Ranking",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "utilization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingView_UtilizationRow_"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "title",
+          "ranking",
+          "criteria",
+          "utilization",
+          "errors"
+        ],
+        "title": "RankingWidgetView",
         "type": "object"
       },
       "RankingWindow": {
@@ -3173,6 +4119,48 @@
           "generated_at"
         ],
         "title": "SearchView",
+        "type": "object"
+      },
+      "SelectionWidgetView": {
+        "description": "An interface-selection widget (UI-004, DASH-006).\n\nAttributes:\n    title: Heading.\n    criteria: The filters in words.\n    rows: The first ``limit`` matches, in priority order.\n    total: Matches in all.\n    more: Matches not shown (``total - len(rows)``).\n    kind: ``interface_selection``.",
+        "properties": {
+          "criteria": {
+            "$ref": "#/components/schemas/CriteriaView"
+          },
+          "kind": {
+            "const": "interface_selection",
+            "default": "interface_selection",
+            "title": "Kind",
+            "type": "string"
+          },
+          "more": {
+            "title": "More",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/InterfaceListRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "criteria",
+          "rows",
+          "total",
+          "more"
+        ],
+        "title": "SelectionWidgetView",
         "type": "object"
       },
       "SeriesView": {
@@ -3826,6 +4814,22 @@
         "title": "VersionInfo",
         "type": "object"
       },
+      "WidgetView": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/PinnedWidgetView"
+          },
+          {
+            "$ref": "#/components/schemas/SelectionWidgetView"
+          },
+          {
+            "$ref": "#/components/schemas/DeviceWidgetView"
+          },
+          {
+            "$ref": "#/components/schemas/RankingWidgetView"
+          }
+        ]
+      },
       "WindowView": {
         "description": "The time window a view covers and the zone to show it in (12.6, API-006).\n\nAttributes:\n    start: Window start (UTC, inclusive).\n    end: Window end (UTC, exclusive).\n    preset: The preset used, such as ``24h``; ``None`` for a custom range.\n    timezone: Display timezone (IANA name; TIME-002, TIME-003).\n    site_timezone: The subject's site zone, when it has one.",
         "properties": {
@@ -4420,6 +5424,557 @@
         "summary": "One collector's health",
         "tags": [
           "catalog"
+        ]
+      }
+    },
+    "/api/v1/dashboards": {
+      "get": {
+        "description": "List dashboards by name.",
+        "operationId": "dashboards_api_v1_dashboards_get",
+        "parameters": [
+          {
+            "description": "Page size, 1 to 500.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Page size, 1 to 500.",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`page.next_cursor` of the previous page.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`page.next_cursor` of the previous page.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Custom dashboards",
+        "tags": [
+          "dashboards"
+        ]
+      },
+      "post": {
+        "description": "Create a dashboard (SEC-018: audited with the administrator).",
+        "operationId": "create_api_v1_dashboards_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such dashboard"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "the name is taken, or a stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Create a dashboard (admin)",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_uuid}": {
+      "delete": {
+        "description": "Delete a dashboard; kiosk displays showing it say so at their next refresh.",
+        "operationId": "delete_api_v1_dashboards__dashboard_uuid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such dashboard"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Delete a dashboard (admin)",
+        "tags": [
+          "dashboards"
+        ]
+      },
+      "get": {
+        "description": "Return a dashboard's definition.",
+        "operationId": "dashboard_api_v1_dashboards__dashboard_uuid__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such dashboard"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "A dashboard's definition",
+        "tags": [
+          "dashboards"
+        ]
+      },
+      "patch": {
+        "description": "Change a dashboard, if nobody changed it since ``body.version`` (DB-003).",
+        "operationId": "change_api_v1_dashboards__dashboard_uuid__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such dashboard"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "the name is taken, or a stale version"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Change a dashboard (admin; carries its version)",
+        "tags": [
+          "dashboards"
+        ]
+      }
+    },
+    "/api/v1/dashboards/{dashboard_uuid}/view": {
+      "get": {
+        "description": "Return every widget resolved with current values, in one bounded answer.",
+        "operationId": "view_api_v1_dashboards__dashboard_uuid__view_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "dashboard_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Dashboard Uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Show this collector's (position's) values.",
+            "in": "query",
+            "name": "collector",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Show this collector's (position's) values.",
+              "title": "Collector"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such dashboard"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "A dashboard with current values",
+        "tags": [
+          "dashboards"
         ]
       }
     },

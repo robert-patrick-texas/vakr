@@ -202,6 +202,12 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/exports/interfaces/{interface_uuid}/history/{kind}` | operator | The graph as a CSV or JSON file (`format`); same parameters as the graph |
 | `GET /api/v1/exports/devices/{device_uuid}/history/reachability` | operator | Latency and loss as a file |
 | `GET /api/v1/exports/rankings/{utilization\|errors}` | operator | A ranking as a file |
+| `GET /api/v1/dashboards` | operator | Custom dashboards by name (name, description, widget count, refresh, last change, version); paged |
+| `POST /api/v1/dashboards` | admin | `{"name", "description", "refresh_s", "widgets": [...]}`: 201 with the definition; 409 for a taken name; 422 naming the field (such as `widgets[1].criteria.site_id`) for a bound or an interface, site, tag, or group that does not exist |
+| `GET /api/v1/dashboards/{dashboard_uuid}` | operator | The definition: widgets in the [dashboards](dashboards.md#the-widget-format) JSON, `version`, who changed it last |
+| `PATCH /api/v1/dashboards/{dashboard_uuid}` | admin | `{"version": N, ...}` with the fields that change; 409 `conflict` when someone saved since version N (reload and apply the change again) |
+| `DELETE /api/v1/dashboards/{dashboard_uuid}` | admin | 204; kiosk displays showing it say so at their next refresh |
+| `GET /api/v1/dashboards/{dashboard_uuid}/view` | operator | Every widget resolved with current values from one position (`collector`), in one bounded answer: pinned interfaces in order (retired or missing ones keep their place with a `note`), selection rows with `total` and `more`, rankings |
 
 **Graph parameters.** `range` is a preset: `1h`, `6h`, `24h` (the default), `7d`, `30d`, `90d`, or `400d`. Or give `start` and `end` in ISO 8601 with a timezone; a custom range is 1 minute to 400 days and may end at most 5 minutes in the future. `source` is `auto` (the default: rollups beyond 30 days), `native`, or `rollup`. `max_points` is 1 to 1,200 per series. `collector` asks for one position. A range out of bounds is refused with 422; nothing is silently widened (API-006). Each series says what it rests on: `resolutions` (the source and bucket width of each part of the window), `gaps`, `markers` (restart, discontinuity, baseline, partial, collector, over capacity, gap), and `truncated`. `window.timezone` is the display zone and `window.site_timezone` the subject's site zone. The [query services guide](../architecture/queries.md) explains the source choice and the markers.
 
@@ -213,7 +219,7 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 
 ## Not in this release
 
-These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), inventory imports, policies, dashboards and their publication, events, asynchronous exports (`/exports/{operation_uuid}`), the server-sent event stream, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`.
+These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), inventory imports, policies, dashboard publication (`POST /dashboards/{uuid}/publish`), events, asynchronous exports (`/exports/{operation_uuid}`), the server-sent event stream, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`.
 
 ## OpenAPI document
 

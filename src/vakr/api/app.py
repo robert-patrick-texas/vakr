@@ -34,6 +34,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from vakr.api import (
     routes_auth,
     routes_catalog,
+    routes_dashboards,
     routes_devices,
     routes_export,
     routes_health,
@@ -89,7 +90,7 @@ COMMON_ERRORS: Responses = {
 }
 _ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_interfaces,
             routes_identity, routes_catalog, routes_views, routes_export,
-            routes_operations)  # fmt: skip
+            routes_dashboards, routes_operations)  # fmt: skip
 
 
 def create_app(context: ApiContext | None = None, *, web: WebMount | None = None) -> FastAPI:

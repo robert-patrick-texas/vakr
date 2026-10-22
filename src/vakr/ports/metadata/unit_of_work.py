@@ -26,7 +26,8 @@ Safety:
 ``reviews`` and ``change_counter`` were added with the M3 inventory loader
 (port extension, E.26); the ``AuthRepositories`` base with M4 local
 authentication (E.12); the ``OperationRepositories`` base with M4 admin
-operations (E.32).
+operations (E.32); the ``DashboardRepositories`` base with M4 custom
+dashboards (E.31).
 
 Example:
     >>> sorted(n for n in dir(MetadataUnitOfWork) if not n.startswith("_"))[:3]
@@ -38,6 +39,7 @@ from types import TracebackType
 from typing import Protocol
 
 from vakr.ports.metadata.auth import AuthRepositories
+from vakr.ports.metadata.dashboards import DashboardRepositories
 from vakr.ports.metadata.operations import OperationRepositories
 from vakr.ports.metadata.repository import (
     AuditRepository,
@@ -52,7 +54,7 @@ from vakr.ports.metadata.repository import (
 from vakr.ports.metadata.reviews import IdentityReviewRepository
 
 
-class MetadataUnitOfWork(AuthRepositories, OperationRepositories, Protocol):
+class MetadataUnitOfWork(AuthRepositories, OperationRepositories, DashboardRepositories, Protocol):
     """A transaction spanning all metadata repositories, including authentication's."""
 
     @property

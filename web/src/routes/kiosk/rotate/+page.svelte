@@ -1,7 +1,8 @@
 <!--
 @component
-A kiosk rotation: several built-in dashboards in turn, `/kiosk/rotate?pages=overview,wan&every=60`
-(UI-013, DASH-T06; Appendix E.31, owner decision 2026-10-21).
+A kiosk rotation: several dashboards in turn, `/kiosk/rotate?pages=overview,wan&every=60`
+(UI-013, DASH-T06; Appendix E.31, owner decision 2026-10-21). Custom dashboards join as
+`dashboard:<uuid>` (UI-004); the dashboard list names them.
 
 Only the dashboard on screen is mounted, so only its reads poll, each at
 its own interval (or the kiosk's `refresh`). Five seconds before a switch
@@ -16,17 +17,18 @@ The address is read once: a rotation is configured, not navigated.
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { useQueryClient } from '@tanstack/svelte-query';
+	import { createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { announce } from '#lib/a11y/announce.svelte.ts';
 	import { aheadReads } from '#lib/kiosk/boards.ts';
 	import KioskBoardView from '#lib/kiosk/KioskBoardView.svelte';
 	import KioskNotice from '#lib/kiosk/KioskNotice.svelte';
+	import { dashboardsQuery } from '#lib/query/reads-dashboards.ts';
 	import {
-		BOARD_TITLES,
 		RotationSchedule,
 		kioskOptions,
+		pageTitle,
 		rotationOptions,
-		type KioskBoard,
+		type KioskPage,
 		type RotationPosition
 	} from '#lib/state/kiosk.ts';
 
@@ -34,11 +36,15 @@ The address is read once: a rotation is configured, not navigated.
 	const client = useQueryClient();
 	const rotation = rotationOptions(page.url.searchParams);
 	const options = kioskOptions(page.url.searchParams);
+	// Custom dashboards are named from the list (one cached read), for the "next" line.
+	const boards = createQuery(() => dashboardsQuery());
+	const names = $derived(new Map((boards.data?.rows ?? []).map((b) => [b.id, b.name])));
+	const titleOf = (p: KioskPage) => pageTitle(p, names);
 	const schedule =
 		'error' in rotation || 'error' in options
 			? null
-			: new RotationSchedule(rotation.pages, rotation.dwellMs);
-	let board = $state<KioskBoard | null>(schedule?.board ?? null);
+			: new RotationSchedule(rotation.pages, rotation.dwellMs, titleOf);
+	let board = $state<KioskPage | null>(schedule?.board ?? null);
 	let position = $state<RotationPosition | null>(schedule?.position() ?? null);
 	let paused = $state(false);
 	let fetchedAhead = false;
@@ -48,7 +54,7 @@ The address is read once: a rotation is configured, not navigated.
 	 *
 	 * @param next - The dashboard that comes next.
 	 */
-	function fetchAhead(next: KioskBoard): void {
+	function fetchAhead(next: KioskPage): void {
 		if ('error' in options) return;
 		for (const read of aheadReads(next, options)) void client.prefetchQuery(read);
 	}
@@ -62,7 +68,7 @@ The address is read once: a rotation is configured, not navigated.
 		if (schedule.update(Date.now(), counting)) {
 			board = schedule.board;
 			fetchedAhead = false;
-			announce(`Now showing ${BOARD_TITLES[schedule.board]}`);
+			announce(`Now showing ${titleOf(schedule.board)}`);
 		} else if (counting && !fetchedAhead && schedule.prefetchDue()) {
 			fetchedAhead = true;
 			fetchAhead(schedule.next);
@@ -79,13 +85,15 @@ The address is read once: a rotation is configured, not navigated.
 </script>
 
 <svelte:head>
-	<title>{board ? BOARD_TITLES[board] : 'Rotation'} · kiosk · vakr</title>
+	<title>{board ? titleOf(board) : 'Rotation'} · kiosk · vakr</title>
 </svelte:head>
 
 {#if 'error' in rotation}
 	<KioskNotice state="invalid" title="This rotation address has a mistake">
 		<p>{rotation.error}</p>
-		<p>Example: <code>/kiosk/rotate?pages=overview,wan,rankings&amp;every=60</code></p>
+		<p>
+			Example: <code>/kiosk/rotate?pages=overview,wan,dashboard:&lt;uuid&gt;&amp;every=60</code>
+		</p>
 	</KioskNotice>
 {:else if 'error' in options}
 	<KioskNotice state="invalid" title="This rotation address has a mistake">

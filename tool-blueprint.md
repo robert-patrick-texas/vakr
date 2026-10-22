@@ -1907,7 +1907,9 @@ GET    /api/v1/dashboards
 POST   /api/v1/dashboards
 GET    /api/v1/dashboards/{dashboard_uuid}
 PATCH  /api/v1/dashboards/{dashboard_uuid}
-POST   /api/v1/dashboards/{dashboard_uuid}/publish
+DELETE /api/v1/dashboards/{dashboard_uuid}            # M4 (E.31 #17)
+GET    /api/v1/dashboards/{dashboard_uuid}/view       # M4: every widget resolved (E.31 #17)
+POST   /api/v1/dashboards/{dashboard_uuid}/publish    # deferred with public dashboards (27.4)
 GET    /api/v1/collectors
 GET    /api/v1/collectors/{collector_uuid}/health
 GET    /api/v1/operations
@@ -4323,9 +4325,19 @@ The web UI is the static SvelteKit app of ADR-035 in `web/`, served by `vakr-api
 | Kiosk `window` (overview, rankings) | `15m` | `15m`, `1h`, `6h`, `24h` (E.28) |
 | Kiosk reads per refresh | overview, high priority, WAN: 1; rankings: 2 | DASH-T06; the high-priority page shows the first 100 interfaces, the WAN page the API's first page, rankings 10 rows each |
 | Rotation `every` (time each dashboard is shown) | 60 s | 15 s to 1 h, whole seconds (decision 15) |
-| Rotation `pages` | none; required | 2 to 8 names of `overview`, `high-priority`, `wan`, `rankings`, comma-separated; repeats allowed, so a dashboard can be shown more often; an unknown name is a full-screen error |
+| Rotation `pages` | none; required | 2 to 8 names of `overview`, `high-priority`, `wan`, `rankings`, or `dashboard:<uuid>` (decision 17), comma-separated; repeats allowed, so a dashboard can be shown more often; an unknown name is a full-screen error |
 | Rotation read-ahead | 5 s before a switch | the next dashboard's reads, made early instead of at the switch: no extra requests |
 | Kiosk token expiry warning | 7 days before | shown on the display, so an admin can hand over a new token in time |
+| Custom dashboards | at most 200 | constant (`vakr.domain.dashboards.MAX_DASHBOARDS`); one bounded list read (decision 17) |
+| Dashboard name / description / widget title | 1–80 / 0–500 / 1–80 characters | names unique, compared exactly; one line, trimmed |
+| Widgets per dashboard | at most 12, of which at most 2 rankings | rankings scan samples; two keep a `/view` within 12.9's 2 s at the default 15-minute window |
+| Pinned interfaces per widget | 1 to 50, distinct, in the admin's order | UI-004 |
+| Selection rows (interface or device selection) | 25 | 1 to 100; more matches are counted ("N more"), not listed |
+| Ranking widget rows / window | 10 / `15m` | 1 to 25 / `15m`, `1h`, `6h`, `24h` (E.28) |
+| Dashboard `refresh_s` | 60 s | 15 s to 1 h; a kiosk `refresh` overrides it |
+| Graph cards on a dashboard page | at most 12, first live pinned interfaces in order | the UI-016 bound above, page-wide; 24-hour cards, lazy |
+| Requests per dashboard refresh | 1 (`GET /api/v1/dashboards/{uuid}/view`) | plus the lazy graph cards (each at the 60 s graph interval); DASH-T06 |
+| Widget schema | 1 | stored beside the widgets; older JSON is upgraded on read, newer JSON refused (DASH-007, decision 17) |
 
 Decisions taken with the M4 web UI:
 
@@ -4345,6 +4357,13 @@ Decisions taken with the M4 web UI:
 14. **Kiosk mode (UI-013).** `/kiosk/overview`, `/kiosk/high-priority`, `/kiosk/wan`, and `/kiosk/rankings` show the built-in dashboards chrome-less: no navigation, no sign-in or sign-out, no admin links, larger type, and rows and names as plain text (a stray tap must not navigate a wall display away). They render the same tables and panels as the normal pages; a kiosk context turns their links into text. Each shows "Data as of HH:MM:SS · refreshes every N s". A refresh keeps the answer on screen and updates rows in place (no loading notice, no flashing, focus kept); a failed refresh keeps the rows with the pages' stale note (UI-015). Displays are set up at `/kiosk/setup` by pasting the token once (E.30 #17); there is deliberately no `#token=` or query form, so a token never lands in history, bookmarks, or a synced profile. A 401 at any request (the token expired or was revoked) drops the data and fills the screen with what to do; under `/kiosk` the app never redirects to the sign-in page. A kiosk principal is an operator (E.12): it can read every page an operator can, if someone navigates there. A value out of bounds or an unknown dashboard is a full-screen error, never a silent fallback, because a display is configured once and then left.
 15. **Dashboard rotation (owner decision 2026-10-21).** `/kiosk/rotate?pages=overview,wan,rankings&every=60` shows the named dashboards in turn. Only the dashboard on screen is mounted, so only its reads poll, each at its own interval (or the kiosk's `refresh`); rotation adds no load beyond the visible page (DASH-T06). Five seconds before a switch the next dashboard's reads are made ahead, so it appears with its data instead of a loading notice; they are the reads it would make at the switch, so the total is unchanged. The switch replaces one dashboard with the next in one update, without a transition, so nothing slides or flashes and `prefers-reduced-motion` has nothing to reduce. The header says "2 of 3 · next: WAN circuits in 40 s" (not a live region; the switch itself is announced politely). Rotation counts only time the tab is visible, and a Pause rotation button stops it. The freshness line, the stale note, and the signed-out screen behave on every rotated dashboard exactly as on a single one.
 16. **Manual rediscovery in the web UI (DISC-003, 2026-10-21).** The device page shows admins a "Rediscover now" button with the device's newest operation: queued, running, or how it ended (the counts of E.32, or the reason). Operators never see it, and the API refuses them anyway. While the operation is active the button is disabled and the page polls it every 2 s; when it ends, the device's data is refreshed. The Admin page lists the newest 25 operations.
+17. **Custom dashboards (UI-004, DASH-006, DASH-007, DASH-010; 2026-10-21).** Admins define dashboards; everyone signed in, kiosk displays included, views them.
+    * **The record.** A metadata record (migration `0005_dashboards`, metadata schema 5, `DashboardRepository`, contract `tests/contract/contract_dashboards.py`): UUID, unique name, description, `refresh_s`, an ordered list of widgets, `managed_by` (META-008), `visibility`, `widget_schema`, created and updated by and at, and `version` for optimistic concurrency (DB-003: a change based on an older version is 409, never a silent overwrite). Dashboards are presentation, not inventory, so DELETE removes the row (no archive); the audit record keeps the name. Edits never move the collection change counter, so the collector never reloads its inventory for one.
+    * **Widgets (schema 1).** `pinned_interfaces` (UI-004: up to 50 interfaces across devices, in the admin's order, optionally with graph cards), `interface_selection` (site, tag, group, provider, WAN, or interest filters; at least one), `device_selection` (site, tag, or group; status order), and `ranking` (top utilization or top errors within the same filters; the ranking queries already accept that scope, so it costs what the rankings page costs). Widgets name inventory by UUID only, so a rename never breaks a dashboard. A write that names an interface, site, tag, or group that does not exist is 422 with the widget's field path. A pinned interface that is later retired, or that a restore no longer holds, keeps its place with "retired" or "no longer exists" and no values; it never disappears silently and never fails the dashboard.
+    * **Schema upgrades (DASH-007).** Widgets are stored as JSON beside the schema that wrote them. `vakr.domain.dashboard_upgrades.UPGRADES[n]` turns schema-*n* JSON into *n + 1*; reading older JSON applies the steps and the next write stores the current schema. JSON from a newer schema than the release knows is refused as unusable, not guessed at.
+    * **One request per refresh (DASH-T06).** `GET /api/v1/dashboards/{uuid}/view` resolves every widget server-side with the services the built-in pages use, for one position (MPOS-008), within the bounds above; the page adds only its lazy graph cards. The page refreshes at the dashboard's `refresh_s`.
+    * **Kiosk.** `/kiosk/dashboard/{uuid}` shows a custom dashboard chrome-less, with decision 14's freshness, stale, and signed-out behaviour; rotations accept `dashboard:{uuid}` entries (decision 15's bounds unchanged) and read a custom dashboard's `/view` ahead like a built-in one's reads. A deleted dashboard, or an entry that is not `dashboard:` plus a UUID, takes the whole screen. The kiosk chooser lists custom dashboards.
+    * **Gaps recorded.** File-managed dashboards (`/etc/vakr/dashboards.toml`, 11.1, META-008): every dashboard is API-managed in this release, and the stored `managed_by` lets file-managed ones arrive without a migration. Public publication (`POST /api/v1/dashboards/{uuid}/publish`, 14; UI-007) stays deferred with public dashboards (27.4), so `visibility` is always `private` and the route is not offered. No dashboard CLI: admins use the web UI or the API (the socket's admins included).
 
 ### E.32 Admin operations (M4)
 

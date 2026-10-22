@@ -78,6 +78,8 @@ Set the display up once with that profile (for example by opening `/kiosk/setup`
 
 For example, `/kiosk/rankings?window=1h&refresh=120`. A value outside these bounds, or an unknown dashboard name, fills the screen with what is allowed instead of showing something else.
 
+A custom dashboard ([dashboards](dashboards.md)) is at `/kiosk/dashboard/<uuid>`; its page in vakr shows that address. Without `refresh` it keeps the interval the admin set on it.
+
 ## Rotating through dashboards
 
 ```text
@@ -86,7 +88,7 @@ For example, `/kiosk/rankings?window=1h&refresh=120`. A value outside these boun
 
 | Option | Meaning | Allowed |
 |---|---|---|
-| `pages` | The dashboards, in order, separated by commas. A dashboard may appear more than once, to show it more often: `overview,wan,overview,rankings`. | 2 to 8 names of `overview`, `high-priority`, `wan`, `rankings` |
+| `pages` | The dashboards, in order, separated by commas. A dashboard may appear more than once, to show it more often: `overview,wan,overview,rankings`. | 2 to 8 names of `overview`, `high-priority`, `wan`, `rankings`, or `dashboard:<uuid>` for a custom dashboard |
 | `every` | Seconds each dashboard is shown. | 15 to 3600; 60 by default |
 | `refresh`, `window` | As above, for every dashboard of the rotation. | as above |
 

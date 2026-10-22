@@ -11,7 +11,7 @@ Example: `<KioskWan settings={{ refreshMs: null, window: '15m' }} />`
 <script lang="ts">
 	import { createQuery } from '@tanstack/svelte-query';
 	import { wanRead, type BoardSettings } from './boards.ts';
-	import type { RotationPosition } from '#lib/state/kiosk.ts';
+	import { BOARD_TITLES, type RotationPosition } from '#lib/state/kiosk.ts';
 	import { pageState } from '#lib/state/page-state.ts';
 	import PageStatus from '#lib/components/PageStatus.svelte';
 	import WanTable from '#lib/components/WanTable.svelte';
@@ -40,7 +40,7 @@ Example: `<KioskWan settings={{ refreshMs: null, window: '15m' }} />`
 </script>
 
 <KioskHeader
-	board="wan"
+	title={BOARD_TITLES.wan}
 	updatedAt={query.dataUpdatedAt}
 	refreshMs={wanRead(settings).refetchInterval}
 	{position}

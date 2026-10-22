@@ -5,7 +5,7 @@
  * the overview (one request), the high-priority interfaces (one page of
  * 100), the WAN circuits (one page), or the two rankings (10 rows each).
  * Each refresh therefore makes one or two requests, whatever the fleet
- * size. A kiosk `refresh` overrides each read's E.31 interval; otherwise
+ * size. A custom dashboard (`dashboard:<uuid>`) reads its one `/view`. A kiosk `refresh` overrides each read's E.31 interval; otherwise
  * every dashboard keeps its own. The rotation uses the same options to
  * fetch the next dashboard just before it is shown, so the first read
  * happens a few seconds early rather than twice.
@@ -25,7 +25,13 @@ import {
 	utilizationRankingQuery,
 	wanQuery
 } from '#lib/query/reads.ts';
-import type { KioskBoard, KioskWindow } from '#lib/state/kiosk.ts';
+import { dashboardViewQuery } from '#lib/query/reads-dashboards.ts';
+import {
+	dashboardIdOf,
+	type KioskBoard,
+	type KioskPage,
+	type KioskWindow
+} from '#lib/state/kiosk.ts';
 
 /** Rows of each kiosk ranking. */
 export const KIOSK_RANKING_ROWS = 10;
@@ -110,12 +116,17 @@ export interface AheadRead {
 /**
  * The reads to make just before a dashboard is shown, so it appears with its data.
  *
- * @param board - The dashboard that comes next.
+ * @param board - The dashboard that comes next: built-in, or `dashboard:<uuid>`.
  * @param s - Kiosk settings.
- * @returns Keys and requests of `boardReads`.
+ * @returns Keys and requests of `boardReads`, or the custom dashboard's one view.
  */
-export function aheadReads(board: KioskBoard, s: BoardSettings): AheadRead[] {
-	return boardReads(board, s).map((r) => ({ queryKey: r.queryKey, queryFn: r.queryFn }));
+export function aheadReads(board: KioskPage, s: BoardSettings): AheadRead[] {
+	const custom = dashboardIdOf(board);
+	const reads =
+		custom === null
+			? boardReads(board as KioskBoard, s)
+			: [dashboardViewQuery(custom, s.refreshMs)];
+	return reads.map((r) => ({ queryKey: r.queryKey, queryFn: r.queryFn }));
 }
 
 /**

@@ -57,7 +57,14 @@ SECURITY_SCHEMES = {
         "description": "Set by POST /api/v1/auth/kiosk over HTTPS (vakr_kiosk over loopback "
         "HTTP) for a kiosk display: operator role, read-only. A session cookie wins over it.",
     },
+    "replicationToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A replication token (vkr_...) this node issued for its partner "
+        "(sudo vakr replication token create): /api/v1/replication/* only (MPOS-006).",
+    },
 }
+REPLICATION_PREFIX = "/api/v1/replication/"
 
 
 def describe_security(
@@ -86,6 +93,8 @@ def describe_security(
             operation["description"] = text.split("\n\nArgs:", 1)[0].strip()
             if path in open_paths or not path.startswith(prefix):
                 operation["security"] = []
+            elif path.startswith(REPLICATION_PREFIX):
+                operation["security"] = [{"replicationToken": []}]
     return document
 
 

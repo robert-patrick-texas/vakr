@@ -95,6 +95,8 @@ Collector overload is the collector's own state (`vakr_collector_state{state="ov
 | `vakr_sessions` | gauge | none | Stored sign-in sessions, expired ones not yet purged included. |
 | `vakr_kiosk_tokens` | gauge | none | Kiosk tokens, expired ones not yet purged included. |
 | `vakr_users` | gauge | none | Local web and API accounts. |
+| `vakr_replication_metadata_age_seconds` | gauge | none | Age of a peer's newest successful metadata pull (E.13); absent on a primary. |
+| `vakr_replication_metadata_pulls_total` | counter | `result` | A peer's metadata pulls by result, since its pull record began. |
 | `vakr_database_size_bytes` | gauge | `database` (metadata, telemetry), `file` (main, wal) | Size of a database file. |
 | `vakr_database_schema_version` | gauge | `database` (metadata, telemetry) | Highest applied schema migration. |
 | `vakr_rollup_lag_seconds` | gauge | none | How far the 15-minute rollups are behind the newest complete native data. |

@@ -57,7 +57,13 @@ class VakrTui(App[None]):
     ]
 
     def __init__(
-        self, source: StatusSource, *, refresh_s: float, zone: str = "", data: str = ""
+        self,
+        source: StatusSource,
+        *,
+        refresh_s: float,
+        zone: str = "",
+        data: str = "",
+        node: str = "",
     ) -> None:
         """Bind the app to its data source.
 
@@ -66,6 +72,7 @@ class VakrTui(App[None]):
             refresh_s: Seconds between automatic refreshes (E.29 bounds).
             zone: Display timezone name; empty means the host's (TIME-002).
             data: The data path for the header, such as ``"vakr-api socket"``; empty to omit.
+            node: This node's position and role (MPOS-003), such as ``"west (peer of ...)"``.
 
         Returns:
             None
@@ -78,6 +85,7 @@ class VakrTui(App[None]):
         self.refresh_s = refresh_s
         self.zone = zone
         self.data = data
+        self.node = node
 
     def on_mount(self) -> None:
         """Open the device list.
@@ -91,7 +99,8 @@ class VakrTui(App[None]):
         Raises:
             None
         """
-        title = f"vakr {get_version()}" + (f" · data: {self.data}" if self.data else "")
+        title = f"vakr {get_version()}" + (f" · {self.node}" if self.node else "")
+        title += f" · data: {self.data}" if self.data else ""
         self.push_screen(DeviceListScreen(self.source, self.refresh_s, self.zone, title))
 
     def action_help(self) -> None:

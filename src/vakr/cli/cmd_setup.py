@@ -34,6 +34,7 @@ import sys
 
 from vakr.cli.common import SubParsers
 from vakr.cli.inventory_support import EXIT_INVALID, EXIT_OK, guarded, require_store
+from vakr.cli.setup_node import add_arguments, apply_node_settings
 from vakr.cli.user_support import (
     cli_actor,
     ensure_auth_key,
@@ -41,6 +42,8 @@ from vakr.cli.user_support import (
     prompt_new_password,
     user_admin,
 )
+from vakr.config.loader import ConfigError, load_effective_config
+from vakr.config.node import NodeSettings, node_settings
 from vakr.domain.users import Role, canonical_username
 from vakr.paths import InstallPaths
 
@@ -67,7 +70,79 @@ def register(subparsers: SubParsers) -> None:
         action="store_true",
         help="create another admin even though one exists",
     )
-    parser.set_defaults(func=run_setup)
+    add_arguments(parser)
+    parser.set_defaults(func=run_setup_entry)
+
+
+def _current_node(paths: InstallPaths) -> NodeSettings:
+    """Return the node settings in force, a primary when the configuration is unreadable.
+
+    Args:
+        paths: The install layout.
+
+    Returns:
+        NodeSettings: The settings.
+
+    Raises:
+        None
+    """
+    try:
+        return node_settings(load_effective_config(paths.config_dir))
+    except ConfigError:
+        return NodeSettings()
+
+
+def run_setup_entry(args: argparse.Namespace) -> int:
+    """Write the node settings as root, then create the first admin unless this is a peer.
+
+    Args:
+        args: ``setup`` arguments, the node flags included.
+
+    Returns:
+        int: Exit status.
+
+    Raises:
+        None
+    """
+    paths = InstallPaths.from_environment()
+    try:
+        written = apply_node_settings(args, paths.config_dir / "config.toml")
+    except (ValueError, EOFError) as exc:
+        print(f"vakr: {exc or 'input ended'}", file=sys.stderr)
+        return EXIT_INVALID
+    if written is not None:
+        print(f"Set node.role = {written.role}, node.position = {written.position or '(none)'}"
+              f"{f', node.primary_url = {written.primary_url}' if written.primary_url else ''}; "
+              "restart vakr.target to apply.")  # fmt: skip
+    node = written or _current_node(paths)
+    if node.is_peer:
+        print("\n".join(peer_steps(node, paths)))
+        return EXIT_OK
+    return run_setup(args)
+
+
+def peer_steps(node: NodeSettings, paths: InstallPaths) -> list[str]:
+    """Say what a peer needs next: accounts and inventory come from the primary.
+
+    Args:
+        node: The peer's settings.
+        paths: The install layout.
+
+    Returns:
+        list[str]: The lines.
+
+    Raises:
+        None
+    """
+    token = paths.secrets_dir / "replication.token"
+    return [
+        f"This node is a peer of {node.primary_url}: its accounts, inventory, and dashboards",
+        "come from the primary (MPOS-003), so setup creates no admin here. Next:",
+        f"  1. On the primary: sudo vakr replication token create {node.position or 'this-peer'}",
+        f"  2. Here: put that token in {token} (one line, mode 0640, owner root:vakr)",
+        "  3. Here: sudo systemctl restart vakr.target, then check with `sudo vakr check health`.",
+        "See docs/operations/two-positions.md.",
+    ]
 
 
 @guarded

@@ -59,6 +59,7 @@ class MemoryUnitOfWork:
         login_failures: Login throttle state.
         sessions: Login sessions.
         kiosk_tokens: Kiosk display tokens.
+        replication_tokens: Partner nodes' pull tokens (E.13).
         dashboards: Custom dashboards.
         operations: Admin operations (E.32).
     """
@@ -93,6 +94,7 @@ class MemoryUnitOfWork:
         self.login_failures = MemoryLoginFailureRepository(self._tx)
         self.sessions = MemorySessionRepository(self._tx)
         self.kiosk_tokens = MemoryKioskTokenRepository(self._tx)
+        self.replication_tokens = MemoryKioskTokenRepository(self._tx, "replication_token")
         self.dashboards = MemoryDashboardRepository(self._tx)
         self.operations = MemoryOperationRepository(self._tx)
 

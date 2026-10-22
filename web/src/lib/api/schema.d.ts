@@ -863,6 +863,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/replication/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One page of replicated metadata (replication token)
+         * @description Return one page of one replicated table.
+         */
+        get: operations["page_api_v1_replication_metadata_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/replication/metadata/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Replicated metadata digest (replication token)
+         * @description Describe the replicated metadata now.
+         */
+        get: operations["state_api_v1_replication_metadata_state_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/search": {
         parameters: {
             query?: never;
@@ -3606,6 +3646,8 @@ export interface components {
          *     Attributes:
          *         version: The vakr release.
          *         api: The API major version, ``v1`` (API-004).
+         *         role: ``primary`` or ``peer`` (MPOS-003); a single node is a primary.
+         *         position: This node's vantage-point label, such as ``east``; may be empty.
          */
         VersionInfo: {
             /**
@@ -3613,6 +3655,16 @@ export interface components {
              * @default v1
              */
             api: string;
+            /**
+             * Position
+             * @default
+             */
+            position: string;
+            /**
+             * Role
+             * @default primary
+             */
+            role: string;
             /** Version */
             version: string;
         };
@@ -6824,6 +6876,122 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RankingView_UtilizationRow_"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    page_api_v1_replication_metadata_get: {
+        parameters: {
+            query: {
+                kind: string;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    state_api_v1_replication_metadata_state_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description not signed in */

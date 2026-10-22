@@ -29,6 +29,7 @@ from vakr.metrics.catalog_spec import (
 from vakr.metrics.exposition import Kind
 
 C, G, S = Kind.COUNTER, Kind.GAUGE, Kind.SUMMARY
+PULL_RESULTS = frozenset({"applied", "unchanged", "failed"})
 _PROC = ("process", PROCESSES)
 
 API_FAMILIES = (
@@ -70,6 +71,11 @@ API_FAMILIES = (
     spec("vakr_sessions", G, "Stored sign-in sessions, expired ones not yet purged included."),
     spec("vakr_kiosk_tokens", G, "Kiosk tokens, expired ones not yet purged included."),
     spec("vakr_users", G, "Local web and API accounts."),
+    spec("vakr_replication_metadata_age_seconds", G,
+         "Age of a peer's newest successful metadata pull (E.13); absent on a primary."),
+    spec("vakr_replication_metadata_pulls_total", C,
+         "A peer's metadata pulls by result, since its pull record began.",
+         ("result", PULL_RESULTS)),
     spec("vakr_database_size_bytes", G, "Size of a database file.",
          ("database", DATABASES), ("file", DB_FILES)),
     spec("vakr_database_schema_version", G, "Highest applied schema migration.",

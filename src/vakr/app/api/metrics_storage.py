@@ -134,6 +134,31 @@ def storage_families(paths: InstallPaths) -> list[Family]:
             build("vakr_database_schema_version", versions), *perf]  # fmt: skip
 
 
+def replication_families(paths: InstallPaths) -> list[Family]:
+    """Read a peer's metadata pull record (MPOS-006); nothing on a node that never pulled.
+
+    Args:
+        paths: Install layout; the record is under the state directory.
+
+    Returns:
+        list[Family]: The age (only after a success) and the pull counts.
+
+    Raises:
+        None
+    """
+    from datetime import UTC, datetime
+
+    from vakr.replication import status
+
+    record = status.read_status(paths.state_dir / status.FILE)
+    if record is None:
+        return []
+    age = record.success_age_s(datetime.now(UTC))
+    return [build("vakr_replication_metadata_age_seconds", [((), age)]),
+            build("vakr_replication_metadata_pulls_total",
+                  [((k,), float(v)) for k, v in sorted(record.pulls.items())])]  # fmt: skip
+
+
 def api_metrics(
     paths: InstallPaths, metadata: MetadataUnitOfWorkFactory, overview: OverviewQueries
 ) -> MetricsService:
@@ -150,5 +175,6 @@ def api_metrics(
     Raises:
         None
     """
-    readers = (partial(state_families, metadata, overview), partial(storage_families, paths))
+    readers = (partial(state_families, metadata, overview), partial(storage_families, paths),
+               partial(replication_families, paths))  # fmt: skip
     return MetricsService(snapshot_path=paths.run_dir / SNAPSHOT_FILE, readers=readers)

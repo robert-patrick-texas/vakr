@@ -63,10 +63,13 @@ def test_api008_document_describes_versions_security_and_errors() -> None:
     assert document["info"]["version"] == "1"
     assert get_version() not in json.dumps(document["info"])
     schemes = set(document["components"]["securitySchemes"])
-    assert schemes == {"sessionCookie", "kioskToken", "kioskCookie"}
+    assert schemes == {"sessionCookie", "kioskToken", "kioskCookie", "replicationToken"}
     assert all(p.startswith("/api/v1/") for p in document["paths"])
     for path, operations in document["paths"].items():
         for operation in operations.values():
+            if path.startswith("/api/v1/replication/"):  # MPOS-006: the replication token only
+                assert operation["security"] == [{"replicationToken": []}], path
+                continue
             assert ("security" in operation) == (path in ANONYMOUS_PATHS), path
             assert "Args:" not in operation.get("description", "")
             if "401" in operation["responses"]:

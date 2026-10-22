@@ -26,6 +26,7 @@ from vakr.adapters.sqlite.metadata.interfaces import SqliteInterfaceRepository
 from vakr.adapters.sqlite.metadata.kiosk import SqliteKioskTokenRepository
 from vakr.adapters.sqlite.metadata.login_failures import SqliteLoginFailureRepository
 from vakr.adapters.sqlite.metadata.operations import SqliteOperationRepository
+from vakr.adapters.sqlite.metadata.replica import SqliteMetadataReplica
 from vakr.adapters.sqlite.metadata.reviews import SqliteReviewRepository, change_counter
 from vakr.adapters.sqlite.metadata.sessions import SqliteSessionRepository
 from vakr.adapters.sqlite.metadata.specs_interface import INTERFACE
@@ -59,6 +60,8 @@ class SqliteUnitOfWork:
         login_failures: Login throttle state.
         sessions: Login sessions.
         kiosk_tokens: Kiosk display tokens.
+        replication_tokens: Partner nodes' pull tokens (E.13).
+        replica: The replicated tables, exported and applied (MPOS-003).
         dashboards: Custom dashboards.
         operations: Admin operations (E.32).
     """
@@ -94,6 +97,8 @@ class SqliteUnitOfWork:
         self.login_failures = SqliteLoginFailureRepository(self._tx)
         self.sessions = SqliteSessionRepository(self._tx)
         self.kiosk_tokens = SqliteKioskTokenRepository(self._tx)
+        self.replication_tokens = SqliteKioskTokenRepository(self._tx, "replication_token")
+        self.replica = SqliteMetadataReplica(self._tx)
         self.dashboards = SqliteDashboardRepository(self._tx)
         self.operations = SqliteOperationRepository(self._tx)
 

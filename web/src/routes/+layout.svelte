@@ -30,6 +30,7 @@ full screen (UI-013), so a wall display never lands on a sign-in form.
 	const client = createQueryClient();
 	let problem = $state<string | null>(null);
 	let version = $state<string | null>(null);
+	let node = $state<string | null>(null);
 	const onLogin = $derived(page.url.pathname === '/login');
 	const kiosk = $derived(page.url.pathname === '/kiosk' || page.url.pathname.startsWith('/kiosk/'));
 	let checked = false;
@@ -60,9 +61,13 @@ full screen (UI-013), so a wall display never lands on a sign-in form.
 	 */
 	async function fetchVersion(): Promise<void> {
 		try {
-			version = (await unwrap(api.GET('/api/v1/version'))).version;
+			const info = await unwrap(api.GET('/api/v1/version'));
+			version = info.version;
+			// A position names this node in a two-position pair (MPOS-003).
+			node = info.position ? `${info.position} (${info.role})` : null;
 		} catch {
 			version = null;
+			node = null;
 		}
 	}
 
@@ -91,7 +96,7 @@ full screen (UI-013), so a wall display never lands on a sign-in form.
 <QueryClientProvider {client}>
 	<a class="skip" href="#main">Skip to content</a>
 	{#if session.status === 'signed-in' && !onLogin && !kiosk}
-		<AppNav current={page.url.pathname} {version} />
+		<AppNav current={page.url.pathname} {version} {node} />
 	{/if}
 	<main id="main" tabindex="-1" class:wide={kiosk}>
 		{#if kiosk}

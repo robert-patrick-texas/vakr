@@ -30,6 +30,7 @@ from vakr.auth.login import LoginService
 from vakr.auth.passwords import Passwords
 from vakr.auth.principal import Principal
 from vakr.auth.purge import PurgeCounts, purge_expired
+from vakr.auth.replication_tokens import ReplicationTokenService
 from vakr.auth.sessions import SessionService
 from vakr.auth.settings import AuthSettings
 from vakr.auth.tokens import token_kind
@@ -50,6 +51,7 @@ class AuthServices:
         login: Password login.
         sessions: Session lifecycle.
         kiosk: Kiosk tokens.
+        replication: Replication tokens for a partner node (E.13).
         users: User administration.
         csrf: CSRF tokens.
     """
@@ -63,6 +65,7 @@ class AuthServices:
     kiosk: KioskService
     users: UserAdmin
     csrf: CsrfGuard
+    replication: ReplicationTokenService
 
     def authenticate(self, token: Secret) -> Principal | None:
         """Resolve a session cookie or kiosk token to its principal.
@@ -136,4 +139,5 @@ def build_auth_services(
         kiosk=KioskService(uow_factory, clock, chosen),
         users=UserAdmin(uow_factory, clock, hashing, chosen),
         csrf=CsrfGuard(keys.csrf),
+        replication=ReplicationTokenService(uow_factory, clock),
     )

@@ -36,6 +36,7 @@ from vakr.cli.common import SubParsers
 from vakr.cli.status_source import open_source
 from vakr.cli.status_stores import NoDataYetError
 from vakr.client.status import SocketStatusSource
+from vakr.config.node import node_settings
 from vakr.domain.errors import StorageError
 from vakr.paths import InstallPaths
 from vakr.ports.migrations import MigrationError
@@ -142,7 +143,9 @@ def run(args: argparse.Namespace) -> int:
             data.source.check()  # 13.4: say at once that the API is unusable, not after a refresh
         configured = min(max(refresh_from_config(data.config), MIN_REFRESH_S), MAX_REFRESH_S)
         zone = str(data.config.get("time.timezone", ""))
-        VakrTui(data.source, refresh_s=args.refresh or configured, zone=zone, data=data.label).run()
+        node = node_settings(data.config).header()
+        VakrTui(data.source, refresh_s=args.refresh or configured, zone=zone, data=data.label,
+                node=node).run()  # fmt: skip
     except SourceUnavailableError as exc:
         print(f"{COMMAND}: {exc}", file=sys.stderr)
         return EXIT_CANNOT_START

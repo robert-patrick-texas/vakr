@@ -233,7 +233,15 @@ def open_inventory(context: InventoryContext) -> InventorySource:
     Raises:
         StorageError: If the implementation cannot reach the metadata database.
     """
-    return INVENTORY_FACTORY(context)
+    from vakr.app.collector.replication_loop import PeerInventory
+    from vakr.config.node import node_settings
+
+    source = INVENTORY_FACTORY(context)
+    # On a peer identity belongs to the primary: discovery must not write (ADR-024).
+    if node_settings(context.config).is_peer:
+        wrapped: InventorySource = PeerInventory(source)  # ty: ignore[invalid-assignment]
+        return wrapped
+    return source
 
 
 type InventoryReload = Callable[[InventorySource, EffectiveConfig, Path], None]

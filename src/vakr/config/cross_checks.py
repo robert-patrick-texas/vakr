@@ -26,6 +26,7 @@ from vakr.api.settings import api_problems
 from vakr.auth.settings import auth_problems
 from vakr.config.keyword_check import keyword_problems
 from vakr.config.loader import EffectiveConfig
+from vakr.config.node import node_problems
 from vakr.ingest.settings import spool_problems
 from vakr.inventory.settings import inventory_problems
 from vakr.scheduler.settings import scheduler_problems
@@ -37,6 +38,7 @@ RULES: tuple[tuple[str, Callable[[EffectiveConfig], list[str]]], ...] = (
     ("invalid inventory file", inventory_problems),
     ("inconsistent auth settings", auth_problems),
     ("invalid api settings", api_problems),
+    ("invalid node settings", node_problems),
 )
 """``(what is wrong, rule)`` pairs, run in order; the first failing rule is reported."""
 

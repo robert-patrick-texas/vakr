@@ -50,7 +50,8 @@ def test_mig002_a_database_before_dashboards_upgrades_with_data(tmp_path: Path) 
     """
     db = tmp_path / METADATA_FILE
     full = metadata_family()
-    before = [m for m in full.migrations if m.name != "dashboards"]
+    cut = next(i for i, m in enumerate(full.migrations) if m.name == "dashboards")
+    before = list(full.migrations[:cut])  # every migration after it builds on it
     old = SchemaFamily(full.name, full.application_id, tuple(before))
     SqliteMigrationManager(db, old).migrate()
     store = SqliteMetadataStore(db, family=old)
@@ -61,7 +62,7 @@ def test_mig002_a_database_before_dashboards_upgrades_with_data(tmp_path: Path) 
         uow.commit()
     store.close()
     applied = metadata_migrations(db).migrate()
-    assert [m.name for m in applied] == ["dashboards"]
+    assert next(m.name for m in applied) == "dashboards"  # later schemas follow it
     upgraded = SqliteMetadataStore(db)
     with sqlite_uow_factory(upgraded)() as uow:
         assert uow.devices.get(device.id) == device

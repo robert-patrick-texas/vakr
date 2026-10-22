@@ -79,8 +79,9 @@ There are two roles ([users](users.md)). Every endpoint checks the caller's role
 | A signed-in user | the session cookie from `POST /api/v1/auth/login` | The account's role |
 | A kiosk display | the kiosk cookie from `POST /api/v1/auth/kiosk`, or `Authorization: Bearer vkk_...` | operator, always |
 | A process on the node | the Unix socket | By account: root and members of `vakr-admin` are admin, members of `vakr-view` and `vakr` are operator, anyone else is refused on every endpoint |
+| The partner node of a two-position pair | `Authorization: Bearer vkr_...`, a replication token this node issued (`sudo vakr replication token create`) | none: only `/api/v1/replication/*`, and 403 `replication_only` everywhere else ([two positions](two-positions.md)) |
 
-Operators read everything the API offers. Admins can also change things; in this release that is the identity-review decision. An anonymous request to a protected endpoint gets 401, and a role that lacks the permission gets 403. Both use the error envelope below.
+Operators read everything the API offers. Admins can also change things; in this release that is the identity-review decision. On a peer node every change but sign-in and kiosk tokens is refused with 409 `peer_read_only`, naming the primary ([two positions](two-positions.md#what-a-peer-refuses)). An anonymous request to a protected endpoint gets 401, and a role that lacks the permission gets 403. Both use the error envelope below.
 
 ## The local socket
 
@@ -203,6 +204,8 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/exports/interfaces/{interface_uuid}/history/{kind}` | operator | The graph as a CSV or JSON file (`format`); same parameters as the graph |
 | `GET /api/v1/exports/devices/{device_uuid}/history/reachability` | operator | Latency and loss as a file |
 | `GET /api/v1/exports/rankings/{utilization\|errors}` | operator | A ranking as a file |
+| `GET /api/v1/replication/metadata/state` | replication token | The replicated metadata's schema version, digest, and row counts, and this node's role and position (MPOS-003) |
+| `GET /api/v1/replication/metadata?kind=&cursor=&limit=` | replication token | One page (1 to 1,000 rows) of one replicated table, `kind`, in key order; pages carry password hashes, so nothing else may read them |
 | `GET /api/v1/dashboards` | operator | Custom dashboards by name (name, description, widget count, refresh, last change, version); paged |
 | `POST /api/v1/dashboards` | admin | `{"name", "description", "refresh_s", "widgets": [...]}`: 201 with the definition; 409 for a taken name; 422 naming the field (such as `widgets[1].criteria.site_id`) for a bound or an interface, site, tag, or group that does not exist |
 | `GET /api/v1/dashboards/{dashboard_uuid}` | operator | The definition: widgets in the [dashboards](dashboards.md#the-widget-format) JSON, `version`, who changed it last |

@@ -16,7 +16,7 @@ added with M4 local authentication (port extension, E.12).
 
 Example:
     >>> sorted(n for n in dir(AuthRepositories) if not n.startswith("_"))
-    ['kiosk_tokens', 'login_failures', 'sessions', 'users']
+    ['kiosk_tokens', 'login_failures', 'replication_tokens', 'sessions', 'users']
 """
 
 from typing import Protocol
@@ -76,6 +76,21 @@ class AuthRepositories(Protocol):
     @property
     def kiosk_tokens(self) -> KioskTokenRepository:
         """Kiosk tokens in this unit of work.
+
+        Args:
+            None
+
+        Returns:
+            KioskTokenRepository: The repository.
+
+        Raises:
+            None
+        """
+        ...
+
+    @property
+    def replication_tokens(self) -> KioskTokenRepository:
+        """Replication tokens, which share the kiosk record shape (``vakr.domain.replication``).
 
         Args:
             None

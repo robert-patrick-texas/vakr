@@ -49,6 +49,7 @@ from vakr.cli.inventory_support import (
     open_store,
     require_store,
 )
+from vakr.cli.node_guard import refused_on_peer
 from vakr.inventory.apply import apply_inventory
 from vakr.inventory.errors import InventoryError, render_issues
 from vakr.inventory.plan import make_plan
@@ -192,6 +193,7 @@ def run_plan(args: argparse.Namespace) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_apply(args: argparse.Namespace) -> int:
     """Apply the file in one transaction, with audit (META-008, SEC-018).
 

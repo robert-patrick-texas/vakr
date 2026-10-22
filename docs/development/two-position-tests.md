@@ -70,7 +70,14 @@ The tests run in this order after a warm-up in which both nodes must show every 
 
 ## Checks that wait for M5 parts A and B
 
-Without `MPOS_FEATURES`, the nodes run as two independent single nodes with the same inventory, and the checks above that need roles or replication print `SKIP` with the part they wait for. `roles` (part A) makes east the metadata primary and west the peer, and exchanges replication tokens in `configure_roles` (`tests/system/mpos/lib.sh`). That function follows the contract part A builds to: `[node] role`, `primary_url`, and a token from `vakr replication token create` on the node that serves, installed on the node that pulls at `/etc/vakr/secrets/replication.token`. When part A's operator guide lands, adjust that one function: how `vakr-api` is reached over HTTPS between the nodes, and the token command's exact output.
+Without `MPOS_FEATURES`, the nodes run as two independent single nodes with the same inventory, and the checks above that need roles or replication print `SKIP` with the part they wait for. `roles` (part A) makes east the metadata primary and west the peer, and exchanges replication tokens in `configure_roles` (`tests/system/mpos/lib.sh`). That function follows part A's contract ([two positions](../operations/two-positions.md), ADR-024):
+
+- **Roles:** `[node] role`, `position`, and, on west, `primary_url = "https://172.29.70.20"`.
+- **Tokens:** each node runs `vakr replication token create mpos-<partner>`, and the token goes into the partner's `/etc/vakr/secrets/replication.token` (mode 0640, `root:vakr`). It is never printed.
+- **HTTPS between the nodes:** vakr-api listens on plain HTTP on loopback, as in production, so the harness puts `tests/system/mpos/tlsproxy.py` in front of it on each node's inter-position address, port 443. It is a test-only TLS terminator standing in for the operator's reverse proxy.
+  - `tlsproxy.py gen` makes, on the host, a test CA and one server certificate per address (SAN = the address). They meet the strict X.509 profile (EGRESS-003).
+  - Each node trusts the CA in `/etc/vakr/tls/ca.d/mpos-test.pem`. vakr's own TLS checks are unchanged, and no option weakens them.
+- **West starts empty:** with `roles`, west installs `inventory.toml` but does not apply it. It copies east's inventory by the metadata pull, as a real peer does; applying it would give the same names other UUIDs, which the pull refuses.
 
 ## Decisions
 

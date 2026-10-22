@@ -1,0 +1,42 @@
+# The two-position system tests, MPOS-T01..T04 (blueprint 27.5), in quick mode:
+# two systemd nodes and a simulated fleet in privileged containers, with
+# partitions and netem. Manual only: it takes 10 to 20 minutes and is not a
+# gate on pushes. See docs/development/two-position-tests.md.
+name: Two positions
+
+on:
+  workflow_dispatch:
+    inputs:
+      features:
+        description: "MPOS_FEATURES: comma list of roles, replication (empty: single-node checks only)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mpos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mpos:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # setup-uv publishes no floating major tag; pinned to the v10.3.1 commit.
+      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+      - name: Two positions, quick mode
+        env:
+          MPOS_FEATURES: ${{ inputs.features }}
+        run: make mpos-test MPOS_QUICK=1 MPOS_FEATURES="$MPOS_FEATURES"
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: mpos-logs-${{ github.sha }}
+          path: dist/mpos-test/logs
+          if-no-files-found: ignore
+          retention-days: 14

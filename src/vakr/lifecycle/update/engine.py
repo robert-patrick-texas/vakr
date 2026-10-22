@@ -27,7 +27,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from vakr.lifecycle.update import backup as backups
-from vakr.lifecycle.update import cache
+from vakr.lifecycle.update import cache, private
 from vakr.lifecycle.update.journal import PRIORITY_ERROR, PRIORITY_INFO, PRIORITY_WARNING
 from vakr.lifecycle.update.model import Hook, Outcome, Toolkit
 from vakr.lifecycle.update.state import StateError, UpdateState, load_state, save_state
@@ -213,7 +213,8 @@ def manual_rollback(
         OSError: When the safety backup cannot be written (nothing changed).
     """
     state, layout = current_state(kit), kit.layout
-    archives = backups.list_backups(layout.backups_dir)
+    # Only an archive root made and nobody else can change may be restored (UPD-005).
+    archives = private.trusted_archives(backups.list_backups(layout.backups_dir))
     safety = backups.create_backup(
         layout.config_dir,
         layout.db_dir,

@@ -16,7 +16,8 @@ recommends_installed() {
         installed "$pkg" || return 1
     done
 }
-newest_backup() { find /var/lib/vakr/backups -name 'pre-update-*.tar.gz' | sort | tail -1; }
+# Releases before root-only update storage (UPD-005) kept the archives beside the databases.
+newest_backup() { find /var/lib/vakr-update/backups /var/lib/vakr/backups -name 'pre-update-*.tar.gz' 2>/dev/null | sort | tail -1; }
 
 section "install v$FROM from GitHub (docs/operations/install.md)"
 apt_get update && apt_get install --no-install-recommends curl openssh-client ca-certificates
@@ -47,7 +48,8 @@ section "vakr self-update --yes ($FROM -> $TO)"
 vakr self-update --yes --version "$TO" >/tmp/update.log 2>&1
 grep -iE '^vakr self-update:|new configuration options|^  [a-z_]+ \([0-9]+\):' /tmp/update.log
 check "now running $TO" equals "$(vakr --version)" "vakr $TO"
-check "update state records success" grep -q '"result": "success"' /var/lib/vakr/update-state.json
+update_state() { if [ -e /var/lib/vakr-update/update-state.json ]; then echo /var/lib/vakr-update/update-state.json; else echo /var/lib/vakr/update-state.json; fi; }
+check "update state records success" grep -q '"result": "success"' "$(update_state)"
 check "both databases are at the current schema" vakr db status
 check "database files are vakr-owned" \
     bash -c '! find /var/lib/vakr -maxdepth 1 -name "*.db*" ! -user vakr | grep -q .'

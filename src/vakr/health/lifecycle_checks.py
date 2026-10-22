@@ -63,7 +63,13 @@ def check_update() -> CheckResult:
     Raises:
         None
     """
-    state_file = InstallPaths.from_environment().state_dir / "update-state.json"
+    paths = InstallPaths.from_environment()
+    state_file = paths.update_dir / "update-state.json"
+    # Until the first self-update of this release moves it, an older release's record is
+    # still beside the databases; it is only displayed here, never acted on.
+    legacy = paths.state_dir / "update-state.json"
+    if not state_file.exists() and legacy.exists():
+        state_file = legacy
     try:
         state = load_state(state_file)
     except StateError:

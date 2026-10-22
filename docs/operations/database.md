@@ -17,7 +17,7 @@ Neither database holds device credentials. Devices name their SNMP credential, a
 | `/var/lib/vakr/telemetry.db` | The telemetry database. At the MVP workload it grows to about 40 GB per node and then stays there, because space freed by retention is reused. |
 | `*.db-wal`, `*.db-shm` beside each | The write-ahead log and its index. While vakr runs they are part of the database: never delete them, and never copy a `.db` file on its own. |
 | `/var/lib/vakr/backups/metadata-<UTC time>.db`, `telemetry-<UTC time>.db` | Verified online backups written by `vakr db migrate` and `vakr db backup`. Each is a single self-contained file at mode 0600 in a 0700 directory. |
-| `/var/lib/vakr/backups/pre-update-<UTC time>.tar.gz` | Self-update's archive of the configuration and every database, taken before each update ([updates](updates.md)). |
+| `/var/lib/vakr-update/backups/pre-update-<UTC time>.tar.gz` | Self-update's archive of the configuration and the metadata database, taken before each update, in a directory only root may write ([updates](updates.md#files)). Earlier releases kept it in `/var/lib/vakr/backups/`. |
 
 The package creates `/var/lib/vakr` (owner `vakr:vakr`, mode 0750). `VAKR_ROOT` relocates every path for tests and containers. Provision at least 100 GB of SSD-class storage for it ([blueprint 27.3](../../tool-blueprint.md#273-storage-sizing-measured-by-adr-021)): the telemetry file, one backup copy of it, the spool, and the logs must all fit.
 

@@ -230,6 +230,8 @@ def test_tmpfiles_modes_match_the_layout() -> None:
         "/run/vakr": ("d", "0751", "vakr", "vakr"),  # the API socket is reachable (E.30)
         "/var/lib/vakr": ("d", "0750", "vakr", "vakr"),
         "/var/lib/vakr/backups": ("d", "0700", "vakr", "vakr"),  # vakr db migrate writes here
+        "/var/lib/vakr-update": ("d", "0755", "root", "root"),  # rollback trusts only root's
+        "/var/lib/vakr-update/backups": ("d", "0700", "root", "root"),
         "/var/cache/vakr": ("d", "0750", "root", "vakr"),
         "/etc/vakr": ("d", "0755", "root", "vakr"),
         "/etc/vakr/secrets": ("d", "0750", "root", "vakr"),

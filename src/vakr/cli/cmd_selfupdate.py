@@ -223,13 +223,16 @@ def _updater(
     )
     layout = Layout(
         cache_root=paths.cache_dir / "updates",
-        backups_dir=paths.state_dir / "backups",
-        state_file=paths.state_dir / "update-state.json",
+        # Root's own directory: rollback restores what is kept here (UPD-005).
+        backups_dir=paths.update_dir / "backups",
+        state_file=paths.update_dir / "update-state.json",
         lock_file=paths.run_dir / "self-update.lock",
         config_dir=paths.config_dir,
         db_dir=paths.state_dir,
         # Not telemetry.db: it reaches about 40 GB per node, too much to copy per update (E.14).
         db_names=(METADATA_FILE,),
+        legacy_backups_dir=paths.state_dir / "backups",
+        legacy_state_file=paths.state_dir / "update-state.json",
     )
     emit = EventSink("vakr-update", echo_always=not unattended)
     kit = Toolkit(layout, hooks, (restart,), INSTALLER(run_command), run_command, emit, UTC_NOW)

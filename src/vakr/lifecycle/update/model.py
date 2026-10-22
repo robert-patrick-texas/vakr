@@ -61,6 +61,9 @@ class Layout:
         db_names: Database file names to back up; empty means every ``*.db``.
         keep_packages: Older cached versions kept (E.14: 2).
         keep_backups: Backups kept.
+        legacy_backups_dir: Where an older release kept its archives, adopted
+            once (``vakr.lifecycle.update.private``); ``None`` for none.
+        legacy_state_file: Where an older release kept its state, likewise.
     """
 
     cache_root: Path
@@ -72,6 +75,8 @@ class Layout:
     db_names: tuple[str, ...] = ()
     keep_packages: int = 2
     keep_backups: int = 5
+    legacy_backups_dir: Path | None = None
+    legacy_state_file: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)

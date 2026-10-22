@@ -30,6 +30,7 @@ from vakr.domain.enums import PollExecution
 from vakr.logic.stats import nearest_rank
 from vakr.scheduler.admission import CAPACITY_REASONS, MissReason
 from vakr.scheduler.records import PollResult
+from vakr.scheduler.step_stats import StepStats
 from vakr.scheduler.steps import StepStatus
 
 WINDOW = 4096  # E.25: about 40 minutes of polls at the MVP workload
@@ -101,7 +102,12 @@ class Percentiles:
 
 
 class Window:
-    """The most recent samples of one latency."""
+    """The most recent samples of one latency, and the lifetime count and sum (E.33).
+
+    Attributes:
+        count: Samples since start.
+        total_us: Sum of every sample since start, in microseconds.
+    """
 
     def __init__(self, size: int = WINDOW) -> None:
         """Create an empty window.
@@ -116,6 +122,8 @@ class Window:
             None
         """
         self._samples: deque[int] = deque(maxlen=size)
+        self.count = 0
+        self.total_us = 0
 
     def add(self, value: int) -> None:
         """Add a sample, dropping the oldest when full.
@@ -130,6 +138,8 @@ class Window:
             None
         """
         self._samples.append(value)
+        self.count += 1
+        self.total_us += value
 
     def percentiles(self) -> Percentiles | None:
         """Return p50/p95/p99 of the window.
@@ -191,6 +201,7 @@ class SchedulerStats:
         lateness: Start minus slot.
         duration: Completion minus start.
         completion: Completion minus slot (TEST-004).
+        steps: Step outcomes, step durations, and ICMP probes (E.33).
     """
 
     def __init__(self, late_after_us: int, window: int = WINDOW) -> None:
@@ -212,6 +223,7 @@ class SchedulerStats:
         self.lateness = Window(window)
         self.duration = Window(window)
         self.completion = Window(window)
+        self.steps = StepStats()
 
     def record(self, result: PollResult) -> None:
         """Count one emitted record.
@@ -227,6 +239,7 @@ class SchedulerStats:
         """
         _count(self.lifetime, result, self._late_after_us)
         _count(self.period, result, self._late_after_us)
+        self.steps.record(result)
         if result.lateness_us is not None and result.duration_us is not None:
             self.lateness.add(result.lateness_us)
             self.duration.add(result.duration_us)

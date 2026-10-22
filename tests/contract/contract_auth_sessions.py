@@ -151,12 +151,14 @@ class AuthSessionsContract:
                 uow.sessions.add(s)
             uow.commit()
         with metadata_uow_factory() as uow:
+            assert uow.sessions.count() == 3  # E.33: stored rows, expired ones included
             assert uow.sessions.purge_expired(now=now, idle_cutoff=now - IDLE, limit=1) == 1
             assert uow.sessions.purge_expired(now=now, idle_cutoff=now - IDLE, limit=10) == 1
             assert uow.sessions.purge_expired(now=now, idle_cutoff=now - IDLE, limit=10) == 0
             uow.commit()
         with metadata_uow_factory() as uow:
             assert [s.id for s in uow.sessions.list_for_user(alice.id, limit=10)] == [live.id]
+            assert uow.sessions.count() == 1
 
     def test_e12_kiosk_tokens_round_trip_and_stay_bounded(
         self, metadata_uow_factory: MetadataUnitOfWorkFactory

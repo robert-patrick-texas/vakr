@@ -4393,3 +4393,36 @@ Decisions taken with the M4 admin operations:
 6. **Audited at the request (SEC-018).** Each request, including one that joins the active operation, appends `device.rediscover` with the requester: the username, `local:<account>` on the socket, or `cli:<login>` (with `(sudo)`). The outcome is the operation record; identity changes the walk makes are audited as every discovery's are (`discovery.reconcile`).
 7. **Operations are not inventory.** They never move the metadata change counter, so following one never makes the collector re-plan, and they are deleted after 30 days, unlike inventory records (META-009 does not apply to an operational log).
 8. **Gaps.** Scheduled rediscoveries are not recorded as operations or events. Cancelling a queued operation is not offered; it expires after an hour if no collector takes it.
+
+### E.33 Self-metrics (M4)
+
+`GET /api/v1/metrics` on `vakr-api` answers vakr's own figures in the Prometheus text format (OBS-001, OBS-004, OBS-005, OBS-007): the API process, the collector, the inventory, and the databases, in one scrape. The operator guide is [self-metrics](docs/operations/metrics.md); every family, its type, and its fixed label values are in `vakr.metrics.catalog_api` and `catalog_collector`, and a test keeps the guide's table equal to them.
+
+| Setting or bound | Default | Allowed range or notes |
+|---|---|---|
+| Endpoint | `GET /api/v1/metrics`, operator role | never anonymous (401); on the node the socket (root, `vakr-view`, `vakr`); through the proxy a kiosk token as `Authorization: Bearer` |
+| Format | text exposition 0.0.4, `text/plain; version=0.0.4; charset=utf-8` | written by `vakr.metrics.exposition`; no runtime dependency |
+| Collector snapshot | `<run dir>/collector-metrics.json` (`/run/vakr`), written at start and every 15 s, mode 0640 `vakr:vakr`, temporary file then rename | removed at a clean stop; the collector unit's `ReadWritePaths` gains `/run/vakr` |
+| Snapshot stale after | 45 s (three intervals) | constant; then `vakr_collector_metrics_up{reason="stale"} 0` |
+| Snapshot size | 1 MiB and 2,000 samples | constant; beyond is `too_large` or `corrupt` |
+| Snapshot time ahead of the API's clock | at most 60 s | more is `corrupt`: the clocks disagree, so it is not called fresh |
+| Snapshot read by the API | at most every 2 s | constant |
+| Inventory and database figures | read at most every 15 s, one refresh at a time | constant; any number of scrapers costs one database pass per period |
+| Series per scrape / answer size | 2,000 / 512 KiB | a family crossing either is left out with every family after it, and `vakr_metrics_truncated` is 1; about 400 series and 40 KiB are typical |
+| Summary windows | 4,096 samples per poll latency and for ingestion latency, 2,048 per step, 1,024 per API route group | p50/p95/p99 by nearest rank (E.17 #13) over the window; `_sum` and `_count` since the process started |
+| Event-loop lag period | at most 60 s | the largest lag of the current period, as in the collector-health observation |
+| Label values | fixed sets (`vakr.metrics.catalog_spec`); `version` must match `[0-9A-Za-z.+~-]{1,64}` | no device, interface, user, address, path, or token ever appears |
+
+Decisions taken with the self-metrics (2026-10-21):
+
+1. **Protected by authentication, not by a listener.** OBS-005 asks for an endpoint "bound to localhost or otherwise protected by default". The endpoint sits under `/api/` and needs the operator role, so the reverse proxy forwards nothing new without a credential (OBS-T02), and no second port or firewall rule is needed. On the node, agents use the Unix socket; a remote Prometheus scrapes through the HTTPS proxy with a kiosk token. **Gap:** a metrics-only credential; a kiosk token reads everything an operator can.
+2. **No exposition dependency.** The text format is small, and the two processes share figures through a file anyway, which is what `prometheus_client`'s multiprocess mode would need too. `vakr.metrics.exposition` writes it, refusing invalid names and never writing a non-finite value.
+3. **The collector writes a snapshot; the API reads it.** The collector gets no listener. Its figures are read on its event loop, where the counters live, and written by a worker thread. The rolling summaries live in `vakr.logic.window`, pure logic the scheduler, the ingester, and the metrics share.
+4. **All or nothing, never zero (invariant 1).** A snapshot is used only if every catalogued family in it is valid; otherwise every collector series is absent and `vakr_collector_metrics_up` is 0 with the reason (`missing`, `stale`, `too_large`, `unreadable`, `corrupt`). Families the catalog does not know are skipped, so a collector one release ahead of the API during an update still shows what both know. Inventory trouble is `vakr_state_metrics_up{reason="metadata_unavailable"} 0` with no counts. Any value not measured yet is absent.
+5. **Counters per process lifetime.** `_total` counters run from the start of their process, and `vakr_process_start_time_seconds` makes a restart's reset visible.
+6. **Overload is the collector's state (OBS-003, OBS-T03).** `vakr_collector_state{state=...}`, the capacity misses, and the late and missed polls show it; there is no per-device series to turn Down.
+7. **Bounded cardinality.** Each label value comes from a fixed set, copied as strings so `vakr.metrics` imports no scheduler or domain module; a test keeps each copy equal to its enum. Request paths map to twelve route groups and status codes to a fixed list (`other`, and `none` for an abandoned request). Sign-in failures and throttling are `vakr_api_requests_total{group="login",code="401"|"429"}`.
+8. **Per-protocol figures from the poll records.** Step outcomes and durations (ICMP, SNMP Stage 1, fallback, Stage 2) and ICMP probes sent and answered are counted from each emitted poll record (`vakr.scheduler.step_stats`), without touching the steps. SNMP PDUs are not counted one by one; the step status is the SNMP result.
+9. **Database figures reuse the checks.** Rollup lag and waiting age, and the ranking projection's missing data, are the performance data of the `rollups` and `rankings` checks of `vakr check health`, so a graph and an alert never disagree. Those checks read the install from the environment, as `vakr check health` does.
+10. **No `metrics` check in `vakr check health`.** The snapshot is readable by the `vakr` group only, so a monitoring account in `vakr-view` could not run it, and the collector-health and spool checks already report a collector that stopped. Not added.
+11. **OBS-006 in part.** `vakr_collector_interval_seconds` gives the configured default and the shortest and longest effective interval planned. **Gap:** per-device configured versus effective intervals and the reasons for degraded behaviour stay in the health views, not the metrics.

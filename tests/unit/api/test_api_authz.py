@@ -29,6 +29,7 @@ LEVELS = {
     ("GET", "/api/v1/health/live"): ANON,
     ("GET", "/api/v1/health/ready"): ANON,
     ("GET", "/api/v1/health/detail"): VIEW,
+    ("GET", "/api/v1/metrics"): VIEW,  # OBS-005, OBS-T02: never anonymous
     ("POST", "/api/v1/auth/login"): ANON,
     ("POST", "/api/v1/auth/logout"): ANON,
     ("GET", "/api/v1/auth/session"): VIEW,

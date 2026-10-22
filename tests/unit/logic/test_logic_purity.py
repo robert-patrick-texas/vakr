@@ -28,6 +28,7 @@ import vakr.logic
 PACKAGE = Path(vakr.logic.__file__).parent
 MODULES = sorted(p for p in PACKAGE.glob("*.py"))
 ALLOWED_IMPORTS = {
+    "collections",  # deque: the bounded window of vakr.logic.window (E.33); no I/O
     "collections.abc",
     "dataclasses",
     "datetime",

@@ -41,6 +41,7 @@ from vakr.app.collector.derive import RateSettings
 from vakr.app.collector.discovery_manual import ManualDiscoveryRunner
 from vakr.app.collector.icmp_step import CollectorIcmpStep
 from vakr.app.collector.maintenance import RollupHook, TelemetryUpkeep
+from vakr.app.collector.metrics_loop import metrics_loop
 from vakr.app.collector.operations import OperationWatcher
 from vakr.app.collector.pipeline import SpoolPump
 from vakr.app.collector.plans import PlanBook
@@ -256,6 +257,7 @@ class CollectorService:
                 self.loops_stop, t.checkpoint_interval_s, partial(write_checkpoint, self)
             ),
             "health": health_loop(self),
+            "metrics snapshot": metrics_loop(self),
         }
         return {name: asyncio.create_task(job, name=name) for name, job in jobs.items()}
 

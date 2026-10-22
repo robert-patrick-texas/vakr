@@ -44,6 +44,7 @@ from vakr.api.middleware_parts import (
     SECURITY_HEADERS,
     decorating_send,
     log_request,
+    record_request,
     refuse_peer,
     replay,
     too_large,
@@ -169,7 +170,9 @@ class ApiMiddleware:
             body = await self._bounded_body(headers, receive, scope, decorated, rid)
             if body is not None:
                 await self._run(scope, replay(body, receive), decorated, rid, state)
-        log_request(scope, state["status"], time.monotonic() - started, view, rid)
+        elapsed = time.monotonic() - started
+        log_request(scope, state["status"], elapsed, view, rid)
+        record_request(scope, state["status"], elapsed)
 
     async def _bounded_body(
         self, headers: dict[str, str], receive: Receive, scope: Scope, send: Send, rid: str

@@ -20,7 +20,7 @@ Example:
     (1.0, 60.0)
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from vakr.domain.errors import StorageError
 from vakr.ingest.batching import DecodedBatch, decode_batch, quarantine_frames, set_aside_incident
@@ -29,6 +29,7 @@ from vakr.ingest.reader import SpoolReader
 from vakr.ingest.segments import quarantine_bytes
 from vakr.ingest.spool import Spool
 from vakr.ingest.state import ConsumerOffset, save_offset
+from vakr.logic.window import Summary
 from vakr.ports.telemetry import WriteResult
 
 RETRY_BASE_S = 1.0
@@ -52,6 +53,7 @@ class IngestStatus:
         last_error_us: When it happened.
         consecutive_failures: Failed write attempts since the last success.
         storage_available: Result of the last write attempt; ``None`` before any.
+        lag_window: ``lag_s`` of every acknowledged batch, for p50/p95/p99 (E.33).
     """
 
     acked_seq: int = 0
@@ -66,6 +68,7 @@ class IngestStatus:
     last_error_us: int | None = None
     consecutive_failures: int = 0
     storage_available: bool | None = None
+    lag_window: Summary = field(default_factory=Summary)
 
     def failed(self, exc: Exception, now_us: int) -> str:
         """Record a failed write attempt.
@@ -199,6 +202,7 @@ def acknowledge_step(
             now_us,
         )
         status.lag_s = max(0, now_us - acked.header.append_us) / 1e6
+        status.lag_window.observe(status.lag_s)
         reader.release(batch.ack_seq)
     spool.usage.set_quarantine(quarantine_bytes(spool.directory)[1])
     status.oldest_unacked_us = reader.oldest_append_us()

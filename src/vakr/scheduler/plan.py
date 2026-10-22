@@ -126,6 +126,21 @@ class Plan:
         """
         return len(self._entries)
 
+    def intervals_s(self) -> tuple[int, int] | None:
+        """Return the shortest and longest effective interval planned (OBS-006, E.33).
+
+        Args:
+            None
+
+        Returns:
+            tuple[int, int] | None: Seconds, or ``None`` with nothing planned.
+
+        Raises:
+            None
+        """
+        found = [e.target.effective_interval_s for e in self._entries.values()]
+        return (min(found), max(found)) if found else None
+
     def next_slot_us(self, device_id: DeviceId) -> int | None:
         """Return a device's next slot, for diagnostics and tests.
 

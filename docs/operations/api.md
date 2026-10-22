@@ -164,6 +164,7 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/health/ready` | anyone | `ready`, `degraded` (telemetry unavailable), or 503 `not_ready`; component names and states only |
 | `GET /api/v1/health/detail` | operator | Components with reasons, the release, the start time, every collector's self-report |
 | `GET /api/v1/version` | operator | `{"version": "<release>", "api": "v1"}` |
+| `GET /api/v1/metrics` | operator | vakr's self-metrics in Prometheus text format (`text/plain; version=0.0.4`): the API, the collector, the inventory, and the databases. See [self-metrics](metrics.md) |
 | `POST /api/v1/auth/login` | anyone | The session (`kind`, `name`, `role`, `csrf_token`, `expires_at`, `idle_timeout_s`); sets the cookie |
 | `POST /api/v1/auth/logout` | a session | 204; clears the cookie |
 | `GET /api/v1/auth/session` | any caller | Who you are, your role, and for users the CSRF token and expiry; for a kiosk display the token's expiry |
@@ -237,6 +238,7 @@ $ make openapi                                       # developers: regenerate do
 - `GET /api/v1/health/live` says the process answers. Use it for liveness probes.
 - `GET /api/v1/health/ready` says whether the API can serve: 200 `ready`, 200 `degraded` (telemetry unavailable, so graphs are empty but inventory works), or 503 `not_ready` (metadata unavailable).
 - `vakr check health` and `vakr doctor` include an `api` check that asks `health/ready` over the socket. It is OK when the API is ready, and also when it is not installed or not running (the unit ships disabled). It is CRITICAL when the socket exists but nothing answers within 2 seconds, or the API is not ready, and UNKNOWN when the caller may not use the socket. Run it as root or as a member of `vakr`. The API never runs this check itself.
+- `GET /api/v1/metrics` answers the API's own figures (requests by route group, durations, connections, event-loop lag) beside the collector's and the databases', for Prometheus and compatible scrapers. See [self-metrics](metrics.md).
 
 ## Limits
 

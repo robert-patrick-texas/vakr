@@ -138,8 +138,9 @@ def test_collector_unit_joins_the_target_hardened_and_disabled() -> None:
     assert settings["RestartPreventExitStatus"] == "78"
     assert settings["TimeoutStopSec"] == "120s"  # > shutdown_grace + stop budget (E.27)
     for key, value in (("NoNewPrivileges", "yes"), ("ProtectSystem", "strict"),
-                       ("ReadWritePaths", "/var/lib/vakr"), ("ProtectHome", "yes"),
-                       ("PrivateTmp", "yes"), ("CapabilityBoundingSet", "")):  # fmt: skip
+                       ("ReadWritePaths", "/var/lib/vakr /run/vakr"),  # E.33 snapshot
+                       ("ProtectHome", "yes"), ("PrivateTmp", "yes"),
+                       ("CapabilityBoundingSet", "")):  # fmt: skip
         assert settings[key] == value, key
     assert ("PartOf", "vakr.target") in collector["Unit"]
     assert collector["Install"] == [("WantedBy", "vakr.target")]

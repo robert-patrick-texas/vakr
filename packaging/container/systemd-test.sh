@@ -164,7 +164,19 @@ check "collectors list shows the running collector" \
     grep -q '"position"' <<<"$(api_get /api/v1/collectors unix)"
 check "metadata stays vakr-owned with both services running" \
     bash -c '! find /var/lib/vakr -maxdepth 1 -name "*.db*" ! -user vakr | grep -q .'
+check "the collector's metrics snapshot is 0640 vakr:vakr in /run/vakr (E.33)" \
+    bash -c '[ "$(stat -c "%a %U %G" /run/vakr/collector-metrics.json)" = "640 vakr vakr" ]'
+metrics=$(api_get /api/v1/metrics unix)
+check "metrics over the socket report the running collector (OBS-001, E.33)" \
+    grep -q '^vakr_collector_metrics_up{reason="ok"} 1$' <<<"$metrics"
+check "metrics carry both processes and the inventory (OBS-T01)" \
+    bash -c 'grep -q "process=\"collector\"" <<<"$1" && grep -q "process=\"api\"" <<<"$1" &&
+             grep -q "^vakr_state_metrics_up{reason=\"ok\"} 1$" <<<"$1"' _ "$metrics"
+check "metrics refuse an anonymous TCP caller (OBS-T02)" \
+    grep -q '^401 ' <<<"$(api_get /api/v1/metrics tcp)"
 systemctl stop vakr-collector.service
+check "a clean collector stop removes its metrics snapshot (E.33)" \
+    test ! -e /run/vakr/collector-metrics.json
 check "systemctl stop vakr-api" systemctl stop vakr-api.service
 check "API exited 0" equals "$(prop ExecMainStatus vakr-api.service)" 0
 check "the socket is removed at stop" test ! -e /run/vakr/api.sock

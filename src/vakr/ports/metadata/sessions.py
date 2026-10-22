@@ -154,6 +154,20 @@ class SessionRepository(Protocol):
         """
         ...
 
+    def count(self) -> int:
+        """Return how many sessions are stored, expired ones not yet purged included (E.33).
+
+        Args:
+            None
+
+        Returns:
+            int: Count.
+
+        Raises:
+            None
+        """
+        ...
+
 
 class KioskTokenRepository(Protocol):
     """Kiosk display tokens (E.12), listed by ``(label, id)``."""

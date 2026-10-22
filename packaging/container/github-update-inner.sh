@@ -74,9 +74,9 @@ check "rolled back to $FROM" equals "$(vakr --version)" "vakr $FROM"
 if has_db_command; then
     # A rollback never restores telemetry.db (E.14). An unmarked release must
     # leave it readable by the older one (exit 2 is "schema newer than I
-    # support"). A manual-update-required release may not: the marker can come
-    # from a migration FROM already has (0.3.0 -> 0.3.1), so either answer is
-    # allowed then, and the log says which.
+    # support"). A manual-update-required release may not, but its marker can
+    # come from a migration FROM already has (a later release kept marked for
+    # nodes still before it), so either answer is allowed then; the log says which.
     vakr db status >/tmp/db.log 2>&1
     db=$?
     if [ "$marked" = yes ]; then

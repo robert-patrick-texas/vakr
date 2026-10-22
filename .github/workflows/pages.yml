@@ -28,8 +28,8 @@ jobs:
           persist-credentials: false
 
       # setup-uv no longer publishes floating major tags (there is no "v10"),
-      # so it is pinned to the v10.3.0 commit as its README recommends.
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      # so it is pinned to the v10.3.1 commit as its README recommends.
+      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
         with:
           # The script's inline metadata is the only dependency declaration.
           cache-dependency-glob: tools/md2html/md2html.py

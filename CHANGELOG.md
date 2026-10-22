@@ -2,7 +2,9 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
-## Unreleased
+## 0.3.0 - 2026-10-21
+
+Milestone M4, viewing: the web UI and JSON API v1 (`vakr-api`, shipped disabled), local accounts, `vakr status` and `vakr tui` over the API socket, kiosk displays with dashboard rotation, custom dashboards, manual rediscovery, rollups and retention, the ranking projection, and self-metrics. **This release is marked `manual-update-required`**: the update timer skips it, so install it with `sudo vakr self-update` (see the notes at the end).
 
 ### Added
 
@@ -14,7 +16,6 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
   - Metadata schema 5 adds the `dashboard` table (`0005_dashboards`; the package runs `vakr db migrate`, which takes a backup first). Not yet: dashboards from `/etc/vakr/dashboards.toml`, public publication, and a `vakr dashboard` command.
 - Manual rediscovery (DISC-003, DISC-010, API-011, Appendix E.32): **Rediscover now** on a device's page (admins), `POST /api/v1/devices/{uuid}/rediscovery`, and `sudo vakr inventory rediscover DEVICE [--wait]` queue an operation and answer at once; `vakr-collector` picks it up within about 5 seconds, runs the same discovery as a scheduled one, and records the counts (interfaces, new, renumbered, missing, identity reviews opened) or the reason. `GET /api/v1/operations[/{uuid}]` and `vakr inventory operations` follow them, the overview's rediscovery events list them, and every request is audited. One active operation per device, 1,000 in all; unclaimed requests expire after 1 hour; finished ones are kept 30 days.
 - Metadata schema 4 adds the `operation` table. The package runs `vakr db migrate`, which takes a backup first.
-
 - The web UI (ADR-035, UI-001 to UI-017): a static SvelteKit app that `vakr-api` serves at every path outside `/api/`, same origin as the API, so the reverse proxy needs nothing new. It has sign-in and sign-out, global navigation and search, the overview (device state, health, high-priority interfaces, WAN circuits, top utilization and errors, events, quick filters), the device list in Attention, Active, Offline/Retired order with filters and browsing by site, tag, group, provider, collector, freshness, and admin state, device and interface pages, graphs (traffic, packets, errors, utilization, the interface state timeline, and SmokePing-style latency with every probe, the median, and loss) with range presets from 1 hour to 400 days or a custom range, rankings, high-priority and WAN pages, collector health, and identity reviews with the admin's decision. Missing data is a gap, never zero; every graph names its resolution and time zone and has a table of exact values and CSV/JSON downloads. Every page tells loading, empty, stale, partial, permission-denied, and backend-unavailable apart, and status always has an icon and words beside its colour. See [the web UI guide](docs/operations/web-ui.md).
 - The package installs the web UI in `/opt/vakr/share/web/` and the bundled front-end packages' licence and notice files in `/opt/vakr/share/doc/web-licenses/` (all MIT, Apache-2.0, BSD-3-Clause, or 0BSD; listed in the copyright file).
 - Pages carry a Content-Security-Policy without `unsafe-inline` or `unsafe-eval`: SvelteKit's bootstrap script is allowed by its SHA-256 hash, read from the build's manifest. Content-hashed files are cached for a year; pages revalidate. Without the web files, `vakr-api` logs `api.web_unavailable` once and serves the API alone.
@@ -57,11 +58,24 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 - The install and field-data guides find the newest release themselves instead of asking for a version. GitHub's "latest release" links skip pre-releases, so the guides read the same release list that self-update uses.
 - Ranking packet sums, behind errors per million packets, are now summed exactly (`math.fsum`), so the result never depends on the order or split in which samples are read (E.28). No measured count changed.
 - Until the collector has built the ranking projection after a start (about 25 s at the MVP workload), a 24-hour ranking reads every native sample and takes about 6 s, against 4.7 s in 0.2.x, because the exact packet sum reads each sample.
+- Self-update's timer also skips a release when an older release it would jump over carries `manual-update-required`, because installing the newer one applies the marked release's changes too (UPD-005). Run `sudo vakr self-update` by hand once, and the timer takes over again. This protects nodes from 0.3.0 on; 0.2.x checks only the newest release's notes.
+- Toolchain and dependencies (TOOLS-001): uv 0.13.4 (package builder image), Node.js 24.22.1 (`web/.node-version`, the builder image, and the release host), `fastapi` 0.159.1, `httpx2` and `httpcore2` 2.16.0 (tests), `ty` 0.0.90, and the `astral-sh/setup-uv` action v10.3.1.
+
+### Deferred updates (TOOLS-001)
+
+- **Python 3.15.1:** uv 0.13.4 offers no python-build-standalone download for it yet, so the package still bundles CPython 3.15.0. It follows at the next release.
+- **uv 0.13.5:** listed on GitHub, but no Linux build was published at release time.
+- **Node.js 26:** a Current release, not LTS. The web build stays on the 24 LTS line (E.31 decision 9).
+- **`@types/node` 26:** it describes Node 26 APIs, and the build runs Node 24. Dependabot now ignores its major versions; its pull request #1 can be closed.
+- **TypeScript 7:** SvelteKit 3.1 (peer `^6.0.0`), svelte-check, and typescript-eslint support only 6.x (E.31 decision 9).
 
 ### Notes for operators updating from 0.2.x
 
 - **This release is marked `manual-update-required`.** It migrates the telemetry schema (schema 2, `0002_ranking_projection.sql`: the ranking projection), and self-update never copies `telemetry.db`, so an automatic rollback could not restore it. The update timer skips this release; install it with `sudo vakr self-update`. The package's `vakr db migrate` applies schema 2 in milliseconds; the collector then builds the projection within its first minute.
 - To go back to 0.2.x after updating, stop `vakr-collector` and `vakr-api` and remove schema 2 before installing the older release, as [the rollups guide](docs/operations/rollups.md#going-back-to-a-release-without-the-projection) shows. The projection holds only derived data, so nothing is lost.
+- The package migrates the metadata database from schema 2 to schema 5 (accounts and sessions, operations, dashboards) after taking a backup, and the telemetry database to schema 2. Nothing needs to be re-entered: every new `[auth]` and `[api]` option has a default. `vakr config new-options --since 0.2.1 --describe` lists them.
+- The web UI and API need `vakr-api`, which the package installs but does not enable: `sudo systemctl enable --now vakr-api.service vakr.target`. Put the HTTPS reverse proxy of [web access](docs/operations/web-access.md) in front of it, then create the first admin with `sudo vakr setup`.
+- `vakr status` and `vakr tui` use `vakr-api` when it runs, and read the databases directly when it does not. Give people and monitoring agents (such as NRPE's `nagios`) that only look the new `vakr-view` group rather than `vakr`, which can also read the SNMP credentials: `sudo usermod -aG vakr-view NAME`.
 
 ## 0.2.1 - 2026-10-20
 

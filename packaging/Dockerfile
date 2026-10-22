@@ -16,13 +16,13 @@ ARG BASE_IMAGE=ubuntu:26.04
 FROM golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b AS nfpm
 RUN CGO_ENABLED=0 GOBIN=/out go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0
 
-# uv 0.13.3, pinned by image digest.
-FROM ghcr.io/astral-sh/uv:0.13.3@sha256:bee0a2a458fd956c5df7b8b4c5fed2257b0af34866e3da7b51db0be3acb375d1 AS uv
+# uv 0.13.4, pinned by image digest.
+FROM ghcr.io/astral-sh/uv:0.13.4@sha256:9f130421e930bfbdc563c00740466603f8723158e90297d07957c2294640262b AS uv
 
-# Node.js 24.22.0 and its npm 11.19.1, pinned by image digest: the LTS line of
+# Node.js 24.22.1 and its npm 11.19.1, pinned by image digest: the LTS line of
 # web/.node-version. They only build the web UI (ADR-035); the package ships
 # the built files and never Node. Change with web/.node-version and engines.
-FROM node:24.22.0-trixie-slim@sha256:a6155384446670e9719bdc4fd0ebe4d4b29fb32a8d6aa523da3547a6cfbcf22c AS node
+FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS node
 
 FROM ${BASE_IMAGE}
 # binutils provides readelf for the glibc symbol-version gate in build.sh.

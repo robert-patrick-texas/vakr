@@ -280,7 +280,7 @@ def version_from_name(project: Project, name: str) -> Version | None:
     pattern = rf"{re.escape(project.package)}_(.+)_{re.escape(project.arch)}\.deb"
     match = re.fullmatch(pattern, name)
     try:
-        # GitHub may serve ``0.3.0~rc.1`` as ``0.3.0.rc.1``; both name one version.
+        # GitHub may serve ``7.3.0~rc.1`` as ``7.3.0.rc.1``; both name one version.
         return Version.parse(match[1].replace(".rc.", "~rc.")) if match else None
     except ValueError:
         return None

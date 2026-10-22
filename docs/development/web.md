@@ -17,7 +17,7 @@ The web UI is a static SvelteKit app in `web/`, built to plain files that `vakr-
 
 | Tool | Version | Where it is pinned |
 |---|---|---|
-| Node.js | 24.22.0 (24 LTS), exact | `web/.node-version` (read by CI's `setup-node` and the release preflight), `engines` in `web/package.json` (`engine-strict` in `web/.npmrc`), and the builder image in `packaging/Dockerfile`, which a test keeps equal to `web/.node-version` |
+| Node.js | 24.22.1 (24 LTS), exact | `web/.node-version` (read by CI's `setup-node` and the release preflight), `engines` in `web/package.json` (`engine-strict` in `web/.npmrc`), and the builder image in `packaging/Dockerfile`, which a test keeps equal to `web/.node-version` |
 | npm | 11.19 or newer | `engines` |
 | Packages | exact versions | `web/package.json` (no ranges) and `web/package-lock.json` |
 

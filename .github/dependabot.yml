@@ -38,6 +38,11 @@ updates:
     schedule:
       interval: weekly
     versioning-strategy: increase
+    ignore:
+      # The types follow the Node line the build runs (web/.node-version, 24 LTS),
+      # not the newest Node: @types/node 26 describes APIs Node 24 lacks.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-and-patch:
         patterns: ["*"]

@@ -167,23 +167,23 @@ Packaged entries:
 
 | Option | Type | Default | Reload | Added in | Description |
 |---|---|---|---|---|---|
-| `auth.session_idle_timeout` | duration, >= 300s, <= 86400s | `"30m"` | restart | v0.2.1 | A signed-in session ends after this long without a request (SEC-010, Appendix E.12). Must not exceed auth.session_lifetime. Use is recorded at most once a minute, so a session can end up to a minute earlier, never later. |
-| `auth.session_lifetime` | duration, >= 600s, <= 604800s | `"12h"` | restart | v0.2.1 | A signed-in session ends this long after login however active it is, and the user signs in again (absolute expiry, SEC-010, Appendix E.12). |
-| `auth.kiosk_token_lifetime` | duration, >= 86400s, <= 3.1536e+07s | `"30d"` | restart | v0.2.1 | How long a kiosk token for an unattended display stays valid after an admin creates it (Appendix E.12). Kiosk tokens have the operator role and no idle expiry. |
-| `auth.login_throttle_after` | int, >= 1, <= 100 | `5` | restart | v0.2.1 | From this many consecutive failed logins for one account from one address, each failure is answered after a delay and the next attempt must wait as long: 1 s, doubling with each further failure, up to auth.login_throttle_max_delay (SEC-012, Appendix E.12). A successful login clears the count. |
-| `auth.login_throttle_max_delay` | duration, >= 1s, <= 300s | `"30s"` | restart | v0.2.1 | Longest delay before the next login attempt for one account from one address (SEC-012, Appendix E.12). |
-| `auth.login_failure_reset` | duration, >= 60s, <= 86400s | `"15m"` | restart | v0.2.1 | A run of failed logins with no new failure for this long is forgotten, and the next failure counts from one again (SEC-012, Appendix E.12). |
-| `auth.password_min_length` | int, >= 8, <= 128 | `15` | restart | v0.2.1 | Fewest characters a new password may have (NIST SP 800-63B for a single-factor password, Appendix E.12). Existing passwords keep working; the rule applies when one is set. |
+| `auth.session_idle_timeout` | duration, >= 300s, <= 86400s | `"30m"` | restart | v0.3.0 | A signed-in session ends after this long without a request (SEC-010, Appendix E.12). Must not exceed auth.session_lifetime. Use is recorded at most once a minute, so a session can end up to a minute earlier, never later. |
+| `auth.session_lifetime` | duration, >= 600s, <= 604800s | `"12h"` | restart | v0.3.0 | A signed-in session ends this long after login however active it is, and the user signs in again (absolute expiry, SEC-010, Appendix E.12). |
+| `auth.kiosk_token_lifetime` | duration, >= 86400s, <= 3.1536e+07s | `"30d"` | restart | v0.3.0 | How long a kiosk token for an unattended display stays valid after an admin creates it (Appendix E.12). Kiosk tokens have the operator role and no idle expiry. |
+| `auth.login_throttle_after` | int, >= 1, <= 100 | `5` | restart | v0.3.0 | From this many consecutive failed logins for one account from one address, each failure is answered after a delay and the next attempt must wait as long: 1 s, doubling with each further failure, up to auth.login_throttle_max_delay (SEC-012, Appendix E.12). A successful login clears the count. |
+| `auth.login_throttle_max_delay` | duration, >= 1s, <= 300s | `"30s"` | restart | v0.3.0 | Longest delay before the next login attempt for one account from one address (SEC-012, Appendix E.12). |
+| `auth.login_failure_reset` | duration, >= 60s, <= 86400s | `"15m"` | restart | v0.3.0 | A run of failed logins with no new failure for this long is forgotten, and the next failure counts from one again (SEC-012, Appendix E.12). |
+| `auth.password_min_length` | int, >= 8, <= 128 | `15` | restart | v0.3.0 | Fewest characters a new password may have (NIST SP 800-63B for a single-factor password, Appendix E.12). Existing passwords keep working; the rule applies when one is set. |
 
 ### `[api]`
 
 | Option | Type | Default | Reload | Added in | Description |
 |---|---|---|---|---|---|
-| `api.listen_address` | str | `"127.0.0.1"` | restart | v0.2.1 | IP address the HTTP listener binds. The default, loopback, serves only a reverse proxy on the same host, which terminates TLS (SEC-013, docs/operations/web-access.md). vakr itself serves plain HTTP. Empty turns the TCP listener off and leaves only the local socket. |
-| `api.port` | int, >= 1, <= 65535 | `8080` | restart | v0.2.1 | TCP port of the HTTP listener on api.listen_address. |
-| `api.socket_path` | str | `""` | restart | v0.2.1 | Unix socket for vakr tui and the CLI on this node. Empty means /run/vakr/api.sock. Each connection gets the role of the connecting account (SO_PEERCRED): root and members of vakr-admin are admins, members of vakr-view and vakr are operators (read-only), and everyone else is refused (Appendix E.12). |
-| `api.trusted_proxies` | list[str] | `[]` | restart | v0.2.1 | Addresses or CIDR networks of reverse proxies whose Forwarded, X-Forwarded-For, and X-Forwarded-Proto headers vakr believes (SEC-013). Empty believes nobody: the client is the connecting address and the scheme is plain HTTP. With nginx on the same host, set ["127.0.0.1/32", "::1/128"]. |
-| `api.max_body_bytes` | int, >= 1024, <= 524288 | `65536` | restart | v0.2.1 | Largest request body vakr-api accepts, in bytes. A larger request is answered 413 without reading the rest (SEC-019). Every API v1 request body is a small JSON object. |
+| `api.listen_address` | str | `"127.0.0.1"` | restart | v0.3.0 | IP address the HTTP listener binds. The default, loopback, serves only a reverse proxy on the same host, which terminates TLS (SEC-013, docs/operations/web-access.md). vakr itself serves plain HTTP. Empty turns the TCP listener off and leaves only the local socket. |
+| `api.port` | int, >= 1, <= 65535 | `8080` | restart | v0.3.0 | TCP port of the HTTP listener on api.listen_address. |
+| `api.socket_path` | str | `""` | restart | v0.3.0 | Unix socket for vakr tui and the CLI on this node. Empty means /run/vakr/api.sock. Each connection gets the role of the connecting account (SO_PEERCRED): root and members of vakr-admin are admins, members of vakr-view and vakr are operators (read-only), and everyone else is refused (Appendix E.12). |
+| `api.trusted_proxies` | list[str] | `[]` | restart | v0.3.0 | Addresses or CIDR networks of reverse proxies whose Forwarded, X-Forwarded-For, and X-Forwarded-Proto headers vakr believes (SEC-013). Empty believes nobody: the client is the connecting address and the scheme is plain HTTP. With nginx on the same host, set ["127.0.0.1/32", "::1/128"]. |
+| `api.max_body_bytes` | int, >= 1024, <= 524288 | `65536` | restart | v0.3.0 | Largest request body vakr-api accepts, in bytes. A larger request is answered 413 without reading the rest (SEC-019). Every API v1 request body is a small JSON object. |
 
 ### `[rates]`
 

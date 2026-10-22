@@ -636,7 +636,7 @@ type = "duration"
 min = 300
 max = 86400
 default = "30m"
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "A signed-in session ends after this long without a request (SEC-010, Appendix E.12). Must not exceed auth.session_lifetime. Use is recorded at most once a minute, so a session can end up to a minute earlier, never later."
 
@@ -646,7 +646,7 @@ type = "duration"
 min = 600
 max = 604800
 default = "12h"
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "A signed-in session ends this long after login however active it is, and the user signs in again (absolute expiry, SEC-010, Appendix E.12)."
 
@@ -656,7 +656,7 @@ type = "duration"
 min = 86400
 max = 31536000
 default = "30d"
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "How long a kiosk token for an unattended display stays valid after an admin creates it (Appendix E.12). Kiosk tokens have the operator role and no idle expiry."
 
@@ -666,7 +666,7 @@ type = "int"
 min = 1
 max = 100
 default = 5
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "From this many consecutive failed logins for one account from one address, each failure is answered after a delay and the next attempt must wait as long: 1 s, doubling with each further failure, up to auth.login_throttle_max_delay (SEC-012, Appendix E.12). A successful login clears the count."
 
@@ -676,7 +676,7 @@ type = "duration"
 min = 1
 max = 300
 default = "30s"
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "Longest delay before the next login attempt for one account from one address (SEC-012, Appendix E.12)."
 
@@ -686,7 +686,7 @@ type = "duration"
 min = 60
 max = 86400
 default = "15m"
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "A run of failed logins with no new failure for this long is forgotten, and the next failure counts from one again (SEC-012, Appendix E.12)."
 
@@ -696,7 +696,7 @@ type = "int"
 min = 8
 max = 128
 default = 15
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "Fewest characters a new password may have (NIST SP 800-63B for a single-factor password, Appendix E.12). Existing passwords keep working; the rule applies when one is set."
 
@@ -707,7 +707,7 @@ description = "Fewest characters a new password may have (NIST SP 800-63B for a 
 key = "api.listen_address"
 type = "str"
 default = "127.0.0.1"
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "IP address the HTTP listener binds. The default, loopback, serves only a reverse proxy on the same host, which terminates TLS (SEC-013, docs/operations/web-access.md). vakr itself serves plain HTTP. Empty turns the TCP listener off and leaves only the local socket."
 
@@ -717,7 +717,7 @@ type = "int"
 min = 1
 max = 65535
 default = 8080
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "TCP port of the HTTP listener on api.listen_address."
 
@@ -725,7 +725,7 @@ description = "TCP port of the HTTP listener on api.listen_address."
 key = "api.socket_path"
 type = "str"
 default = ""
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "Unix socket for vakr tui and the CLI on this node. Empty means /run/vakr/api.sock. Each connection gets the role of the connecting account (SO_PEERCRED): root and members of vakr-admin are admins, members of vakr-view and vakr are operators (read-only), and everyone else is refused (Appendix E.12)."
 
@@ -733,7 +733,7 @@ description = "Unix socket for vakr tui and the CLI on this node. Empty means /r
 key = "api.trusted_proxies"
 type = "list[str]"
 default = []
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "Addresses or CIDR networks of reverse proxies whose Forwarded, X-Forwarded-For, and X-Forwarded-Proto headers vakr believes (SEC-013). Empty believes nobody: the client is the connecting address and the scheme is plain HTTP. With nginx on the same host, set [\"127.0.0.1/32\", \"::1/128\"]."
 
@@ -743,7 +743,7 @@ type = "int"
 min = 1024
 max = 524288
 default = 65536
-since = "0.2.1"
+since = "0.3.0"
 reload = "restart"
 description = "Largest request body vakr-api accepts, in bytes. A larger request is answered 413 without reading the rest (SEC-019). Every API v1 request body is a small JSON object."
 

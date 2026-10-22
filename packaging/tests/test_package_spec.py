@@ -240,7 +240,7 @@ def test_build_inputs_are_pinned() -> None:
         AssertionError: If an unpinned input appears.
     """
     dockerfile = (PKG / "Dockerfile").read_text(encoding="utf-8")
-    assert re.search(r"FROM ghcr.io/astral-sh/uv:0\.13\.3@sha256:[0-9a-f]{64} ", dockerfile)
+    assert re.search(r"FROM ghcr.io/astral-sh/uv:0\.13\.4@sha256:[0-9a-f]{64} ", dockerfile)
     assert re.search(r"FROM golang:1\.27\.3@sha256:[0-9a-f]{64} ", dockerfile)
     node = re.search(r"FROM node:(\d+\.\d+\.\d+)-trixie-slim@sha256:[0-9a-f]{64} ", dockerfile)
     assert node is not None

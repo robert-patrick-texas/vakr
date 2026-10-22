@@ -568,7 +568,7 @@ def build_release(directory: Path, signer: Signer, version_deb: str, payload: by
     Args:
         directory: Output directory.
         signer: Release signer.
-        version_deb: Debian version string, e.g. ``0.3.0`` or ``0.3.0~rc.1``.
+        version_deb: Debian version string, e.g. ``7.3.0`` or ``7.3.0~rc.1``.
         payload: Fake package bytes.
 
     Returns:
@@ -876,7 +876,7 @@ class Harness:
         """Build, sign, and serve a release.
 
         Args:
-            semver: Version such as ``0.3.0`` or ``0.3.0-rc.1``.
+            semver: Version such as ``7.3.0`` or ``7.3.0-rc.1``.
             body: Release notes.
             prerelease: GitHub pre-release flag.
 

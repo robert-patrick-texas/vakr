@@ -62,10 +62,10 @@ def test_placeholders_expand_to_each_version_form() -> None:
         AssertionError: If a placeholder expands wrongly.
     """
     cfg = load_config(SHIPPED, Path("/repo"))
-    version = ReleaseVersion.parse("0.3.0-rc.2")
-    assert cfg.expand(cfg.artifacts[0], version) == "dist/vakr_0.3.0~rc.2_amd64.deb"
-    assert cfg.expand(cfg.output_dir, version) == "dist/release/v0.3.0-rc.2"
-    assert cfg.expand("{pep440}/{version}", version) == "0.3.0rc2/0.3.0-rc.2"
+    version = ReleaseVersion.parse("7.3.0-rc.2")
+    assert cfg.expand(cfg.artifacts[0], version) == "dist/vakr_7.3.0~rc.2_amd64.deb"
+    assert cfg.expand(cfg.output_dir, version) == "dist/release/v7.3.0-rc.2"
+    assert cfg.expand("{pep440}/{version}", version) == "7.3.0rc2/7.3.0-rc.2"
     with pytest.raises(ConfigError, match="placeholder"):
         cfg.expand("dist/{unknown}", version)
 

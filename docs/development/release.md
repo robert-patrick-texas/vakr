@@ -35,7 +35,7 @@ A release is a GitHub release holding the `.deb`, the field kit `vakr-fieldkit.p
 
 3. **Authenticate the GitHub CLI** with `gh auth login`. The release tool uses `gh` to read CI status and create releases.
 
-4. **Install Node.js and npm** (the exact release `web/.node-version` names, 24.22.0 today) on the development host. The web UI is built and checked with them (ADR-035): `make check` runs its lint, type, and unit checks, and the release preflight stops if `node` or `npm` is missing or `node` is on another line. The package itself is built in a container that brings its own Node, and production hosts never need it.
+4. **Install Node.js and npm** (the exact release `web/.node-version` names, 24.22.1 today) on the development host. The web UI is built and checked with them (ADR-035): `make check` runs its lint, type, and unit checks, and the release preflight stops if `node` or `npm` is missing or `node` is on another line. The package itself is built in a container that brings its own Node, and production hosts never need it.
 
 Until step 2 is done, the shipped signers file is a placeholder, every signature check fails closed, and `tools/release` refuses to publish.
 
@@ -102,7 +102,7 @@ Both targets need Docker, git, and uv.
 
 How the build works (`packaging/build-deb.sh`, which runs `packaging/container/build.sh` in the builder image from `packaging/Dockerfile`):
 
-- **Pinned inputs.** uv 0.13.3 and Go 1.27.3 images are pinned by digest, and nfpm v2.48.0 is verified by the Go checksum database. `uv python install 3.15` fetches a checksum-verified python-build-standalone interpreter into `/opt/vakr/python`. Runtime wheels come from `uv export --frozen` with `--require-hashes --only-binary :all:`, and the hatchling build backend is pinned with hashes in `packaging/build-constraints.txt`.
+- **Pinned inputs.** uv 0.13.4 and Go 1.27.3 images are pinned by digest, and nfpm v2.48.0 is verified by the Go checksum database. `uv python install 3.15` fetches a checksum-verified python-build-standalone interpreter into `/opt/vakr/python`. Runtime wheels come from `uv export --frozen` with `--require-hashes --only-binary :all:`, and the hatchling build backend is pinned with hashes in `packaging/build-constraints.txt`.
 - **Reproducible.** `SOURCE_DATE_EPOCH` is the commit time. Every packaged file gets that mtime, bytecode is compiled with `PYTHONHASHSEED=0` and hash-based invalidation, and nfpm stamps the same time on the archive, so two builds of one commit are byte-identical (PKG-004).
 - **Checked.** Before packaging, the build imports every extension module, checks that no binary needs a newer glibc than the declared `libc6` dependency, and runs `systemd-analyze verify` on the units. After packaging, it runs `lintian --fail-on error`. The only accepted lintian tags are listed, each with its justification, in `packaging/lintian/vakr`: `dir-or-file-in-opt` (the owner's `/opt/vakr` decision) and tags caused by the bundled interpreter.
 - **Test builds.** `VERSION_OVERRIDE=X.Y.Z make deb` builds a package that reports version `X.Y.Z`. It exists only for upgrade tests; `tools/release` refuses to run while it is set, and removes it from the build environment.

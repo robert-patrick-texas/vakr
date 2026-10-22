@@ -29,6 +29,7 @@ Example:
 import asyncio
 import contextlib
 import logging
+import socket
 from collections.abc import Generator
 from typing import Any
 
@@ -44,6 +45,7 @@ from vakr.api.settings import (
 from vakr.app.api.build import ApiParts
 from vakr.app.api.listeners import Listeners
 from vakr.domain.errors import StorageError
+from vakr.scheduler.lag import LoopLagMonitor
 from vakr.service.sdnotify import notify
 
 _LOG = logging.getLogger(__name__)
@@ -192,6 +194,39 @@ class ApiService:
                 if max(counts.sessions, counts.kiosk_tokens, counts.login_failures) < full:
                     break
 
+    def _listeners(self) -> list[tuple[str, int, int]]:
+        """Report each listener's open connections and limit (E.33).
+
+        Args:
+            None
+
+        Returns:
+            list[tuple[str, int, int]]: ``tcp`` or ``socket``, connections, limit.
+
+        Raises:
+            None
+        """
+        return [("socket" if sock.family == socket.AF_UNIX else "tcp",
+                 len(server.server_state.connections), int(server.config.limit_concurrency or 0))
+                for server, sock in self.servers]  # fmt: skip
+
+    async def _watch_metrics(self) -> None:
+        """Measure the API's event-loop lag and report its listeners (OBS-007, E.33).
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            asyncio.CancelledError: When the service stops.
+        """
+        metrics = self.parts.context.metrics
+        metrics.lag = LoopLagMonitor(self.parts.context.clock)
+        metrics.listeners = self._listeners
+        await metrics.lag.run()
+
     async def run(self) -> int:
         """Serve until stopped.
 
@@ -206,6 +241,7 @@ class ApiService:
         """
         tasks = [asyncio.create_task(s.serve(sockets=[sock])) for s, sock in self.servers]
         purge = asyncio.create_task(self._purge())
+        lag = asyncio.create_task(self._watch_metrics())
         failed = not await self._started(tasks)
         if not failed:
             notify("READY=1\nSTATUS=serving API v1")
@@ -219,7 +255,8 @@ class ApiService:
             server.should_exit = True
         await asyncio.gather(*tasks, return_exceptions=True)
         purge.cancel()
-        await asyncio.gather(purge, return_exceptions=True)
+        lag.cancel()
+        await asyncio.gather(purge, lag, return_exceptions=True)
         await asyncio.to_thread(self.parts.close)
         self.listeners.close()
         _LOG.info("vakr-api stopped", extra={"event_id": "api.stopped"})

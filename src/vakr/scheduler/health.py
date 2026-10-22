@@ -58,6 +58,7 @@ class SchedulerSnapshot:
         period: Counters of the period this snapshot closed (or is in).
         lifetime: Counters since start.
         draining: True once shutdown has begun.
+        intervals_s: Shortest and longest effective interval planned (OBS-006).
     """
 
     devices: int
@@ -78,6 +79,7 @@ class SchedulerSnapshot:
     period: Counters = field(default_factory=Counters)
     lifetime: Counters = field(default_factory=Counters)
     draining: bool = False
+    intervals_s: tuple[int, int] | None = None
 
     def collector_state(self) -> CollectorState:
         """Summarise collector health from this snapshot (E.25).

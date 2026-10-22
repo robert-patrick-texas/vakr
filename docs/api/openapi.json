@@ -9813,6 +9813,66 @@
         ]
       }
     },
+    "/api/v1/metrics": {
+      "get": {
+        "description": "Answer the self-metrics.",
+        "operationId": "metrics_api_v1_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain; version=0.0.4; charset=utf-8": {
+                "example": "# HELP vakr_build_info Always 1; ...\n# TYPE vakr_build_info gauge\n"
+              }
+            },
+            "description": "Prometheus text exposition 0.0.4"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Self-metrics (Prometheus text format; operator)",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/v1/operations": {
       "get": {
         "description": "List operations newest first.",
@@ -11183,7 +11243,7 @@
   ],
   "tags": [
     {
-      "description": "Liveness, readiness, component health, version.",
+      "description": "Liveness, readiness, component health, version, metrics.",
       "name": "health"
     },
     {

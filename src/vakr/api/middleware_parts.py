@@ -204,3 +204,26 @@ def log_request(scope: Scope, status: int, elapsed: float, view: ClientView, rid
         _LOG.log(level, "%s %s %d %.0f ms client %s request %s", method, scope.get("path", ""),
                  status, elapsed * 1000, view.address, rid,
                  extra={"event_id": "api.request"})  # fmt: skip
+
+
+def record_request(scope: Scope, status: int, elapsed: float) -> None:
+    """Count the answer in the self-metrics, by route group and status (E.33).
+
+    The application's state holds the services; an app built for its schema
+    only, or a non-HTTP scope, counts nothing.
+
+    Args:
+        scope: The ASGI scope.
+        status: Response status (0 when the client went away first).
+        elapsed: Seconds taken.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    context = getattr(getattr(scope.get("app"), "state", None), "vakr", None)
+    metrics = getattr(context, "metrics", None)
+    if metrics is not None and scope.get("type") == "http":
+        metrics.requests.observe(scope.get("path", ""), status, elapsed)

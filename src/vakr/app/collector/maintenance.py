@@ -141,6 +141,8 @@ class TelemetryUpkeep:
     Attributes:
         passes: Completed passes by kind (``move``, ``projection``, ``retention``).
         failures: Failed passes by kind.
+        last_success: When each kind last succeeded (UTC), for the self-metrics (E.33).
+        last_duration_s: How long each kind's last successful pass took.
     """
 
     def __init__(
@@ -173,6 +175,8 @@ class TelemetryUpkeep:
         self._stop = asyncio.Event()
         self.passes = dict.fromkeys(_KINDS, 0)
         self.failures = dict.fromkeys(_KINDS, 0)
+        self.last_success: dict[str, datetime] = {}
+        self.last_duration_s: dict[str, float] = {}
 
     async def run(self) -> None:
         """Run passes on their cadences until ``stop``; a pass in progress finishes.
@@ -226,7 +230,7 @@ class TelemetryUpkeep:
         Raises:
             None
         """
-        now = self._clock.now_utc()
+        now, began = self._clock.now_utc(), self._clock.monotonic()
         try:
             await asyncio.to_thread(self._work, kind, now)
         except Exception as exc:  # noqa: BLE001 - upkeep trouble must never stop collection
@@ -240,6 +244,8 @@ class TelemetryUpkeep:
             )
             return
         self.passes[kind] += 1
+        self.last_success[kind] = now
+        self.last_duration_s[kind] = self._clock.monotonic() - began
 
     def _work(self, kind: str, now: datetime) -> None:
         """Do one pass (blocking; worker thread only).

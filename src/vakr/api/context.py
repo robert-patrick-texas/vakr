@@ -36,6 +36,7 @@ from fastapi import Request
 from vakr.api.errors import ApiError
 from vakr.api.settings import ApiSettings
 from vakr.auth import AuthServices
+from vakr.metrics.service import MetricsService
 from vakr.operations import OperationService
 from vakr.ports.clock import Clock
 from vakr.ports.metadata import MetadataUnitOfWorkFactory
@@ -137,6 +138,8 @@ class ApiContext:
             logins so neither can crowd out the other.
         operations: Admin operations (manual rediscovery, E.32); ``None``
             builds one with the default reachability strategy (tests).
+        metrics: Self-metrics for ``GET /api/v1/metrics`` (E.33); tests get one
+            without a collector snapshot or database readers.
     """
 
     auth: AuthServices
@@ -153,6 +156,7 @@ class ApiContext:
         default_factory=lambda: LoginGate(KIOSK_ACTIVE, KIOSK_WAITING)
     )
     operations: OperationService | None = None
+    metrics: MetricsService = field(default_factory=MetricsService)
 
 
 def get_context(request: Request) -> ApiContext:

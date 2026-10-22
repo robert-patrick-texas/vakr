@@ -43,6 +43,7 @@ from vakr.adapters.sqlite.telemetry import (
 )
 from vakr.api.context import ApiContext
 from vakr.api.settings import ApiSettings, api_settings_from_config
+from vakr.app.api.metrics_storage import api_metrics
 from vakr.app.api.readonly import ReadOnlyTelemetry
 from vakr.app.collector import preflight
 from vakr.app.collector.preflight import PreflightError
@@ -277,6 +278,7 @@ def build_parts(
         context = ApiContext(auth, overview, history, uow, clock, settings, clock.now_utc(),
                              state)  # fmt: skip
         context.operations = operation_service(uow, clock, config)
+        context.metrics = api_metrics(paths, uow, overview)
         return ApiParts(context, config, local_groups(), [*closers, metadata.close])
     except BaseException:
         for closer in (*closers, metadata.close):

@@ -183,3 +183,17 @@ class MemorySessionRepository:
         for session in dead:
             self._tx.delete("session", session.id)
         return len(dead)
+
+    def count(self) -> int:
+        """Return how many sessions are stored (E.33).
+
+        Args:
+            None
+
+        Returns:
+            int: Count.
+
+        Raises:
+            None
+        """
+        return len(self._tx.records("session"))

@@ -41,6 +41,7 @@ from vakr.api import (
     routes_identity,
     routes_interfaces,
     routes_kiosk,
+    routes_metrics,
     routes_operations,
     routes_views,
 )
@@ -71,7 +72,7 @@ DESCRIPTION = (
     "Times are UTC ISO 8601 with `Z`; a missing value is `null`, never 0."
 )
 TAGS = [
-    {"name": "health", "description": "Liveness, readiness, component health, version."},
+    {"name": "health", "description": "Liveness, readiness, component health, version, metrics."},
     {"name": "auth", "description": "Sign-in, sign-out, and the current session."},
     {"name": "kiosk", "description": "Kiosk display setup and kiosk tokens (admin)."},
     {"name": "devices", "description": "Device list, device screen, reachability history."},
@@ -90,7 +91,7 @@ COMMON_ERRORS: Responses = {
 }
 _ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_interfaces,
             routes_identity, routes_catalog, routes_views, routes_export,
-            routes_dashboards, routes_operations)  # fmt: skip
+            routes_dashboards, routes_operations, routes_metrics)  # fmt: skip
 
 
 def create_app(context: ApiContext | None = None, *, web: WebMount | None = None) -> FastAPI:

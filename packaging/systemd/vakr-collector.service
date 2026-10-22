@@ -48,10 +48,11 @@ LimitNOFILE=16384
 # Hardening (15.3). ICMP uses unprivileged ping sockets, so the collector
 # holds no capability; the documented raw-socket fallback is a drop-in in
 # packaging/examples/vakr-collector.service.d/, never part of this unit.
+# /run/vakr takes the metrics snapshot that vakr-api reads (Appendix E.33).
 NoNewPrivileges=yes
 CapabilityBoundingSet=
 ProtectSystem=strict
-ReadWritePaths=/var/lib/vakr
+ReadWritePaths=/var/lib/vakr /run/vakr
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes

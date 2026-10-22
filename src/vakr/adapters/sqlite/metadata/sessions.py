@@ -227,3 +227,17 @@ class SqliteSessionRepository:
             "WHERE expires_at <= ? OR last_seen_at <= ? ORDER BY expires_at, id LIMIT ?)",
             (encode_time(now), encode_time(idle_cutoff), max(limit, 0)),
         )
+
+    def count(self) -> int:
+        """Return how many sessions are stored (E.33).
+
+        Args:
+            None
+
+        Returns:
+            int: Count.
+
+        Raises:
+            StorageError: If the table cannot be read.
+        """
+        return int(self._tx.query("SELECT count(*) FROM auth_session")[0][0])

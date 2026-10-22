@@ -245,4 +245,5 @@ class Scheduler:
             lateness=stats.lateness.percentiles(), duration=stats.duration.percentiles(),
             completion=stats.completion.percentiles(),
             period=period, lifetime=replace(stats.lifetime), draining=d.stopping,
+            intervals_s=d.plan.intervals_s(),
         )  # fmt: skip

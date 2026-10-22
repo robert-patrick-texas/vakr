@@ -134,13 +134,13 @@ def test_next_patch_is_newer_and_final() -> None:
 @pytest.mark.parametrize(
     ("text", "rule", "expected"),
     [
-        ("0.4.0", "rc-or-major-zero", True),
+        ("0.9.0", "rc-or-major-zero", True),
         ("1.0.0-rc.2", "rc-or-major-zero", True),
         ("1.0.0", "rc-or-major-zero", False),
-        ("0.4.0", "rc", False),
+        ("0.9.0", "rc", False),
         ("1.0.0-rc.2", "rc", True),
         ("1.0.0", "always", True),
-        ("0.4.0-rc.1", "never", False),
+        ("0.9.0-rc.1", "never", False),
     ],
 )
 def test_prerelease_rules(text: str, rule: str, expected: bool) -> None:

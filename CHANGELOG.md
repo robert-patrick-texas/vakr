@@ -2,7 +2,9 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
-## Unreleased
+## 0.4.0 - 2026-10-22
+
+Milestone M5, two positions: node roles, `vkr_` replication tokens, metadata pull to a read-only peer, and observation replication in both directions. Each position keeps working through a partition and backfills afterwards; the composite status reads "Reachable from <position> only". Also read-compatible telemetry versioning, and a security fix: self-update's archives, record, and lock now live where only root may write. **This release is marked `manual-update-required`** for nodes updating from 0.3.x (telemetry schema 3); a new installation is unaffected.
 
 ### Security
 
@@ -24,15 +26,24 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
   - A newer schema with a breaking change is still refused, naming the migration.
   - Older releases refuse every newer telemetry schema, so releases that add telemetry migrations still carry `manual-update-required`.
 
-### Notes for operators updating from 0.3.x
-
-- **This release is marked `manual-update-required`.** It migrates the telemetry schema to 3 (`0003_replication.sql`), and self-update never copies `telemetry.db`, so an automatic rollback could not restore it. The update timer skips this release; install it with `sudo vakr self-update`. The migration adds two empty tables in milliseconds.
-- To go back to 0.3.x after updating, stop `vakr-collector` and `vakr-api`, then drop the two tables and the journal row of version 3, as [the database guide](docs/operations/database.md#going-back-before-telemetry-schema-3) shows, before installing the older release. Observations a partner replicated stay, as ordinary rows of its collector.
-
 ### Changed
 
 - Developers: `make mpos-test` runs the two-position system tests, MPOS-T01 to MPOS-T04 ([two-position tests](docs/development/two-position-tests.md)). It starts two systemd nodes, `east` and `west`, and a simulated fleet in privileged containers, and applies nftables partitions and netem delays. `MPOS_QUICK=1` takes about 7 minutes with a prebuilt package; the full run holds a 30-minute partition. The checks that need node roles or observation replication (M5 parts A and B) print SKIP until `MPOS_FEATURES` names them. A manual GitHub workflow, **Two positions**, runs quick mode. Not part of `make check`.
 - Developers: `make github-update-test` reads the update timer's log from a whole-journal cursor, because the unit has none before its first run. For a `manual-update-required` release, it accepts either answer from the rolled-back release: it may refuse the new telemetry schema, or, when FROM already has that migration, accept it. Verified against the published releases, 0.2.1 → 0.3.1 and 0.3.0 → 0.3.1.
+- Toolchain and dependencies (TOOLS-001): the package bundles CPython 3.15.1 (from `.python-version`'s 3.15 line; 3.15.0 before), the builder image has uv 0.13.5, `pycparser` is 3.12, and the developer dependency `eslint-plugin-jsdoc` is 65.4.1.
+
+### Deferred updates (TOOLS-001)
+
+- **Node.js 26 and `@types/node` 26:** Node 26 is a Current release, not LTS. The web build stays on 24 LTS (E.31 decision 9), and Dependabot ignores `@types/node` majors.
+- **TypeScript 7:** SvelteKit 3.1, svelte-check, and typescript-eslint support only 6.x (E.31 decision 9).
+
+### Notes for operators
+
+- **A new installation** needs nothing beyond the [install guide](docs/operations/install.md). A single node needs no `[node]` settings. For two positions, see [two positions](docs/operations/two-positions.md).
+
+- **This release is marked `manual-update-required`.** It migrates the telemetry schema to 3 (`0003_replication.sql`), and self-update never copies `telemetry.db`, so an automatic rollback could not restore it. The update timer skips this release; install it with `sudo vakr self-update`. The migration adds two empty tables in milliseconds.
+- To go back to 0.3.x after updating, stop `vakr-collector` and `vakr-api`, then drop the two tables and the journal row of version 3, as [the database guide](docs/operations/database.md#going-back-before-telemetry-schema-3) shows, before installing the older release. Observations a partner replicated stay, as ordinary rows of its collector.
+- **After updating, self-update keeps its files in `/var/lib/vakr-update`.** The first `sudo vakr self-update` of this release moves an older release's pre-update archives and update record from `/var/lib/vakr` and logs `update.storage.adopted`. A file there that root doesn't own, or that others may change, is left behind and never restored.
 
 ## 0.3.1 - 2026-10-22
 

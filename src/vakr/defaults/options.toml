@@ -71,7 +71,7 @@ key = "node.peer_url"
 type = "str"
 format = "url"
 default = ""
-since = "0.3.1"
+since = "0.4.0"
 reload = "restart"
 description = "HTTPS URL of the peer node, for example https://vakr-west.example.net. On a primary it is where the collector pulls the peer's observations from (MPOS-004); empty replicates nothing. Not used on a peer, which pulls from node.primary_url."
 

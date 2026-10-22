@@ -80,15 +80,16 @@ sudo apt install ./vakr_${debver}_amd64.deb
 | `/opt/vakr/share/doc/web-licenses/` | Licence and notice files of the front-end packages bundled into the web UI | package |
 | `/opt/vakr/share/systemd/`, `share/doc/`, `share/templates/` | Unit sources, license and changelog, config template | package |
 | `/usr/bin/vakr` | Symlink to `/opt/vakr/venv/bin/vakr` | package |
-| `/usr/lib/systemd/system/` | `vakr.target`, `vakr-collector.service` ([collector](collector.md)), `vakr-update.service`, `vakr-update.timer` | package |
+| `/usr/lib/systemd/system/` | `vakr.target`, `vakr-collector.service` ([collector](collector.md)), `vakr-api.service` ([API](api.md)), `vakr-update.service`, `vakr-update.timer` | package |
 | `/usr/lib/sysusers.d/vakr.conf`, `/usr/lib/tmpfiles.d/vakr.conf` | Account and directory definitions | package |
 | `/etc/vakr/config.toml` | Your settings, overrides only (mode `0640`, `root:vakr`) | you |
 | `/etc/vakr/secrets/` | Credentials (mode `0750`, `root:vakr`) | you |
 | `/etc/vakr/tls/ca.d/` | Extra trusted CA certificates (EGRESS-002) | you |
 | `/var/lib/vakr/` | State and telemetry history (mode `0750`, `vakr:vakr`) | vakr |
 | `/var/cache/vakr/` | Downloaded and previous packages for rollback | vakr |
+| `/var/lib/vakr-update/` | Self-update's record, lock, and pre-update backups (`backups/`, mode `0700`); only root may write here ([updates](updates.md#files)) | root |
 
-The package also creates the system user and group `vakr` (home `/var/lib/vakr`, no login shell) and the group `vakr-admin`.
+The package also creates the system user and group `vakr` (home `/var/lib/vakr`, no login shell) and the groups `vakr-admin` (admin on the local API socket) and `vakr-view` (read-only on the socket, no file access).
 
 `/etc/vakr/config.toml` is created only if it does not exist, and the package never overwrites it. It is deliberately not a dpkg conffile, so upgrades never stop to ask about it (CFGM-005). Defaults live in `/opt/vakr/share/defaults/`, so the file only needs the settings you change.
 
@@ -118,6 +119,9 @@ To start monitoring:
 3. Enable the collector and `vakr.target`, the unit that starts and stops all vakr services together: `sudo systemctl enable --now vakr-collector.service vakr.target` ([collector](collector.md)).
 4. Watch the result with `vakr status` or `vakr tui` ([status and TUI](status-and-tui.md)).
 5. Start the API for the web UI, integrations, and the local socket: `sudo systemctl enable --now vakr-api.service`, then put it behind TLS with a reverse proxy ([API](api.md), [web access](web-access.md)). The same service serves the web UI at the proxy's address; sign in with the account `vakr setup` created ([web UI](web-ui.md)).
+6. Point your monitoring at vakr itself: `vakr check health` for CheckMK or Nagios, run by an account in `vakr-view` ([status and TUI](status-and-tui.md)), and `GET /api/v1/metrics` for Prometheus ([metrics](metrics.md)).
+
+A single node needs no `[node]` settings. To run a second position, install a second node the same way and follow [two positions](two-positions.md): one node is the primary, the other a peer, and each gets a replication token from the other.
 
 ## Automatic updates
 

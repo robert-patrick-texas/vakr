@@ -88,7 +88,7 @@ def test_empty_section_counts_as_missing() -> None:
     assert changelog_notes("## v2.0.0\n\n## 1.0.0\n- x\n", "2.0.0") is None
 
 
-@pytest.mark.parametrize(("text", "prerelease"), [("0.4.0", True), ("1.0.0", False)])
+@pytest.mark.parametrize(("text", "prerelease"), [("0.9.0", True), ("1.0.0", False)])
 def test_publish_commands_tag_push_then_release(text: str, prerelease: bool) -> None:
     """Section 28.7: annotated tag, push, then ``gh release create`` with assets.
 

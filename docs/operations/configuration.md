@@ -25,7 +25,7 @@ Useful commands: `vakr config show-effective --sources` prints every effective v
 | `node.role` | enum: primary \| peer | `"primary"` | restart | v0.1.0 | Role of this node. A primary owns inventory and policy metadata; a peer pulls metadata from node.primary_url and keeps collecting while isolated (MPOS-003). |
 | `node.position` | str | `""` | restart | v0.1.0 | Label for this node's network vantage point, shown in the UI, for example east. vakr setup sets it on first install. |
 | `node.primary_url` | str (url) | `""` | restart | v0.1.0 | HTTPS URL of the primary node, for example https://vakr-east.example.net. Required when node.role is peer; ignored on a primary. |
-| `node.peer_url` | str (url) | `""` | restart | v0.3.1 | HTTPS URL of the peer node, for example https://vakr-west.example.net. On a primary it is where the collector pulls the peer's observations from (MPOS-004); empty replicates nothing. Not used on a peer, which pulls from node.primary_url. |
+| `node.peer_url` | str (url) | `""` | restart | v0.4.0 | HTTPS URL of the peer node, for example https://vakr-west.example.net. On a primary it is where the collector pulls the peer's observations from (MPOS-004); empty replicates nothing. Not used on a peer, which pulls from node.primary_url. |
 
 ### `[time]`
 

@@ -32,15 +32,15 @@ If the install or any hook fails, self-update rolls back automatically. See [Rol
 The command ends with a short summary, and for an update it includes an excerpt of the release notes:
 
 ```text
-vakr self-update: updated: updated 0.4.0 -> 0.5.0
-release notes (0.5.0):
+vakr self-update: updated: updated 7.3.0 -> 7.4.0
+release notes (7.4.0):
   ## Changes
   - ...
 
-3 new configuration options since 0.4.0 (packaged defaults apply):
+3 new configuration options since 7.3.0 (packaged defaults apply):
   snmp (2): bulk_walks, max_walk_rows
   tui (1): refresh_interval
-  descriptions: vakr config new-options --since 0.4.0 --describe
+  descriptions: vakr config new-options --since 7.3.0 --describe
 To add them to your files as commented examples: vakr config new-options --annotate
 ```
 
@@ -55,7 +55,7 @@ egress https://api.github.com/: ok
   [ok  ] tcp: connected to api.github.com:443 in 27 ms
   [ok  ] tls: TLSv1.3 verified; issuer 'CN=...'
   [ok  ] http: HTTP 200 from api.github.com
-vakr self-update: available: 0.5.0 is available (installed 0.4.0)
+vakr self-update: available: 7.4.0 is available (installed 7.3.0)
 ```
 
 `--check` changes nothing. It first tests the path to the GitHub API step by step (DNS, TCP or proxy CONNECT, TLS, HTTP), then reports `available`, `up-to-date`, or `skipped` with the reason. It exits 0 when the check completed, whatever the answer, and exits 1 when GitHub cannot be reached or the API refuses the request.

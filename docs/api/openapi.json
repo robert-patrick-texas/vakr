@@ -637,7 +637,7 @@
         "type": "object"
       },
       "EventRow": {
-        "description": "One recent event.\n\nAttributes:\n    kind: ``restart``, ``identity_review``, or ``telemetry_loss``.\n    at: When it happened or was detected (UTC).\n    subject: What it concerns, such as a device name or a spool.\n    device_id: The device, when the event concerns one.\n    position: The position that saw it, when known.\n    text: Operator words.",
+        "description": "One recent event.\n\nAttributes:\n    kind: ``restart``, ``rediscovery``, ``identity_review``, or ``telemetry_loss``.\n    at: When it happened or was detected (UTC).\n    subject: What it concerns, such as a device name or a spool.\n    device_id: The device, when the event concerns one.\n    position: The position that saw it, when known.\n    text: Operator words.",
         "properties": {
           "at": {
             "format": "date-time",
@@ -2099,6 +2099,204 @@
         ],
         "title": "MarkerView",
         "type": "object"
+      },
+      "OperationOut": {
+        "description": "One admin operation (API-011).\n\nAttributes:\n    id: Operation UUID; ``GET /api/v1/operations/{id}`` follows it.\n    kind: ``rediscovery``.\n    device_id: The device.\n    device_name: Its current display name; ``null`` if it cannot be read.\n    state: ``queued``, ``running``, ``succeeded``, ``failed``, or ``expired``.\n    requested_by: Username, ``local:<account>``, or ``cli:<login>``.\n    requested_at: When it was asked for (UTC).\n    started_at: When a collector claimed it.\n    finished_at: When it ended.\n    collector_id: The collector that ran it.\n    result: What a succeeded rediscovery found and changed.\n    error: Why a failed or expired operation did not succeed.",
+        "properties": {
+          "collector_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Collector Id"
+          },
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "requested_at": {
+            "format": "date-time",
+            "title": "Requested At",
+            "type": "string"
+          },
+          "requested_by": {
+            "title": "Requested By",
+            "type": "string"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OperationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "device_id",
+          "device_name",
+          "state",
+          "requested_by",
+          "requested_at",
+          "started_at",
+          "finished_at",
+          "collector_id",
+          "result",
+          "error"
+        ],
+        "title": "OperationOut",
+        "type": "object"
+      },
+      "OperationPage": {
+        "description": "One page of operations, newest first (API-005).\n\nAttributes:\n    rows: The operations.\n    page: Paging facts.",
+        "properties": {
+          "page": {
+            "$ref": "#/components/schemas/PageInfo"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/OperationOut"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "page"
+        ],
+        "title": "OperationPage",
+        "type": "object"
+      },
+      "OperationResult": {
+        "description": "What a finished rediscovery found and changed (DISC-T03).\n\nAttributes:\n    interfaces: Interfaces the agent reported.\n    new: Interfaces that got a new identity.\n    renumbered: Known interfaces matched at another ``ifIndex``.\n    missing: Known interfaces the agent no longer reported.\n    reviews_opened: Identity cases left for an administrator (IFID-007).\n    capability_changes: Interfaces whose counter capabilities changed (DISC-009).\n    partial: Whether some table came back incomplete.\n    duration_ms: How long the discovery took.",
+        "properties": {
+          "capability_changes": {
+            "default": 0,
+            "title": "Capability Changes",
+            "type": "integer"
+          },
+          "duration_ms": {
+            "default": 0,
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "interfaces": {
+            "title": "Interfaces",
+            "type": "integer"
+          },
+          "missing": {
+            "default": 0,
+            "title": "Missing",
+            "type": "integer"
+          },
+          "new": {
+            "default": 0,
+            "title": "New",
+            "type": "integer"
+          },
+          "partial": {
+            "default": false,
+            "title": "Partial",
+            "type": "boolean"
+          },
+          "renumbered": {
+            "default": 0,
+            "title": "Renumbered",
+            "type": "integer"
+          },
+          "reviews_opened": {
+            "default": 0,
+            "title": "Reviews Opened",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "interfaces"
+        ],
+        "title": "OperationResult",
+        "type": "object"
+      },
+      "OperationState": {
+        "description": "Where an operation is; see the module docstring for the transitions.",
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed",
+          "expired"
+        ],
+        "title": "OperationState",
+        "type": "string"
       },
       "OverviewView": {
         "description": "The authenticated overview (12.2).\n\nAttributes:\n    devices: Device state summary with freshness.\n    health: Metadata, telemetry, and per-collector health (spool fill included).\n    high_priority: Primary-interest interfaces with current values.\n    wan: WAN circuits with provider, circuit, contracted rate, and state.\n    top_utilization: Top utilization for the selected window.\n    top_errors: Top errors for the selected window.\n    events: Restart, rediscovery, identity-review, and telemetry-loss feeds.\n    filters: Quick-filter choices.\n    generated_at: When the view was computed (UTC).",
@@ -5030,6 +5228,110 @@
         ]
       }
     },
+    "/api/v1/devices/{device_uuid}/rediscovery": {
+      "post": {
+        "description": "Queue a manual rediscovery and answer at once with the operation (DISC-003, DISC-010).",
+        "operationId": "rediscovery_api_v1_devices__device_uuid__rediscovery_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationOut"
+                }
+              }
+            },
+            "description": "the operation already queued or running"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such device"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no collector would rediscover it, or full"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Rediscover a device now (admin; asynchronous)",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
     "/api/v1/exports/devices/{device_uuid}/history/reachability": {
       "get": {
         "description": "Export one device's latency, loss, and jitter per position.",
@@ -7956,6 +8258,222 @@
         ]
       }
     },
+    "/api/v1/operations": {
+      "get": {
+        "description": "List operations newest first.",
+        "operationId": "operations_api_v1_operations_get",
+        "parameters": [
+          {
+            "description": "Only this device's.",
+            "in": "query",
+            "name": "device",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this device's.",
+              "title": "Device"
+            }
+          },
+          {
+            "description": "Repeatable.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "default": [],
+              "description": "Repeatable.",
+              "items": {
+                "$ref": "#/components/schemas/OperationState"
+              },
+              "maxItems": 5,
+              "title": "State",
+              "type": "array"
+            }
+          },
+          {
+            "description": "Page size, 1 to 500.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "description": "Page size, 1 to 500.",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "`page.next_cursor` of the previous page.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 1024,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "`page.next_cursor` of the previous page.",
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Admin operations, newest first",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/api/v1/operations/{operation_uuid}": {
+      "get": {
+        "description": "Return one operation.",
+        "operationId": "operation_api_v1_operations__operation_uuid__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such operation"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "One admin operation: progress and result",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
     "/api/v1/overview": {
       "get": {
         "description": "Return the overview dashboard.",
@@ -9132,6 +9650,10 @@
     {
       "description": "Interface identity history and reviews.",
       "name": "identity"
+    },
+    {
+      "description": "Manual rediscovery and admin operations.",
+      "name": "operations"
     },
     {
       "description": "Sites, tags, groups, and collectors.",

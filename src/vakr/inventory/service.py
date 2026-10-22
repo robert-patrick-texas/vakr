@@ -14,9 +14,12 @@ write):
   ``None`` when it was never discovered (DISC-001).
 - ``record_discovery(device, result, now)``: reconcile, store, classify,
   and return the new plan (IFID-001, DISC-007, META-012).
+  ``record_discovery_report`` does the same and also says what changed,
+  for a manual rediscovery's result (DISC-T03).
 
 Dependencies:
     vakr.discovery.reconcile.persist: Reconciliation and its writes.
+    vakr.inventory.discovery_report: Capability memory and the discovery report.
     vakr.inventory.planning, reads: Plans and bounded lists.
     vakr.policy: Rules and keywords; vakr.ports: clock and metadata.
 
@@ -46,7 +49,8 @@ from vakr.domain.enums import AdminState, AuditOutcome
 from vakr.domain.errors import ConflictError, DuplicateError, NotFoundError
 from vakr.domain.ids import AuditEventId, CollectorId, DeviceId, new_id
 from vakr.domain.inventory import Device
-from vakr.inventory.planning import Capabilities, PlanInputs, build_plan
+from vakr.inventory.discovery_report import CapabilityMemory, DiscoveryReport
+from vakr.inventory.planning import PlanInputs, build_plan
 from vakr.inventory.reads import all_devices
 from vakr.logic.lifecycle_model import STALE_AFTER
 from vakr.policy.keywords import KeywordSet, packaged_keywords
@@ -99,7 +103,7 @@ class InventoryService:
         self._stale_after = stale_after
         self._lock = threading.Lock()
         self._epoch = 0
-        self._caps: dict[DeviceId, dict[int, Capabilities]] = {}
+        self._caps = CapabilityMemory()
 
     def devices(self) -> tuple[Device, ...]:
         """Return the devices this collector polls, ordered by ``(name, id)``.
@@ -166,7 +170,8 @@ class InventoryService:
             StorageError: If the store cannot be read.
         """
         with self._lock:
-            inputs, caps = self._inputs, dict(self._caps.get(device_id, {}))
+            inputs = self._inputs
+        caps = self._caps.of(device_id)
         with self._factory() as uow:
             device = uow.devices.get(device_id)
             if device is None:
@@ -187,6 +192,25 @@ class InventoryService:
             PollPlan: The new plan; empty when the agent reported no interfaces.
 
         Raises:
+            NotFoundError, ConflictError, DuplicateError, StorageError: As
+            ``record_discovery_report`` documents.
+        """
+        return self.record_discovery_report(device_id, result, now).plan
+
+    def record_discovery_report(
+        self, device_id: DeviceId, result: DiscoveryResult, now: datetime
+    ) -> DiscoveryReport:
+        """Record a discovery like ``record_discovery`` and say what it changed (DISC-T03).
+
+        Args:
+            device_id: The device discovered.
+            result: What discovery found.
+            now: When discovery ran (UTC).
+
+        Returns:
+            DiscoveryReport: The new plan, identity changes, and capability changes.
+
+        Raises:
             NotFoundError: If the device does not exist.
             ConflictError, DuplicateError: If concurrent writers collided
                 ``WRITE_ATTEMPTS`` times.
@@ -197,15 +221,16 @@ class InventoryService:
         write = DiscoveryWrite(device_id, now, keywords, self._stale_after)
         for attempt in range(1, WRITE_ATTEMPTS + 1):
             try:
-                self._write(write, result)
+                persisted = self._write(write, result)
                 break
             except ConflictError, DuplicateError:
                 if attempt == WRITE_ATTEMPTS:
                     raise
-        self._remember(device_id, result)
-        return self.poll_plan(device_id) or PollPlan(())
+        moved = self._caps.remember(device_id, result)
+        plan = self.poll_plan(device_id) or PollPlan(())
+        return DiscoveryReport(plan, persisted.changes, moved)
 
-    def _write(self, write: DiscoveryWrite, result: DiscoveryResult) -> None:
+    def _write(self, write: DiscoveryWrite, result: DiscoveryResult) -> Persisted:
         """Run one discovery write in its own unit of work.
 
         Args:
@@ -213,7 +238,7 @@ class InventoryService:
             result: What discovery found.
 
         Returns:
-            None
+            Persisted: What the write decided and changed.
 
         Raises:
             NotFoundError, ConflictError, DuplicateError, StorageError: As
@@ -225,6 +250,7 @@ class InventoryService:
             persisted = persist_discovery(uow, write, result)
             self._audit(uow, write.device_id, persisted)
             uow.commit()
+        return persisted
 
     def _audit(self, uow: MetadataUnitOfWork, device_id: DeviceId, persisted: Persisted) -> None:
         """Audit a discovery that changed identities (SEC-018); quiet rediscoveries are not.
@@ -256,23 +282,3 @@ class InventoryService:
                 f"identity decisions ({version}): {summary}",
             )
         )
-
-    def _remember(self, device_id: DeviceId, result: DiscoveryResult) -> None:
-        """Keep the probed counter capabilities for later plans of this device.
-
-        Args:
-            device_id: The device.
-            result: What discovery found.
-
-        Returns:
-            None
-
-        Raises:
-            None
-        """
-        caps = {
-            r.if_index: Capabilities(r.hc_octets, r.hc_packets, r.discontinuity)
-            for r in result.interfaces
-        }
-        with self._lock:
-            self._caps[device_id] = caps

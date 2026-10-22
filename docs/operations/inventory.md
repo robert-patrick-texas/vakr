@@ -165,6 +165,30 @@ Each decision is recorded in the interface's identity history with your login an
 
 The rules are deliberately cautious for the MVP. Their weights will be tuned from field captures of IOS XE devices (ADR-015), which should reduce how often you are asked.
 
+## Rediscovering a device now
+
+Rediscovery runs every 24 hours by default (`discovery_interval` per device). To walk a device at once, for example after a line card swap or a description change you want to see now, an admin asks for a manual rediscovery: **Rediscover now** on the device's page in the web UI, `POST /api/v1/devices/{device_uuid}/rediscovery` ([API](api.md)), or on the node:
+
+```console
+$ sudo vakr inventory rediscover core1 --wait
+queued manual rediscovery of core1 (operation 0190a3c4-...)
+core1: queued
+core1: running
+core1: succeeded: 48 interfaces, 1 new, 0 renumbered, 2 missing, 1 identity reviews opened in 2.4 s
+```
+
+The request answers at once; `vakr-collector` picks it up within about 5 seconds when a discovery slot is free, and runs the same discovery as a scheduled rediscovery, with the same identity rules as above. The device's next scheduled rediscovery is then a whole interval later. A second request while one is queued or running follows the first instead of queueing another.
+
+| Situation | What you see |
+|---|---|
+| The device is disabled or retired, has no SNMP credential, or is `icmp_only` | Refused with the reason (exit 1); nothing is queued |
+| No collector has reported lately | The command says so; the request waits and expires after 1 hour: "no collector picked this up within 1 h; is vakr-collector running?" (`--wait` exits 3 at once) |
+| The agent does not answer | `failed: the agent did not answer` (exit 1) |
+| `--timeout` (default 300 s, at most 3600 s) passes | `--wait` exits 3; the operation goes on |
+| The collector restarts during the walk | `failed: the collector restarted during the rediscovery` |
+
+`vakr inventory operations [DEVICE]` lists recent requests, newest first (`--json`, `--limit`, 1 to 500). Finished operations are kept for 30 days. Every request is audited with who asked (Appendix E.32).
+
 ## Troubleshooting
 
 | Symptom | Cause and fix |

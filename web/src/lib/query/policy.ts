@@ -37,7 +37,9 @@ export const REFRESH = {
 	/** Rankings: the window end is aligned to 1 or 5 minutes (E.28). */
 	ranking: 60 * SECOND,
 	/** Identity reviews. */
-	reviews: 60 * SECOND
+	reviews: 60 * SECOND,
+	/** An admin operation while it is queued or running (manual rediscovery, E.32). */
+	operation: 2 * SECOND
 } as const;
 
 /** Most retries of one read after the first attempt (ADR-035 decision 6). */

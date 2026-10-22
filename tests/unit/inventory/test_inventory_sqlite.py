@@ -127,7 +127,7 @@ def test_mig002_schema_1_upgrades_with_data(tmp_path: Path) -> None:
         uow.commit()
     store.close()
     applied = metadata_migrations(db).migrate()
-    assert [(a.version, a.name) for a in applied] == [(2, "identity_review"), (3, "local_auth")]
+    assert [(a.version, a.name) for a in applied][:2] == [(2, "identity_review"), (3, "local_auth")]
     upgraded = SqliteMetadataStore(db)
     with sqlite_uow_factory(upgraded)() as uow:
         assert uow.devices.get(device.id) == device

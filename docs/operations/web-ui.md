@@ -43,7 +43,7 @@ The bar at the top has every section, a search box, your name and role, the rele
 | Collectors/Health | `/collectors` | Each collector with its state, report age, and spool use, and the API's own components. |
 | Identity reviews | `/identity-reviews` | Interfaces that discovery could not match with certainty. Admins decide them here. |
 | Search | `/search?q=` | Devices, interfaces, sites, providers, circuits, tags, and groups whose names contain the text. Every hit opens its page, so any interface's history is two steps from the search box. |
-| Admin | `/admin` | Admin tasks (admins only). |
+| Admin | `/admin` | Admin tasks and the newest manual rediscoveries (admins only). |
 
 ## What the page states mean
 
@@ -94,12 +94,13 @@ Pages refresh themselves while the browser tab is visible, and stop while it is 
 | Device and interface pages (current values), collectors | 30 s |
 | Graphs | 60 s |
 | Rankings, identity reviews | 60 s |
+| A manual rediscovery while it is queued or running | 2 s |
 
 A refresh replaces values in place: the page does not flash, the keyboard focus stays where it was, and unchanged content is not announced again. A failed refresh is retried twice (after 1 s and 2 s) when vakr-api did not answer, and the page then shows the stale note until a refresh succeeds.
 
 ## Who sees what
 
-Operators see every page. Admins also see **Admin** and the decision buttons on identity reviews. vakr-api checks every request itself; hiding a button is not the control ([API: who may do what](api.md#who-may-do-what)).
+Operators see every page. Admins also see **Admin**, the decision buttons on identity reviews, and **Rediscover now** on each device's page, which walks the device at once and shows the result there when the collector has finished ([inventory](inventory.md#rediscovering-a-device-now)). vakr-api checks every request itself; hiding a button is not the control ([API: who may do what](api.md#who-may-do-what)).
 
 To answer an identity review, an admin chooses **It is \<interface\>** (the row is that interface, and its history continues) or **It is a new interface**, then confirms. The decision is recorded with the admin's name in the identity history and the audit log.
 
@@ -109,7 +110,7 @@ The overview, high-priority interfaces, WAN circuits, and rankings also run on a
 
 ## Not in this release
 
-Building and pinning your own dashboards, public dashboards, editing devices and interfaces, rediscovery requests, policy explanations, and live updates (server-sent events) come later. Inventory changes are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
+Building and pinning your own dashboards, public dashboards, editing devices and interfaces, policy explanations, and live updates (server-sent events) come later. Inventory changes are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
 
 ## Troubleshooting
 

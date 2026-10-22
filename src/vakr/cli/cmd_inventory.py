@@ -1,5 +1,8 @@
 """``vakr inventory validate|plan|apply|list``: the file-managed inventory (META-008, META-010).
 
+``vakr inventory rediscover`` and ``operations`` (manual rediscovery,
+DISC-003) live in ``vakr.cli.inventory_ops`` and are registered here.
+
 NetOps keeps devices, sites, and interface annotations in
 ``/etc/vakr/inventory.toml``. ``validate`` checks the file and its relation
 to storage; ``plan`` shows exactly what ``apply`` would change, without
@@ -33,6 +36,7 @@ from pathlib import Path
 
 from vakr.adapters.sqlite.metadata import sqlite_uow_factory
 from vakr.cli.common import SubParsers
+from vakr.cli.inventory_ops import register_operations
 from vakr.cli.inventory_support import (
     EXIT_INVALID,
     EXIT_OK,
@@ -102,6 +106,7 @@ def register(subparsers: SubParsers) -> None:
     listing.add_argument("--json", action="store_true", help="print JSON instead of text")
     listing.add_argument("--all", action="store_true", help="include retired devices")
     listing.set_defaults(func=run_list)
+    register_operations(actions)
 
 
 def _usage(parser: argparse.ArgumentParser) -> int:

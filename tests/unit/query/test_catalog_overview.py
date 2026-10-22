@@ -229,7 +229,8 @@ def test_12_2_overview_summary_feeds_and_filters() -> None:
     assert sum(s.count for s in view.devices.by_status) == 2
     feeds = {f.kind: f for f in view.events}
     assert list(feeds) == ["restart", "rediscovery", "identity_review", "telemetry_loss"]
-    assert not feeds["rediscovery"].available
+    assert feeds["rediscovery"].available  # manual rediscoveries (E.32); none requested here
+    assert feeds["rediscovery"].rows == ()
     assert feeds["telemetry_loss"].rows[0].text == "torn_tail: a torn record was dropped"
     assert view.filters.providers == ("ACME",)
     assert [name for _, name in view.filters.sites] == ["Austin", "Dallas DC1"]

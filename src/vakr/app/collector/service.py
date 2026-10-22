@@ -4,7 +4,8 @@ One process does everything ``vakr-collector.service`` owns in the Compact
 profile: the scheduler runs ICMP and SNMP polls through the collector steps,
 the spool pump makes every result durable, the ingester writes the spool
 into the SQLite telemetry store (the only telemetry writer), discovery runs
-beside polling, and timers checkpoint rate baselines every minute, write a
+beside polling (with manual rediscoveries an administrator queued, picked up
+by the operation watcher), and timers checkpoint rate baselines every minute, write a
 collector-health observation every minute, and keep the telemetry store in
 shape. A watcher follows the inventory change counter, and SIGHUP reloads
 the configuration.
@@ -37,9 +38,10 @@ from typing import Any
 
 from vakr.app.collector.build import CollectorParts
 from vakr.app.collector.derive import RateSettings
-from vakr.app.collector.discovery import DiscoveryRunner
+from vakr.app.collector.discovery_manual import ManualDiscoveryRunner
 from vakr.app.collector.icmp_step import CollectorIcmpStep
 from vakr.app.collector.maintenance import RollupHook, TelemetryUpkeep
+from vakr.app.collector.operations import OperationWatcher
 from vakr.app.collector.pipeline import SpoolPump
 from vakr.app.collector.plans import PlanBook
 from vakr.app.collector.ranking_projector import collector_projector
@@ -68,10 +70,14 @@ class CollectorService:
 
     Attributes:
         parts: What the preflight opened.
-        scheduler, discovery, ingester, pump, upkeep, replanner: The parts at work.
+        scheduler, discovery, ingester, pump, upkeep, replanner, operations: The parts at work.
         plans, baselines, tally: Shared working state.
         failed: Name of a component that stopped unexpectedly, if any.
     """
+
+    failed: str | None
+    exit_code: int | None  # set by a hard stop; overrides 0 or 1
+    reloads: set[asyncio.Task[bool]]
 
     def __init__(
         self, parts: CollectorParts, timings: ServiceTimings | None = None,
@@ -108,21 +114,21 @@ class CollectorService:
         self.pump = SpoolPump(self.outbox, parts.spool)
         self.ingester = Ingester(parts.spool, parts.telemetry.writer, parts.telemetry.capabilities)
         name = parts.scheduler.rule.collector_name
-        self.discovery = DiscoveryRunner(parts.inventory, parts.snmp_factory, self.plans, clock,
-                                         self.timings, name)  # fmt: skip
+        self.discovery = ManualDiscoveryRunner(parts.inventory, parts.snmp_factory, self.plans,
+                                               clock, self.timings, name)  # fmt: skip
         self.discovery.config = parts.snmp
         self.replanner = Replanner(parts.inventory, self.scheduler, self.discovery, self.plans,
                                    self.baselines, parts.uow_factory, clock,
                                    self.timings.poll_interval_override_s)  # fmt: skip
         self.replanner.defaults = parts.scheduler.defaults
         self.discovery.on_plan = self.replanner.refresh_capacity
+        self.operations = OperationWatcher(self.discovery, parts.uow_factory,
+                                           parts.collector.id, clock)  # fmt: skip
         job = rollups if rollups is not None else collector_job(parts, clock, self.ingester)
         projector = collector_projector(parts, clock, self.ingester)
         self.upkeep = TelemetryUpkeep(parts.telemetry, clock, self.timings, job, projector)
-        self.failed: str | None = None
-        self.exit_code: int | None = None  # set by a hard stop; overrides 0 or 1
-        self._stop, self.loops_stop = asyncio.Event(), asyncio.Event()
-        self.reloads: set[asyncio.Task[bool]] = set()
+        self.failed = self.exit_code = None
+        self._stop, self.loops_stop, self.reloads = asyncio.Event(), asyncio.Event(), set()
 
     def request_stop(self) -> None:
         """Begin graceful shutdown (SIGTERM, SIGINT).
@@ -245,6 +251,7 @@ class CollectorService:
             "discovery": self.discovery.run(),
             "telemetry upkeep": self.upkeep.run(),
             "inventory watch": self.replanner.watch(self.loops_stop, t.change_poll_s),
+            "operations watch": self.operations.watch(self.loops_stop, t.change_poll_s),
             "baseline checkpoint": repeat(
                 self.loops_stop, t.checkpoint_interval_s, partial(write_checkpoint, self)
             ),

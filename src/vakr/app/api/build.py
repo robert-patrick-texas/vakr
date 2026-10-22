@@ -61,6 +61,7 @@ from vakr.config.loader import EffectiveConfig
 from vakr.domain.errors import StorageError, ValidationError
 from vakr.ingest.incidents import LossIncident, read_incidents
 from vakr.ingest.settings import SpoolSettings
+from vakr.operations import operation_service
 from vakr.paths import InstallPaths
 from vakr.ports.clock import Clock, SystemClock
 from vakr.ports.migrations import MigrationError
@@ -275,6 +276,7 @@ def build_parts(
         history = HistoryQueries(uow, telemetry, query, clock)
         context = ApiContext(auth, overview, history, uow, clock, settings, clock.now_utc(),
                              state)  # fmt: skip
+        context.operations = operation_service(uow, clock, config)
         return ApiParts(context, config, local_groups(), [*closers, metadata.close])
     except BaseException:
         for closer in (*closers, metadata.close):

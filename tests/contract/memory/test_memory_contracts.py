@@ -11,6 +11,7 @@ from tests.contract.contract_auth_sessions import AuthSessionsContract
 from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
+from tests.contract.contract_metadata_operations import OperationsContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 from tests.contract.contract_ranking_projection import RankingProjectionContract
 from tests.contract.contract_rollup_source import RollupSourceContract
@@ -54,6 +55,10 @@ class TestMemoryAuthUsers(AuthUsersContract):
 
 class TestMemoryAuthSessions(AuthSessionsContract):
     """SEC-010, AUTH-002: sessions and kiosk tokens on the memory adapter."""
+
+
+class TestMemoryOperations(OperationsContract):
+    """API-011, DISC-T03, API-T06: admin operations on the memory adapter."""
 
 
 class TestMemoryTelemetryHistory(TelemetryHistoryContract):

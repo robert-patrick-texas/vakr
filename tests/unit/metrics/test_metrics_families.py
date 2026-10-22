@@ -146,8 +146,12 @@ def test_obs_t01_every_catalogued_family_is_in_the_scrape(
     path = paths.run_dir / "collector-metrics.json"
     pull_record(paths.state_dir / pull_status.FILE, "applied", datetime.now(UTC), digest="0" * 64)
     stamp = obs_status.stamp(datetime.now(UTC))
-    obs_status.write_status(paths.state_dir / obs_status.FILE, obs_status.ObservationPullStatus(
-        sources={"x": obs_status.SourceStatus(cursor=5, newest_seq=9, newest_ts=stamp)}))  # fmt: skip
+    obs_status.write_status(
+        paths.state_dir / obs_status.FILE,
+        obs_status.ObservationPullStatus(
+            sources={"x": obs_status.SourceStatus(cursor=5, newest_seq=9, newest_ts=stamp)}
+        ),
+    )
     now = WHEN.timestamp()
     write_snapshot(path, encode_snapshot(collector_families(snap, stats), now - 3))
     fleet = Fleet()

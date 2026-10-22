@@ -65,9 +65,11 @@ def test_mpos004_local_ingest_is_logged_once_in_seq_order(tmp_path: Path) -> Non
     feed = SqliteObservationFeed(store)
     assert feed.bounds(east) == (1, 15)
     page = feed.feed(east, 0, 10)
-    assert [e.seq for e in page.entries] == list(range(1, 11)) and page.has_more
+    assert [e.seq for e in page.entries] == list(range(1, 11))
+    assert page.has_more
     rest = feed.feed(east, page.next_after, 10)
-    assert not rest.has_more and rest.next_after == 15
+    assert not rest.has_more
+    assert rest.next_after == 15
     got = [e.observation for e in (*page.entries, *rest.entries)]
     assert _sorted(got) == _sorted(rows)  # exactly as written, every family
     assert [o.timestamp for o in got] == sorted(o.timestamp for o in got)  # oldest first
@@ -101,8 +103,10 @@ def test_mpos004_pull_stores_every_observation_and_a_replay_adds_none(tmp_path: 
     assert writer.cursor(east) == 20
     assert puller.pull_once(50_000) == 0  # nothing new: no duplicate (MPOS-004)
     status = rec.read_status(record)
-    assert status is not None and status.sources[str(east)].backlog == 0
-    assert status.sources[str(east)].position == "east" and status.last_error is None
+    assert status is not None
+    assert status.sources[str(east)].backlog == 0
+    assert status.sources[str(east)].position == "east"
+    assert status.last_error is None
     with closing(sqlite3.connect(dst.path)) as conn:
         uuids = conn.execute("SELECT count(*), count(DISTINCT observation_uuid) FROM "
                              "obs_icmp_hot").fetchone()  # fmt: skip
@@ -135,7 +139,8 @@ def test_e13_budget_paces_a_backfill_oldest_first(tmp_path: Path) -> None:
     assert writer.cursor(east) == 7
     oldest = sorted(o.timestamp for o in rows)[:5]
     status = rec.read_status(tmp_path / rec.FILE)
-    assert status is not None and status.sources[str(east)].backlog == 23
+    assert status is not None
+    assert status.sources[str(east)].backlog == 23
     assert status.sources[str(east)].newest_ts is not None
     assert min(oldest) <= k.T0 + k.MINUTE  # the first pass took the first minutes
     assert puller.pull_once(50_000) == 23
@@ -164,7 +169,8 @@ def test_mpos005_a_purged_observation_is_a_reported_gap(tmp_path: Path) -> None:
                                tmp_path / rec.FILE, ManualClock(k.T0), None)  # fmt: skip
     assert puller.pull_once(50_000) == 8
     status = rec.read_status(tmp_path / rec.FILE)
-    assert status is not None and status.sources[str(east)].gaps == 2
+    assert status is not None
+    assert status.sources[str(east)].gaps == 2
     src.close()
     dst.close()
 
@@ -277,6 +283,33 @@ def test_mpos006_partner_trouble_is_recorded_as_node_health(tmp_path: Path) -> N
     with pytest.raises(ObservationPullError, match="this node's own collector"):
         puller.pull_once(100)
     status = rec.read_status(record)
-    assert status is not None and status.pulls["failed"] == 1 and status.last_error
+    assert status is not None
+    assert status.pulls["failed"] == 1
+    assert status.last_error
+    src.close()
+    dst.close()
+
+
+def test_mpos005_a_partner_whose_log_restarted_is_read_again(tmp_path: Path) -> None:
+    """MPOS-005: a partner log shorter than the cursor held here is re-read from its start.
+
+    Args:
+        tmp_path: Directory for the stores.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    east = new_id(CollectorId)
+    src, dst = k.store_at(tmp_path / "east"), k.store_at(tmp_path / "west")
+    k.backend(src).writer.write_batch(new_id(BatchId), k.minutes(east, 1))
+    writer = k.backend(dst).writer
+    writer.write_replicated(east, [], 900)  # a cursor from before the partner's log restarted
+    puller = ObservationPuller(k.FakePartner(k.source_for(src, east)), writer,
+                               tmp_path / rec.FILE, ManualClock(k.T0), None)  # fmt: skip
+    assert puller.pull_once(100) == 5
+    assert writer.cursor(east) == 5
     src.close()
     dst.close()

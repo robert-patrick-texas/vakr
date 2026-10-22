@@ -22,7 +22,7 @@ Example:
 
 import dataclasses
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlencode, urlsplit
 
 from vakr.credentials.secret import Secret
@@ -61,6 +61,27 @@ class PartnerError(Exception):
         """
         super().__init__(f"partner answered HTTP {status} {code}: {message}".strip())
         self.status, self.code, self.message = status, code, message
+
+
+class PartnerReader(Protocol):
+    """What a puller needs of the partner: its address and bounded JSON reads."""
+
+    base_url: str
+
+    def get_json(self, path: str, query: Mapping[str, str | int] | None = None) -> Any:
+        """GET one replication endpoint and return its parsed JSON.
+
+        Args:
+            path: Relative to ``/api/v1/replication/``.
+            query: Its parameters.
+
+        Returns:
+            Any: The parsed answer.
+
+        Raises:
+            PartnerError, EgressError: As ``PartnerClient.get_json``.
+        """
+        ...
 
 
 class PartnerClient:
@@ -153,4 +174,4 @@ def _failure(status: int, body: bytes) -> PartnerError:
     return PartnerError(status, code if isinstance(code, str) else "", text)
 
 
-__all__ = ["MAX_ANSWER_BYTES", "EgressError", "PartnerClient", "PartnerError"]
+__all__ = ["MAX_ANSWER_BYTES", "EgressError", "PartnerClient", "PartnerError", "PartnerReader"]

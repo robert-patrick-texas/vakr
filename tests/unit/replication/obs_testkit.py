@@ -13,6 +13,7 @@ Example:
 """
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -65,8 +66,13 @@ def minutes(collector: CollectorId, count: int, start: int = 0) -> list[Observat
     dev, iface, rows = s.device().id, new_id(InterfaceId), []
     for m in range(start, start + count):
         at = T0 + MINUTE * m
-        rows += [s.sample(dev, iface, collector, at), s.icmp(dev, collector, at),
-                 s.snmp(dev, collector, at), s.poll(dev, collector, at), s.health(collector, at)]  # fmt: skip
+        rows += [
+            s.sample(dev, iface, collector, at),
+            s.icmp(dev, collector, at),
+            s.snmp(dev, collector, at),
+            s.poll(dev, collector, at),
+            s.health(collector, at),
+        ]
     return rows
 
 
@@ -109,7 +115,7 @@ class FakePartner:
         """
         self.source, self.calls = source, 0
 
-    def get_json(self, path: str, query: dict[str, Any] | None = None) -> Any:
+    def get_json(self, path: str, query: Mapping[str, Any] | None = None) -> Any:
         """Answer one replication call.
 
         Args:
@@ -124,11 +130,11 @@ class FakePartner:
         """
         self.calls += 1
         if path == "observations/state":
-            answer: Any = {"role": "primary", "position": "east",
-                           "collectors": self.source.state()}  # fmt: skip
+            answer: Any = {"role": "primary", "position": "east", "collectors": self.source.state()}
         elif path == "observations" and query is not None:
-            answer = self.source.page(CollectorId(UUID(query["collector"])), int(query["after"]),
-                                      int(query["limit"]))  # fmt: skip
+            answer = self.source.page(
+                CollectorId(UUID(query["collector"])), int(query["after"]), int(query["limit"])
+            )
         else:
             raise KeyError(path)
         return json.loads(json.dumps(answer))

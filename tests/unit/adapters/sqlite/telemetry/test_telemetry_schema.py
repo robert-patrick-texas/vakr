@@ -77,7 +77,7 @@ def _primary_key(path: Path, table: str) -> list[str]:
 
 
 def test_mig001_fresh_install_creates_the_fixed_schema(tmp_path: Path) -> None:
-    """MIG-001: migrate creates every fixed table (0002 projection, 0003 replication), stamps, seeds.
+    """MIG-001: migrate creates every fixed table (0002, 0003 included), stamps the ID, seeds.
 
     Args:
         tmp_path: Directory for the file.
@@ -188,18 +188,44 @@ def test_mig004_store_refuses_a_newer_or_older_schema(tmp_path: Path) -> None:
     SqliteTelemetryStore(path, family=later).close()  # the newer release itself may open it
 
 
+FLOOR_LOGIC_ENTRY = "Read-compatible telemetry versioning"
+"""The changelog entry of the release that first reads newer additive schemas (E.14)."""
+OLDEST_UPGRADE_SOURCE = (0, 1, 0)
+"""The oldest release self-update must still upgrade from: today every published one (E.14)."""
+
+
+def floor_release(sections: list[str]) -> tuple[int, ...] | None:
+    """Return the first published release whose notes introduce the reader floor.
+
+    Args:
+        sections: The changelog's ``## `` sections, newest first.
+
+    Returns:
+        tuple[int, ...] | None: Its version, or ``None`` while it is unreleased.
+
+    Raises:
+        None
+    """
+    released = [re.match(r"(\d+)\.(\d+)\.(\d+) - ", s) for s in sections]
+    found = [tuple(int(g) for g in m.groups()) for m, s in zip(released, sections, strict=True)
+             if m is not None and FLOOR_LOGIC_ENTRY in s]  # fmt: skip
+    return min(found) if found else None
+
+
 def test_a_second_telemetry_migration_needs_a_rollback_story() -> None:
     """E.14 tripwire: self-update does not back up telemetry.db, so rollback cannot undo its schema.
 
     A failed update restores ``metadata.db`` from its pre-update backup, but
-    ``telemetry.db`` (about 40 GB per node) is never copied. Once a release
-    migrates it, an older release refuses the newer schema (MIG-004). Until
-    the telemetry file has read-compatible versioning (older releases open
-    newer additive schemas), every telemetry migration after 0001 must ship
-    in a release whose notes carry the ``manual-update-required`` marker, so
-    the update timer skips it (UPD-005), and say how to step back. The
-    changelog section that names the migration file is those notes: this
-    test requires the marker there (ADR-021 amendment 7 for 0002).
+    ``telemetry.db`` (about 40 GB per node) is never copied. A release that
+    rolls back must therefore still use the newer schema. Releases with the
+    reader floor do when the newer migrations are additive (E.14). Releases
+    without it, and any release facing a breaking migration, refuse it
+    (MIG-004). So a telemetry migration after 0001 ships in a release whose
+    notes carry ``manual-update-required``, which keeps the update timer
+    away (UPD-005), unless it is additive and every release self-update may
+    still upgrade from (``OLDEST_UPGRADE_SOURCE``) has the floor logic. The
+    changelog section naming the migration file is those notes (ADR-021
+    amendment 7 for 0002).
 
     Args:
         None
@@ -210,14 +236,37 @@ def test_a_second_telemetry_migration_needs_a_rollback_story() -> None:
     Raises:
         None
     """
-    from vakr.adapters.sqlite import telemetry
     from vakr.lifecycle.update.policy import MANUAL_MARKER
 
-    sql = sorted(p.name for p in (Path(telemetry.__file__).parent / "sql").glob("*.sql"))
-    assert sql[0] == "0001_initial.sql"
+    family = telemetry_family()
+    assert family.migrations[0].name == "initial"
     changelog = (Path(__file__).parents[5] / "CHANGELOG.md").read_text(encoding="utf-8")
     sections = re.split(r"^## ", changelog, flags=re.MULTILINE)[1:]
-    for name in sql[1:]:
+    first = floor_release(sections)
+    readers_ready = first is not None and first <= OLDEST_UPGRADE_SOURCE
+    for m in family.migrations[1:]:
+        name = f"{m.version:04d}_{m.name}.sql"
         notes = [s for s in sections if name in s]
         assert notes, f"name {name} in the changelog section of the release that ships it"
+        if family.additive(m.version) and readers_ready:
+            continue  # every release that may roll back reads it (E.14)
         assert MANUAL_MARKER in notes[0], f"the release shipping {name} needs {MANUAL_MARKER}"
+
+
+def test_the_floor_release_comes_from_the_changelog() -> None:
+    """E.14: only a published section introducing the floor counts; the oldest such one wins.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    entry = f"- {FLOOR_LOGIC_ENTRY} (E.14).\n"
+    assert floor_release([f"Unreleased\n{entry}", "0.2.1 - 2026-10-20\nfixes\n"]) is None
+    sections = [f"1.1.0 - 2027-01-02\n{entry}", f"1.0.0 - 2027-01-01\n{entry}", "0.9.0 - x\n"]
+    assert floor_release(sections) == (1, 0, 0)
+    assert OLDEST_UPGRADE_SOURCE < (1, 0, 0)  # so additive migrations still need the marker

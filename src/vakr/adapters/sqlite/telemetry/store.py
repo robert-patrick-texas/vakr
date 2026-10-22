@@ -50,6 +50,8 @@ TELEMETRY_FILE = "telemetry.db"
 """File name of the telemetry database inside the state directory."""
 
 TELEMETRY_APPLICATION_ID = 0x766B746C  # ASCII "vktl": marks a vakr telemetry database
+TELEMETRY_COMPAT_FROM = 3
+"""Telemetry migrations from 0003 on declare ``compat`` (E.14); 0001 and 0002 are breaking."""
 
 COMPACT_POLICY = RetentionPolicy(native=timedelta(days=30), rollup=timedelta(days=400))
 """Compact retention when configuration says nothing else (5.1, E.10)."""
@@ -69,7 +71,7 @@ def telemetry_family() -> SchemaFamily:
         ValidationError: If a packaged migration file is malformed (a build bug).
     """
     migrations = load_migrations(files("vakr.adapters.sqlite.telemetry").joinpath("sql"))
-    return SchemaFamily("telemetry", TELEMETRY_APPLICATION_ID, migrations)
+    return SchemaFamily("telemetry", TELEMETRY_APPLICATION_ID, migrations, TELEMETRY_COMPAT_FROM)
 
 
 def telemetry_migrations(

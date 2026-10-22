@@ -123,6 +123,20 @@ class ReplicaWriter(Protocol):
         """
         ...
 
+    def rewind(self, source: CollectorId) -> None:
+        """Forget ``source``'s cursor: its log restarted, so read it from the start again.
+
+        Args:
+            source: The partner collector.
+
+        Returns:
+            None
+
+        Raises:
+            StorageError: If the store cannot be written.
+        """
+        ...
+
     def cursor(self, source: CollectorId) -> int | None:
         """Return the newest partner seq stored for ``source``.
 

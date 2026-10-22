@@ -13,8 +13,13 @@
 --   observation adds one log row of about 40 bytes, about 3 GB per collector over 30 days at
 --   the MVP workload (1,900 observations a minute), purged with native retention.
 -- test-impact: MIG-001 and the tripwire in test_telemetry_schema.py;
---   tests/unit/adapters/sqlite/telemetry/test_replication_log.py and the observation
---   replication tests in tests/unit/replication/.
+--   tests/unit/replication/test_observation_replication.py and test_replication_log.py.
+-- compat: additive
+
+-- Additive (E.14): two new tables only. A release rolled back onto this schema keeps working,
+-- but it does not log what it ingests meanwhile, so those observations never reach the partner
+-- (ADR-024 records the limit). Releases without the floor logic refuse schema 3 outright, so
+-- the release that ships it carries manual-update-required.
 
 -- One row per observation this node's own spool ingested, in ingestion order. seq is the
 -- replication cursor a partner pulls by (27.5 item 3): AUTOINCREMENT, so a seq is never

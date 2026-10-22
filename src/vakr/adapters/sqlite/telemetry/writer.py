@@ -54,6 +54,7 @@ from vakr.adapters.sqlite.telemetry.replication_log import (
     cursor_of,
     log_rows,
     set_cursor,
+    store_part,
 )
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.adapters.sqlite.telemetry.tuning import MAX_BATCH_ROWS
@@ -158,6 +159,24 @@ class SqliteObservationWriter:
         keys.publish()
         return WriteResult(BatchId(new_id(BatchId)), inserted, len(observations) - inserted)
 
+    def rewind(self, source: CollectorId) -> None:
+        """Forget ``source``'s cursor, so the next pull starts from its oldest entry.
+
+        For a partner whose log restarted (its newest seq is below the cursor
+        held here); replaying what is already stored changes nothing.
+
+        Args:
+            source: The partner collector.
+
+        Returns:
+            None
+
+        Raises:
+            StorageError: If the database is unavailable.
+        """
+        with self._store.writing() as conn:
+            set_cursor(conn, source, 0, to_epoch_us(datetime.now(UTC)))
+
     def cursor(self, source: CollectorId) -> int | None:
         """Return the newest partner seq stored for ``source``.
 
@@ -259,41 +278,10 @@ def _insert(
         # series first for a day partition.
         hot = table.endswith("_hot")
         part.sort(key=(lambda r: (r[2], r[0], r[1], r[3])) if hot else (lambda r: r[:4]))
-        stored = _store_part(conn, insert_sql(table, family), part, family, log)
+        stored = store_part(conn, insert_sql(table, family), part, FAMILY_CODE[family], log)
         samples += stored if family == FAMILY else 0
         inserted += stored
     if samples:
         # A projected bucket must keep matching its samples (E.28); a replay changes nothing.
         forget_buckets(conn, (row.ts_us for row in rows if row.family == FAMILY))
     return inserted
-
-
-def _store_part(
-    conn: sqlite3.Connection, sql: str, part: list[KeyedRow], family: str,
-    log: list[LogEntry] | None,
-) -> int:  # fmt: skip
-    """Insert one table's rows, noting which were new when they are to be logged.
-
-    Args:
-        conn: Connection holding the write lock.
-        sql: The table's idempotent insert.
-        part: Its keyed rows.
-        family: Their native family.
-        log: Where new rows' log entries go, or ``None``.
-
-    Returns:
-        int: Rows inserted for the first time.
-
-    Raises:
-        sqlite3.Error: If a statement fails; the caller rolls back.
-    """
-    if log is None:
-        return conn.executemany(sql, part).rowcount
-    # One statement per row tells which rows were new; a replayed row must not be logged
-    # twice, or a partner would be served it twice.
-    code, stored = FAMILY_CODE[family], 0
-    for row in part:
-        if conn.execute(sql, row).rowcount:
-            stored += 1
-            log.append((int(row[1]), code, int(row[0]), int(row[2]), bytes(row[3])))
-    return stored

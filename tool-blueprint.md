@@ -3774,6 +3774,11 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | Partner client | HTTPS only, egress trust and proxy settings, 20 s timeout, answers up to 8 MiB, no redirects |
 | Metadata page / pull / set | 1 to 1,000 rows per page (500 by default); at most 1,000 page requests per pull; at most 500,000 replicated rows in all |
 | Metadata pull record | `/var/lib/vakr/replication/metadata-pull.json` (mode 0640): newest attempt and success, error, counts by result; the `replication` check warns 5 min and is critical 30 min after the newest success |
+| Observation cursor | `repl_log.seq` (telemetry schema 3): an `AUTOINCREMENT` ingestion sequence of this node's own observations, never reused; one log row (about 40 bytes) per local observation, purged with native retention, at most 1,000,000 rows per retention pass |
+| Observation page / pass | 1 to 10,000 observations per page (2,000 by default) and at most 6 MiB of envelopes; at most 50,000 observations per 30 s pass |
+| Backfill pacing (detail) | While the local spool holds more than 10,000 unacknowledged records, a pass stores at most half of what local ingestion stored since the previous pass, and nothing while it stored nothing |
+| Partner URL | A peer pulls observations from `node.primary_url`; a primary from `node.peer_url` (`https://` only; empty replicates nothing) |
+| Observation pull record | `/var/lib/vakr/replication/observation-pull.json`: newest attempt and success, error, and per partner collector the cursor, its newest seq, the backlog, the newest observation's time, gaps, and counts. The `replication` check warns when the newest partner observation is 5 min old, on gaps, or on a failing pull, and is critical at 30 min |
 
 Decisions taken with M5 part A (ADR-024, [two positions](docs/operations/two-positions.md)):
 
@@ -3784,6 +3789,14 @@ Decisions taken with M5 part A (ADR-024, [two positions](docs/operations/two-pos
 5. **The peer refuses metadata writes** (409 `peer_read_only` in the API for every state change but sign-in and kiosk tokens; the CLI's write commands), naming the primary (MPOS-003).
 6. **Same release on both nodes.** A peer refuses metadata from another schema version, and a partner that reports itself as a peer.
 
+Decisions taken with M5 part B, observation replication (2026-10-22; ADR-024 decisions 15 to 22):
+
+7. **Cursor: an ingestion sequence, not the spool's.** 27.5 item 3 names the per-collector spool sequence, but stored observations do not keep it, and a recreated spool starts its sequence again. **Contradiction recorded; choice:** `repl_log` in telemetry schema 3 (compat `additive`, E.14) gives every locally ingested observation a durable `seq` in spool order, logged in the transaction that first inserts it.
+8. **Serve only one's own collector; pull the other's.** Each node serves its own collector's log, `GET /api/v1/replication/observations` (`replication_read`), and its collector pulls the other node's every 30 s, storing each verified page with its cursor in one transaction. Replicated rows are ordinary rows of the partner's collector, never logged or served onward.
+9. **Gaps and restarts are reported.** What the partner no longer holds is counted as a gap (MPOS-005). A partner log shorter than the cursor is read again from its start.
+10. **Visibility.** The `replication` check, five metrics (E.33), `HealthView.replication` (the health line of `vakr status`, the TUI header, and the web UI health panel), and `vakr replication status` show lag, backlog, last exchange, and gaps. A replication failure never changes a device's state (MPOS-006).
+11. **A month-long partition** takes at least 14 hours to backfill at this pace; a 30-minute one at the MVP workload, about 57,000 observations a direction, one or two passes.
+
 ### E.14 Updates
 
 | Setting | Default |
@@ -3793,7 +3806,15 @@ Decisions taken with M5 part A (ADR-024, [two positions](docs/operations/two-pos
 | Cached previous packages for rollback | 2 |
 | Pre-update backup | configuration plus `metadata.db`; 5 kept. `telemetry.db` is not copied: it reaches about 40 GB per node (27.3), and five copies would not fit the volume. |
 
-Because rollback cannot restore `telemetry.db`, a release that migrates the telemetry schema must leave it readable by the previous release (additive changes only, with read-compatible versioning) or carry the `manual-update-required` marker. Telemetry schema 2 (the ranking projection, E.28 decision 1) takes the marker: a test fails unless the changelog section naming each telemetry migration after 0001 carries the marker, until read-compatible versioning exists.
+Because rollback cannot restore `telemetry.db`, a release that migrates the telemetry schema must leave it readable by the previous release (additive changes only, with read-compatible versioning) or carry the `manual-update-required` marker. Telemetry schema 2 (the ranking projection, E.28 decision 1) takes the marker.
+
+Read-compatible telemetry versioning (decisions of 2026-10-22):
+
+1. **Compat header.** Every telemetry migration from 0003 on declares `-- compat: additive` or `-- compat: breaking`; a missing or unknown value fails the build (`SchemaFamily.compat_from`). 0001 and 0002 count as breaking. Metadata has no compat header: self-update backs it up and restores it on rollback, so it keeps refusing any newer schema (MIG-004).
+2. **What additive means.** An older release can keep reading and writing the file. Allowed: `CREATE TABLE`, `CREATE VIEW`, `CREATE INDEX` (a `UNIQUE` index only on a table the same migration creates), `ALTER TABLE ... ADD COLUMN` (`NOT NULL` only with a `DEFAULT`), and triggers or rows only on tables the same migration creates. Everything else is breaking: `DROP`, `RENAME`, `UPDATE`, `DELETE`, `PRAGMA`, and rows, triggers, or uniqueness on existing tables. `vakr.adapters.sqlite.migrations.compat.additive_problems` checks this statically, and a unit test runs it on every shipped migration that declares `additive`. Additive migrations are never destructive.
+3. **Partition templates are breaking.** A new template version, an `INSERT INTO partition_template`, is breaking, because `partitions.ensure` reads a family's template without choosing a version, so an older release would build partitions from DDL it does not know. This is stricter than the database guide's description of column changes as template updates: such a change ships with the marker. Teaching older code to pick its own template version, so templates can grow additively, is a recorded gap.
+4. **Reader floor.** Each migration that declared `compat` gets a row in `schema_compat`, written in the transaction that marks it applied; the journal's own shape does not change. The floor is the newest applied migration that is not additive (no row counts as breaking). A release that runs schema N accepts a file at schema M > N when the floor is at most N, every migration in it finished, and its own history matches. It then reports `CURRENT` ("schema M (readable by schema F and later)"): services start and ingest, `vakr db status` exits 0, and `vakr db migrate` does nothing and says so. It never runs a migration down and never touches tables it does not know. Any other newer schema is still refused (MIG-004, exit 2), naming the breaking migration. **Contradiction recorded:** MIG-004 says an older binary refuses an unsupported future schema; a read-compatible one is now supported, so MIG-004 keeps applying to breaking ones only.
+5. **When an additive migration may skip the marker.** Releases before this one have no floor logic and refuse every newer telemetry schema. So the release that ships an additive migration still needs `manual-update-required` until every release self-update may still upgrade from has the floor logic. The tripwire test reads the first published release with the floor logic from the changelog (its entry starts "Read-compatible telemetry versioning"). It compares it with `OLDEST_UPGRADE_SOURCE`, the oldest release self-update must still upgrade from, which today is every published release (0.1.0). Raising that constant is an owner decision. Until then every telemetry migration needs the marker, as before, and breaking ones always do. The next version number is not chosen yet, so it is read from the changelog rather than written into the test.
 
 ### E.15 Interface description keywords (META-012)
 

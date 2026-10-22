@@ -25,6 +25,7 @@ Example:
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import cast
 from uuid import UUID
 
 from vakr.adapters.sqlite.telemetry.layout import all_columns, day_table, hot_table
@@ -73,6 +74,38 @@ def log_rows(conn: sqlite3.Connection, entries: Iterable[LogEntry]) -> None:
         "VALUES (?, ?, ?, ?, ?)",
         entries,
     )
+
+
+def store_part(
+    conn: sqlite3.Connection, sql: str, part: list[tuple[object, ...]], code: int,
+    log: list[LogEntry] | None,
+) -> int:  # fmt: skip
+    """Insert one table's rows, noting which were new when they are to be logged.
+
+    Args:
+        conn: Connection holding the write lock.
+        sql: The table's idempotent insert.
+        part: Its keyed rows.
+        code: Their family's ``FAMILY_CODE``.
+        log: Where new rows' log entries go, or ``None``.
+
+    Returns:
+        int: Rows inserted for the first time.
+
+    Raises:
+        sqlite3.Error: If a statement fails; the caller rolls back.
+    """
+    if log is None:
+        return conn.executemany(sql, part).rowcount
+    # One statement per row tells which rows were new; a replayed row must not be logged
+    # twice, or a partner would be served it twice.
+    stored = 0
+    for row in part:
+        if conn.execute(sql, row).rowcount:
+            stored += 1
+            series, collector, ts_us, uuid = cast(tuple[int, int, int, bytes], row[:4])
+            log.append((collector, code, series, ts_us, uuid))
+    return stored
 
 
 def bounds(conn: sqlite3.Connection, collector_key: int) -> tuple[int | None, int | None]:

@@ -38,7 +38,7 @@ from vakr.domain.observations import Observation
 from vakr.ports.clock import Clock
 from vakr.ports.telemetry.replication import ReplicaWriter
 from vakr.replication import observation_status as rec
-from vakr.replication.client import EgressError, PartnerClient, PartnerError
+from vakr.replication.client import EgressError, PartnerError, PartnerReader
 
 PAGE_LIMIT = 10_000
 """Observations asked for per page (E.13)."""
@@ -53,7 +53,7 @@ class ObservationPuller:
 
     def __init__(
         self,
-        client: PartnerClient,
+        client: PartnerReader,
         writer: ReplicaWriter,
         record: Path,
         clock: Clock,
@@ -129,6 +129,9 @@ class ObservationPuller:
         entry.name, entry.position, entry.newest_seq = source["name"], source["position"], \
             source["newest_seq"]  # fmt: skip
         cursor, stored = self._writer.cursor(cid) or 0, 0
+        if source["newest_seq"] is not None and cursor > source["newest_seq"]:
+            self._writer.rewind(cid)  # the partner's log restarted: re-read it (idempotent)
+            cursor = 0
         oldest = source["oldest_seq"]
         if oldest is not None and cursor < oldest - 1:
             entry.gaps += oldest - 1 - cursor  # the partner purged these before we asked

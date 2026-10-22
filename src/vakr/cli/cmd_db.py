@@ -244,7 +244,7 @@ def _migrate_one(path: Path, manager: SqliteMigrationManager, args: argparse.Nam
     try:
         status = manager.status()
         if status.state is SchemaState.CURRENT:
-            print(f"{path}: schema {status.version} is current; nothing to migrate")
+            print(f"{path}: {status.detail}; nothing to migrate")  # also a newer, readable one
             return EXIT_OK
         if not status.can_migrate:
             _fail(status.detail)

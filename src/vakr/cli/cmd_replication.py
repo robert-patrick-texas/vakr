@@ -24,6 +24,7 @@ Example:
 
 import argparse
 import sys
+from dataclasses import asdict
 from datetime import datetime
 from uuid import UUID
 
@@ -46,7 +47,9 @@ from vakr.domain.ids import KioskTokenId
 from vakr.domain.replication import ReplicationToken
 from vakr.paths import InstallPaths
 from vakr.ports.clock import SystemClock
+from vakr.replication import observation_status as obs_status
 from vakr.replication import status
+from vakr.replication.overview import replication_reader as reader_of
 
 
 def register(subparsers: SubParsers) -> None:
@@ -281,14 +284,17 @@ def run_status(args: argparse.Namespace) -> int:
     except ConfigError:
         node = NodeSettings()
     pull = status.read_status(paths.state_dir / status.FILE) if node.is_peer else None
+    obs = obs_status.read_status(paths.state_dir / obs_status.FILE)
     data = {"role": node.role, "position": node.position, "primary_url": node.primary_url or None,
-            "token_file": str(paths.secrets_dir / TOKEN_FILE),
-            "metadata_pull": None if pull is None else vars(pull)}  # fmt: skip
+            "peer_url": node.peer_url or None, "token_file": str(paths.secrets_dir / TOKEN_FILE),
+            "metadata_pull": None if pull is None else vars(pull),
+            "observation_pull": None if obs is None else asdict(obs)}  # fmt: skip
     lines = [f"role {node.role}, position {node.position or '(none)'}"]
     if node.is_peer:
         lines.append(f"primary {node.primary_url}")
         lines.append("no metadata pull recorded yet" if pull is None else
                      f"newest success {pull.last_success_at or 'never'}; newest attempt "
                      f"{pull.last_attempt_at}{_failed(pull.last_error)}")  # fmt: skip
+    lines += [f"observations: {r.text}"] if (r := reader_of(paths.state_dir, node)()) else []
     emit(args, lines, data)
     return EXIT_OK

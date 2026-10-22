@@ -40,10 +40,14 @@ class VersionInfo:
     Attributes:
         version: The vakr release.
         api: The API major version, ``v1`` (API-004).
+        role: ``primary`` or ``peer`` (MPOS-003); a single node is a primary.
+        position: This node's vantage-point label, such as ``east``; may be empty.
     """
 
     version: str
     api: str = "v1"
+    role: str = "primary"
+    position: str = ""
 
 
 @dataclass(frozen=True, slots=True)

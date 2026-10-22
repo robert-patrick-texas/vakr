@@ -165,6 +165,10 @@ async def _bearer(context: ApiContext, header: str) -> Principal:
     """
     scheme, _, value = header.strip().partition(" ")
     value = value.strip()
+    if scheme.lower() == "bearer" and value.startswith("vkr_"):  # a partner node, ADR-024
+        raise ApiError(
+            403, "replication_only", "a replication token reaches only /api/v1/replication/"
+        )
     if scheme.lower() == "bearer" and value.startswith("vkk_") and len(value) <= MAX_TOKEN_LENGTH:
         principal = await call(context.auth.authenticate, Secret(value))
         if principal is not None and principal.kind is PrincipalKind.KIOSK:

@@ -26,23 +26,28 @@ from vakr.domain.ids import KioskTokenId
 from vakr.domain.sessions import KioskToken
 from vakr.domain.timestamps import to_epoch_us
 
+_NOUNS = {"kiosk_token": "kiosk token", "replication_token": "replication token"}
+
 
 class MemoryKioskTokenRepository:
-    """Kiosk display tokens, by ``(label, id)``."""
+    """Kiosk display tokens (or replication tokens), by ``(label, id)``."""
 
-    def __init__(self, tx: Transaction) -> None:
-        """Bind the repository to a transaction.
+    def __init__(self, tx: Transaction, table: str = "kiosk_token") -> None:
+        """Bind the repository to a transaction and one token table.
 
         Args:
             tx: The unit of work's transaction.
+            table: ``kiosk_token`` or ``replication_token`` (E.13).
 
         Returns:
             None
 
         Raises:
-            None
+            KeyError: For any other table.
         """
         self._tx = tx
+        self._noun = _NOUNS[table]
+        self._table = table
 
     def add(self, token: KioskToken) -> None:
         """Stage a new kiosk token.
@@ -57,12 +62,12 @@ class MemoryKioskTokenRepository:
             DuplicateError: If the ID, digest, or label is taken.
         """
         if self.get(token.id) is not None:
-            raise DuplicateError("kiosk token", "id", token.id)
+            raise DuplicateError(self._noun, "id", token.id)
         if self.get_by_token_hash(token.token_hash) is not None:
-            raise DuplicateError("kiosk token", "token", "-")
-        if any(t.label == token.label for t in self._tx.records("kiosk_token")):
-            raise DuplicateError("kiosk token", "label", token.label)
-        self._tx.put("kiosk_token", token, None)
+            raise DuplicateError(self._noun, "token", "-")
+        if any(t.label == token.label for t in self._tx.records(self._table)):
+            raise DuplicateError(self._noun, "label", token.label)
+        self._tx.put(self._table, token, None)
 
     def get(self, token_id: KioskTokenId) -> KioskToken | None:
         """Return one kiosk token.
@@ -76,7 +81,7 @@ class MemoryKioskTokenRepository:
         Raises:
             None
         """
-        return self._tx.get("kiosk_token", token_id)
+        return self._tx.get(self._table, token_id)
 
     def get_by_token_hash(self, token_hash: bytes) -> KioskToken | None:
         """Return the kiosk token with this digest.
@@ -90,7 +95,7 @@ class MemoryKioskTokenRepository:
         Raises:
             None
         """
-        rows = self._tx.records("kiosk_token")
+        rows = self._tx.records(self._table)
         return next((t for t in rows if t.token_hash == token_hash), None)
 
     def list_all(self, *, limit: int) -> tuple[KioskToken, ...]:
@@ -105,7 +110,7 @@ class MemoryKioskTokenRepository:
         Raises:
             None
         """
-        rows = sorted(self._tx.records("kiosk_token"), key=lambda t: (t.label, str(t.id)))
+        rows = sorted(self._tx.records(self._table), key=lambda t: (t.label, str(t.id)))
         return tuple(rows[: max(limit, 0)])
 
     def touch(self, token_id: KioskTokenId, at: datetime) -> None:
@@ -122,7 +127,7 @@ class MemoryKioskTokenRepository:
             None
         """
         if (stored := self.get(token_id)) is not None:
-            self._tx.put("kiosk_token", replace(stored, last_used_at=at), None)
+            self._tx.put(self._table, replace(stored, last_used_at=at), None)
 
     def delete(self, token_id: KioskTokenId) -> bool:
         """Delete one kiosk token.
@@ -138,7 +143,7 @@ class MemoryKioskTokenRepository:
         """
         if self.get(token_id) is None:
             return False
-        self._tx.delete("kiosk_token", token_id)
+        self._tx.delete(self._table, token_id)
         return True
 
     def purge_expired(self, *, now: datetime, limit: int) -> int:
@@ -155,11 +160,11 @@ class MemoryKioskTokenRepository:
             None
         """
         dead = sorted(
-            (t for t in self._tx.records("kiosk_token") if t.expires_at <= now),
+            (t for t in self._tx.records(self._table) if t.expires_at <= now),
             key=lambda t: (to_epoch_us(t.expires_at), t.id.int),
         )[: max(limit, 0)]
         for token in dead:
-            self._tx.delete("kiosk_token", token.id)
+            self._tx.delete(self._table, token.id)
         return len(dead)
 
     def count(self) -> int:
@@ -174,4 +179,4 @@ class MemoryKioskTokenRepository:
         Raises:
             None
         """
-        return len(self._tx.records("kiosk_token"))
+        return len(self._tx.records(self._table))

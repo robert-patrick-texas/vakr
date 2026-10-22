@@ -3224,7 +3224,7 @@ Goal: during a network partition, each position keeps collecting from every devi
 1. Each position runs a complete vakr node: collector, Compact storage, API/web, and TUI. Each node polls the full inventory from its own vantage point under its own collector UUID. Every device is therefore watched twice; the extra SNMP load is a few PDUs per device per minute, which is negligible at MVP scale.
 2. One node is the metadata primary (`[node] role = "primary"`). The peer (`role = "peer"`) pulls inventory, policies, annotations, and users from the primary's API every 60 seconds. If the primary is unreachable, the peer keeps polling with its last-known metadata. A peer refuses metadata edits with a message that names the primary. Promoting a peer is a documented manual command (`vakr node promote`).
 3. Each observation belongs to the collector that made it, so replication has no write conflicts. Each node pulls the other's observations from `/api/v1/replication/observations` in bounded batches. The per-collector spool sequence serves as the cursor, and observation UUIDs make inserts idempotent. A partition only delays replication; after it heals, the backlog drains oldest-first without starving local ingestion.
-4. Peer traffic uses HTTPS (directly or through the documented reverse proxy) with a dedicated replication credential. That credential can reach only the replication and metadata-read endpoints.
+4. Peer traffic uses HTTPS (directly or through the documented reverse proxy) with a dedicated replication credential. That credential can reach only the replication and metadata-read endpoints. ADR-024 and Appendix E.13 fix the credential (`vkr_` tokens), the metadata endpoints, and the bounds.
 5. Views show per-position state side by side. The composite device status (Appendix E.2) is "Down" only when every fresh collector reports the device down. A device that is down from one position and up from the other shows amber "Reachable from <position> only", which is often the first sign of a partition.
 6. Latency, loss, and jitter are never merged across collectors, because the 55–70 ms between positions makes a merged RTT meaningless; graphs show one series per position. Counter values from different collectors are never summed (MPOL-003). Traffic graphs default to the local collector and can switch to the peer.
 7. Replication lag, backlog, and the last successful exchange are visible on the health page, in metrics, in `vakr check health`, and in the TUI header.
@@ -3584,7 +3584,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | ADR-021 | Compact profile: SQLite telemetry with time partitioning for 30/400-day retention | Accepted on benchmark evidence (layout C+H, every pass criterion met at 2× the MVP workload); owner sign-off pending |
 | ADR-022 | MVP walking-skeleton milestone order (section 27.8) supersedes the phase order until MVP acceptance | Accepted 2026-10-19 |
 | ADR-023 | Unprivileged ICMP datagram sockets; no `CAP_NET_RAW` by default | Accepted 2026-10-19 |
-| ADR-024 | Multi-position: independent full nodes, metadata primary, pull replication of observations | Proposed; validate in milestone M5 |
+| ADR-024 | Multi-position: independent full nodes, metadata primary, pull replication of observations | Accepted for implementation 2026-10-22 (M5 part A: roles, `vkr_` tokens, metadata pull); owner to confirm |
 | ADR-025 | Packaging with `nfpm`; all installed files under `/opt/vakr` (bundled relocatable interpreter, venv, defaults, signers), with only OS integration points outside it | Accepted 2026-10-20 (owner: install under `/opt/vakr`); validate in milestone M1 |
 | ADR-026 | Release trust: `SHA256SUMS` signed with an SSH signing key held off GitHub, verified with `ssh-keygen -Y verify` | Proposed; validate in milestone M1 |
 | ADR-027 | Configuration layering and upgrade merge (overrides-only operator files, packaged defaults, versioned config migrations) | Accepted 2026-10-19 |
@@ -3769,6 +3769,20 @@ Phase and order hashes use the first 8 bytes of SHA-256 over UTF-8 input (`colle
 | Metadata pull interval | 60 s |
 | Replication lag warning / critical | 5 minutes / 30 minutes |
 | Backfill pacing | Uses no more than 50% of ingestion capacity while local ingestion has a backlog |
+| Replication token (`vkr_`) | 256 bits, SHA-256 digest stored; lifetime 1 to 730 days, 365 by default; at most 10 per node; scopes `metadata_read` and `replication_read` only, on `/api/v1/replication/*` only |
+| Token file on the pulling node | `/etc/vakr/secrets/replication.token`: one line, strict mode (owner root or `vakr`, group read at most, no symlink); re-read at every pull |
+| Partner client | HTTPS only, egress trust and proxy settings, 20 s timeout, answers up to 8 MiB, no redirects |
+| Metadata page / pull / set | 1 to 1,000 rows per page (500 by default); at most 1,000 page requests per pull; at most 500,000 replicated rows in all |
+| Metadata pull record | `/var/lib/vakr/replication/metadata-pull.json` (mode 0640): newest attempt and success, error, counts by result; the `replication` check warns 5 min and is critical 30 min after the newest success |
+
+Decisions taken with M5 part A (ADR-024, [two positions](docs/operations/two-positions.md)):
+
+1. **A single node is a primary.** `node.role` defaults to `primary`; with no peer it behaves as before. A peer needs an `https://` `node.primary_url` and a `node.position`; a primary must not set the URL.
+2. **Rows, not edits.** The peer copies the primary's replicated tables row for row, UUIDs, versions, and ownership kept, and applies a pull in one transaction only if it hashes to the digest the primary's state advertised (`vakr.adapters.sqlite.metadata.replica`).
+3. **What replicates.** 27.5 item 2 names inventory, policies, annotations, and users. Dashboards and identity reviews replicate too, so both positions show the same dashboards and history; sessions, kiosk and replication tokens, login failures, audit, and operations stay node-local. **Interpretation recorded:** 27.5 item 4's "metadata-read endpoints" are the replication metadata endpoints (`/api/v1/replication/metadata*`), not the operator reads; a `vkr_` token reaches nothing else.
+4. **Identity belongs to the primary.** A peer's discovery writes no metadata; it polls with the replicated interfaces, and manual rediscovery is refused there.
+5. **The peer refuses metadata writes** (409 `peer_read_only` in the API for every state change but sign-in and kiosk tokens; the CLI's write commands), naming the primary (MPOS-003).
+6. **Same release on both nodes.** A peer refuses metadata from another schema version, and a partner that reports itself as a peer.
 
 ### E.14 Updates
 

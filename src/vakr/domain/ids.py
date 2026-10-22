@@ -52,6 +52,9 @@ ReviewId = NewType("ReviewId", UUID)  # an identity case awaiting admin review (
 UserId = NewType("UserId", UUID)  # a local web/API account (SEC-005)
 SessionId = NewType("SessionId", UUID)  # a server-side login session (SEC-010)
 KioskTokenId = NewType("KioskTokenId", UUID)  # a read-only display token (E.12)
+ReplicationTokenId = NewType(
+    "ReplicationTokenId", KioskTokenId
+)  # a partner node's pull token (E.13)
 DashboardId = NewType("DashboardId", UUID)  # a custom dashboard (UI-004)
 OperationId = NewType("OperationId", UUID)  # an asynchronous admin operation (API-011)
 

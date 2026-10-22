@@ -152,6 +152,10 @@ Operators only read (SEC-006). Give people who only look `vakr-view`: it grants 
 
 Group membership is that of the *connecting process*, the same rule the kernel uses for file access. After `sudo usermod -aG vakr-admin alice`, Alice must log out and in again before the new group counts. Members of `vakr-admin` and `vakr-view` need not also be in `vakr`: the socket is reachable by every account (mode 0666 in `/run/vakr`, mode 0751), and `vakr-api` refuses everyone else itself. `vakr-api` serves the socket ([API](api.md#the-local-socket)). When it is not running, `vakr status` and `vakr tui` read the databases directly instead, as described in [status and TUI](status-and-tui.md#where-the-data-comes-from).
 
+## Two positions
+
+On a pair of nodes ([two positions](two-positions.md)), accounts live on the primary. The peer copies them, password hashes, roles, and enabled state included, every 60 seconds, so the same users sign in on either node. On the peer, `vakr user add`, `passwd`, `disable`, `enable`, and `role` are refused with a message naming the primary, and `vakr setup` creates no admin. Sessions, kiosk tokens, and failed-login counts stay each node's own: `vakr user revoke-sessions` and `vakr kiosk` work on the peer.
+
 ## Audit records
 
 Every sign-in, failed sign-in, sign-out, and account change is recorded in the audit log in the same transaction as the change (SEC-018). Records name the account and the client address, never a password, hash, or token.

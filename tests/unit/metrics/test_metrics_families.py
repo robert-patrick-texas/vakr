@@ -30,7 +30,7 @@ from tests.integration.collector.collector_lab import make_root
 from tests.unit.metrics.metrics_testkit import parse
 from tests.unit.query.query_testkit import Fleet
 from tests.unit.scheduler.sched_fakes import IDS, make_target
-from vakr.app.api.metrics_storage import storage_families
+from vakr.app.api.metrics_storage import replication_families, storage_families
 from vakr.app.collector.metrics_families import (
     fault_family,
     latency_families,
@@ -50,6 +50,8 @@ from vakr.metrics.snapshot import encode_snapshot, write_snapshot
 from vakr.metrics.state import state_families
 from vakr.query import OverviewQueries
 from vakr.query.settings import QuerySettings
+from vakr.replication import status as pull_status
+from vakr.replication.status import record as pull_record
 from vakr.scheduler.admission import Miss, MissReason
 from vakr.scheduler.health import SchedulerSnapshot
 from vakr.scheduler.lag import LoopLagMonitor
@@ -141,6 +143,7 @@ def test_obs_t01_every_catalogued_family_is_in_the_scrape(
                              queue_capacity=1000, loop_lag_us=1500, intervals_s=(60, 300),
                              lifetime=stats.lifetime)  # fmt: skip
     path = paths.run_dir / "collector-metrics.json"
+    pull_record(paths.state_dir / pull_status.FILE, "applied", datetime.now(UTC), digest="0" * 64)
     now = WHEN.timestamp()
     write_snapshot(path, encode_snapshot(collector_families(snap, stats), now - 3))
     fleet = Fleet()
@@ -149,7 +152,11 @@ def test_obs_t01_every_catalogued_family_is_in_the_scrape(
                                fleet.clock)  # fmt: skip
     service = MetricsService(
         snapshot_path=path,
-        readers=(lambda: state_families(fleet.uow, overview), lambda: storage_families(paths)),
+        readers=(
+            lambda: state_families(fleet.uow, overview),
+            lambda: storage_families(paths),
+            lambda: replication_families(paths),
+        ),
     )
     service.lag = LoopLagMonitor(fleet.clock)
     service.lag.observe(2000)

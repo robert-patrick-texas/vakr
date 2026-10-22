@@ -37,7 +37,7 @@ from vakr.domain.errors import ConflictError, DuplicateError
 TABLES = (
     "device", "interface", "site", "tag", "group", "policy", "collector",
     "identity_history", "audit", "review", "user", "session", "kiosk_token", "login_failure",
-    "dashboard",
+    "dashboard", "replication_token",
     "operation",
 )  # fmt: skip
 UNIQUE = {
@@ -45,7 +45,7 @@ UNIQUE = {
     "collector": "name", "user": "username", "dashboard": "name",
 }  # fmt: skip
 """Tables with a natural key besides the ID, and the attribute that holds it."""
-UNVERSIONED = frozenset({"session", "kiosk_token", "login_failure"})
+UNVERSIONED = frozenset({"session", "kiosk_token", "login_failure", "replication_token"})
 TOMBSTONE: Any = object()
 """Staged in ``pending`` for a row this transaction deleted."""
 

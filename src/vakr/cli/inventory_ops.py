@@ -39,6 +39,7 @@ import time
 from vakr.adapters.sqlite.metadata import SqliteMetadataStore, sqlite_uow_factory
 from vakr.cli.collector_check import collectors_reporting
 from vakr.cli.inventory_support import EXIT_INVALID, EXIT_OK, emit, guarded, require_store
+from vakr.cli.node_guard import refused_on_peer
 from vakr.cli.operation_render import operation_lines, operation_row
 from vakr.cli.status_stores import load_config
 from vakr.cli.user_support import cli_actor
@@ -122,6 +123,7 @@ def _service(store: SqliteMetadataStore) -> OperationService:
 
 
 @guarded
+@refused_on_peer
 def run_rediscover(args: argparse.Namespace) -> int:
     """Queue a manual rediscovery and, with ``--wait``, follow it to the end.
 

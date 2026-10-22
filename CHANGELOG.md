@@ -4,6 +4,14 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Added
+
+- Two positions, part A (MPOS-001 to MPOS-003, MPOS-006; ADR-024, [two positions](docs/operations/two-positions.md)): `[node] role = "peer"` makes a node copy its primary's metadata (inventory, interface identity and annotations, sites, tags, groups, policies, accounts, dashboards, identity reviews) every 60 s. The copy is row for row, UUIDs and versions kept, and is applied only when it matches the primary's digest. A peer refuses local metadata changes, naming the primary (409 `peer_read_only`, and the CLI likewise), keeps polling with its last-known copy while the primary is away, and reports a failing pull as node health only.
+- Replication tokens (`vkr_`): `sudo vakr replication token create|list|revoke` issues the token a partner node installs in `/etc/vakr/secrets/replication.token`. It grants only `/api/v1/replication/*` (`GET /api/v1/replication/metadata/state` and `/metadata`); `vakr replication status` shows a node's role and its newest pull.
+- `vakr setup --role --position --primary-url` writes the `[node]` table, asking at a first-install terminal; on a peer it creates no admin. `GET /api/v1/version` and the web and TUI headers show the node's position and role.
+- A `replication` check in `vakr check health` and `vakr doctor` (warning after 5 min, critical after 30 min without a successful pull, E.13), and the metrics `vakr_replication_metadata_age_seconds` and `vakr_replication_metadata_pulls_total`.
+- Metadata schema 6 adds the `replication_token` table. The package runs `vakr db migrate`, which takes a backup first.
+
 ### Changed
 
 - Developers: `make github-update-test` reads the update timer's log from a whole-journal cursor, because the unit has none before its first run. For a `manual-update-required` release, it accepts either answer from the rolled-back release: it may refuse the new telemetry schema, or, when FROM already has that migration, accept it. Verified against the published releases, 0.2.1 → 0.3.1 and 0.3.0 → 0.3.1.

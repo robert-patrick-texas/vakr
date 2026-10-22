@@ -4796,11 +4796,21 @@
         "type": "object"
       },
       "VersionInfo": {
-        "description": "What is running.\n\nAttributes:\n    version: The vakr release.\n    api: The API major version, ``v1`` (API-004).",
+        "description": "What is running.\n\nAttributes:\n    version: The vakr release.\n    api: The API major version, ``v1`` (API-004).\n    role: ``primary`` or ``peer`` (MPOS-003); a single node is a primary.\n    position: This node's vantage-point label, such as ``east``; may be empty.",
         "properties": {
           "api": {
             "default": "v1",
             "title": "Api",
+            "type": "string"
+          },
+          "position": {
+            "default": "",
+            "title": "Position",
+            "type": "string"
+          },
+          "role": {
+            "default": "primary",
+            "title": "Role",
             "type": "string"
           },
           "version": {
@@ -4889,6 +4899,11 @@
       },
       "kioskToken": {
         "description": "A kiosk token (vkk_...) created by an admin: operator role, read-only.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "replicationToken": {
+        "description": "A replication token (vkr_...) this node issued for its partner (sudo vakr replication token create): /api/v1/replication/* only (MPOS-006).",
         "scheme": "bearer",
         "type": "http"
       },
@@ -10637,6 +10652,182 @@
         "summary": "Top utilization (p95, DASH-003)",
         "tags": [
           "dashboards"
+        ]
+      }
+    },
+    "/api/v1/replication/metadata": {
+      "get": {
+        "description": "Return one page of one replicated table.",
+        "operationId": "page_api_v1_replication_metadata_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 512,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Page Api V1 Replication Metadata Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "security": [
+          {
+            "replicationToken": []
+          }
+        ],
+        "summary": "One page of replicated metadata (replication token)",
+        "tags": [
+          "replication"
+        ]
+      }
+    },
+    "/api/v1/replication/metadata/state": {
+      "get": {
+        "description": "Describe the replicated metadata now.",
+        "operationId": "state_api_v1_replication_metadata_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response State Api V1 Replication Metadata State Get"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "security": [
+          {
+            "replicationToken": []
+          }
+        ],
+        "summary": "Replicated metadata digest (replication token)",
+        "tags": [
+          "replication"
         ]
       }
     },

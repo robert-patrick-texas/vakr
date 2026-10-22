@@ -59,6 +59,7 @@ from vakr.auth import (
     local_groups,
 )
 from vakr.config.loader import EffectiveConfig
+from vakr.config.node import node_settings
 from vakr.domain.errors import StorageError, ValidationError
 from vakr.ingest.incidents import LossIncident, read_incidents
 from vakr.ingest.settings import SpoolSettings
@@ -279,6 +280,7 @@ def build_parts(
                              state)  # fmt: skip
         context.operations = operation_service(uow, clock, config)
         context.metrics = api_metrics(paths, uow, overview)
+        context.node = node_settings(config)
         return ApiParts(context, config, local_groups(), [*closers, metadata.close])
     except BaseException:
         for closer in (*closers, metadata.close):

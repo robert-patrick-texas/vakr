@@ -43,6 +43,7 @@ from vakr.api import (
     routes_kiosk,
     routes_metrics,
     routes_operations,
+    routes_replication,
     routes_views,
 )
 from vakr.api.context import ApiContext
@@ -51,6 +52,7 @@ from vakr.api.errors import ErrorEnvelope, Responses
 from vakr.api.middleware import ApiMiddleware
 from vakr.api.openapi import ANONYMOUS_PATHS, describe_security
 from vakr.api.principals import csrf_guard
+from vakr.api.replication_auth import peer_guard
 from vakr.api.settings import ApiSettings
 
 type WebMount = Callable[[FastAPI], None]
@@ -91,7 +93,7 @@ COMMON_ERRORS: Responses = {
 }
 _ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_interfaces,
             routes_identity, routes_catalog, routes_views, routes_export,
-            routes_dashboards, routes_operations, routes_metrics)  # fmt: skip
+            routes_dashboards, routes_operations, routes_metrics, routes_replication)  # fmt: skip
 
 
 def create_app(context: ApiContext | None = None, *, web: WebMount | None = None) -> FastAPI:
@@ -111,7 +113,8 @@ def create_app(context: ApiContext | None = None, *, web: WebMount | None = None
                   openapi_url=f"{API_PREFIX}/openapi.json", docs_url=None, redoc_url=None,
                   openapi_tags=TAGS)  # fmt: skip
     install_handlers(app)
-    v1 = APIRouter(prefix=API_PREFIX, dependencies=[Depends(csrf_guard)], responses=COMMON_ERRORS)
+    guards = [Depends(csrf_guard), Depends(peer_guard)]
+    v1 = APIRouter(prefix=API_PREFIX, dependencies=guards, responses=COMMON_ERRORS)
     for module in _ROUTERS:
         v1.include_router(module.router)
     app.include_router(v1)

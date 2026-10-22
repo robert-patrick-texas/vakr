@@ -20,9 +20,11 @@ Example: `<AppNav current="/devices" />`
 		current: string;
 		/** The release, from `GET /api/v1/version`, or null until known. */
 		version: string | null;
+		/** This node's position and role, such as `west (peer)`, or null for a single node. */
+		node?: string | null;
 	}
 
-	const { current, version }: Props = $props();
+	const { current, version, node = null }: Props = $props();
 	let text = $state('');
 	let signingOut = $state(false);
 
@@ -102,6 +104,7 @@ Example: `<AppNav current="/devices" />`
 				<button type="button" onclick={leave} disabled={signingOut}>Sign out</button>
 			{/if}
 		{/if}
+		{#if node}<span class="muted version">{node}</span>{/if}
 		{#if version}<span class="muted version">vakr {version}</span>{/if}
 	</div>
 </header>

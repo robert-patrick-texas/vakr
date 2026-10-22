@@ -37,6 +37,7 @@ from vakr.cli.inventory_support import (
     guarded,
     require_store,
 )
+from vakr.cli.node_guard import refused_on_peer
 from vakr.cli.user_support import (
     cli_actor,
     prompt_new_password,
@@ -127,6 +128,7 @@ def run_list(args: argparse.Namespace) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_add(args: argparse.Namespace) -> int:
     """Create an account after asking for its password twice.
 
@@ -157,6 +159,7 @@ def run_add(args: argparse.Namespace) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_passwd(args: argparse.Namespace) -> int:
     """Set a new password after asking for it twice; ends the account's sessions.
 
@@ -215,6 +218,7 @@ def _change(args: argparse.Namespace, what: str) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_disable(args: argparse.Namespace) -> int:
     """Disable an account and end its sessions.
 
@@ -231,6 +235,7 @@ def run_disable(args: argparse.Namespace) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_enable(args: argparse.Namespace) -> int:
     """Enable an account.
 
@@ -247,6 +252,7 @@ def run_enable(args: argparse.Namespace) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_role(args: argparse.Namespace) -> int:
     """Change an account's role and end its sessions.
 

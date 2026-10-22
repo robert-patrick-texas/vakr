@@ -43,11 +43,12 @@ Context = Annotated[ApiContext, Depends(get_context)]
 
 
 @router.get("/version", response_model=VersionInfo, summary="Running release")
-async def version(_: Viewer) -> JSONResponse:
+async def version(_: Viewer, context: Context) -> JSONResponse:
     """Return the running release (operator).
 
     Args:
         _: The caller (operator or admin).
+        context: The services (this node's role and position).
 
     Returns:
         JSONResponse: ``VersionInfo``.
@@ -55,7 +56,8 @@ async def version(_: Viewer) -> JSONResponse:
     Raises:
         None
     """
-    return view_response(VersionInfo(get_version()))
+    node = context.node
+    return view_response(VersionInfo(get_version(), role=node.role, position=node.position))
 
 
 @router.get("/health/live", response_model=HealthInfo, summary="Liveness (anyone)")

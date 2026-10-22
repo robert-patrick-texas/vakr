@@ -43,6 +43,7 @@ from vakr.cli.inventory_support import (
     local_actor,
     require_store,
 )
+from vakr.cli.node_guard import refused_on_peer
 from vakr.discovery.reconcile.admin import ReviewError, create_identity, map_review
 from vakr.domain.ids import InterfaceId, ReviewId, parse_id
 from vakr.domain.reviews import IdentityReview
@@ -106,6 +107,7 @@ def _usage(parser: argparse.ArgumentParser) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_claim(args: argparse.Namespace) -> int:
     """Transfer an interface to ``inventory.toml`` and write its annotation.
 
@@ -247,6 +249,7 @@ def _decide(args: argparse.Namespace, interface: InterfaceId | None) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_review_map(args: argparse.Namespace) -> int:
     """The review's row is an existing interface; its history continues.
 
@@ -263,6 +266,7 @@ def run_review_map(args: argparse.Namespace) -> int:
 
 
 @guarded
+@refused_on_peer
 def run_review_new(args: argparse.Namespace) -> int:
     """The review's row is a new interface with its own identity.
 

@@ -45,6 +45,8 @@ ACTIONS = {
     "kiosk.create": "kiosk",
     "kiosk.revoke": "kiosk",
     "kiosk.setup": "kiosk",
+    "replication.token_create": "replication_token",
+    "replication.token_revoke": "replication_token",
 }
 """Audited action codes and the object type each acts on."""
 _MAX_SUMMARY = 500

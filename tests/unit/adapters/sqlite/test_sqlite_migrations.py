@@ -123,7 +123,7 @@ def test_db007_schema_has_no_row_ids(tmp_path: Path) -> None:
     )
     # 10 record tables (identity_review since 0002), 4 membership, 4 authentication (0003),
     # 1 admin operation table (0004), 1 dashboard table (0005)
-    assert len(tables) == 20
+    assert len(tables) == 21  # 0006 adds replication_token
     assert all("WITHOUT ROWID" in str(sql) for _, sql in tables)
 
 

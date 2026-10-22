@@ -36,6 +36,7 @@ from fastapi import Request
 from vakr.api.errors import ApiError
 from vakr.api.settings import ApiSettings
 from vakr.auth import AuthServices
+from vakr.config.node import NodeSettings
 from vakr.metrics.service import MetricsService
 from vakr.operations import OperationService
 from vakr.ports.clock import Clock
@@ -140,6 +141,7 @@ class ApiContext:
             builds one with the default reachability strategy (tests).
         metrics: Self-metrics for ``GET /api/v1/metrics`` (E.33); tests get one
             without a collector snapshot or database readers.
+        node: This node's role and position (MPOS-003); a primary by default.
     """
 
     auth: AuthServices
@@ -157,6 +159,7 @@ class ApiContext:
     )
     operations: OperationService | None = None
     metrics: MetricsService = field(default_factory=MetricsService)
+    node: NodeSettings = field(default_factory=NodeSettings)
 
 
 def get_context(request: Request) -> ApiContext:

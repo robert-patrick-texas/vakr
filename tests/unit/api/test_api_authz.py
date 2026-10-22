@@ -24,12 +24,15 @@ from tests.unit.auth.auth_testkit import new_password
 from vakr.domain.users import Role
 
 ANON, VIEW, ADMIN = "anonymous", "operator", "admin"
+REPL = "replication"  # MPOS-006: a vkr_ token only, and nothing else reaches it
 LEVELS = {
     ("GET", "/api/v1/version"): VIEW,
     ("GET", "/api/v1/health/live"): ANON,
     ("GET", "/api/v1/health/ready"): ANON,
     ("GET", "/api/v1/health/detail"): VIEW,
     ("GET", "/api/v1/metrics"): VIEW,  # OBS-005, OBS-T02: never anonymous
+    ("GET", "/api/v1/replication/metadata/state"): REPL,
+    ("GET", "/api/v1/replication/metadata"): REPL,
     ("POST", "/api/v1/auth/login"): ANON,
     ("POST", "/api/v1/auth/logout"): ANON,
     ("GET", "/api/v1/auth/session"): VIEW,
@@ -92,7 +95,7 @@ BODY = {"/api/v1/interfaces/{interface_uuid}/identity-resolution":
 OWN_SESSION = ("/api/v1/auth/logout", "/api/v1/auth/login", "/api/v1/auth/kiosk",
                "/api/v1/auth/kiosk/forget")  # fmt: skip
 CALLERS = ("anonymous", "operator", "admin", "kiosk", "socket-admin", "socket-operator",
-           "socket-refused")  # fmt: skip
+           "socket-refused", "replication")  # fmt: skip
 
 
 def concrete(path: str) -> str:
@@ -127,6 +130,10 @@ def expected(level: str, caller: str) -> bool:
     """
     if caller == "socket-refused":
         return False  # refused on every endpoint, even anonymous ones (E.12)
+    if level == REPL:
+        return caller == "replication"  # MPOS-006: only a vkr_ token
+    if caller == "replication":
+        return level == ANON  # the token reaches nothing outside /api/v1/replication
     if level == ANON:
         return True
     if level == VIEW:
@@ -196,6 +203,9 @@ def test_auth001_authorization_matrix(kit: ApiKit, caller: str) -> None:
             headers["X-CSRF-Token"] = client.get("/api/v1/auth/session").json()["csrf_token"]
         elif caller == "kiosk":
             headers["Authorization"] = f"Bearer {kit.kiosk_token(f'wall-{uuid.uuid4().hex[:8]}')}"
+        elif caller == "replication":
+            made = kit.auth.replication.create(f"peer-{uuid.uuid4().hex[:8]}", actor="test")
+            headers["Authorization"] = f"Bearer {made.token.reveal()}"
     for (method, template), level in LEVELS.items():
         if template in OWN_SESSION and caller != "socket-refused":
             continue  # these change the caller's own session; test_api_auth(_kiosk) cover them

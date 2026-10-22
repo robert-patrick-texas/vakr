@@ -6,6 +6,12 @@ as metadata, with its ``PRAGMA application_id`` and its migrations 1..N in
 order. The family publishes the supported schema range (5.6): it upgrades
 from an empty database (0) and runs on its newest version.
 
+A family with ``compat_from`` set has read-compatible versioning (E.14):
+from that version on, every migration says whether it is ``additive``,
+which an older release can keep reading and writing, or ``breaking``. Only
+telemetry has it, because self-update's rollback never restores
+``telemetry.db``; metadata is restored from its pre-update backup instead.
+
 Dependencies:
     vakr.domain: Checks and errors.
     vakr.ports.migrations: ``MigrationInfo`` and ``SchemaRange``.
@@ -21,12 +27,20 @@ Example:
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 
 from vakr.domain.checks import require_int
 from vakr.domain.errors import ValidationError
 from vakr.ports.migrations import MigrationInfo, SchemaRange
 
 _MAX_APPLICATION_ID = 2**31 - 1  # PRAGMA application_id is a signed 32-bit header field
+
+
+class Compat(StrEnum):
+    """Whether a release that predates a migration can still use the database (E.14)."""
+
+    ADDITIVE = "additive"  # older releases keep reading and writing; the reader floor stays
+    BREAKING = "breaking"  # older releases must refuse it; the floor rises to this version
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +58,7 @@ class Migration:
         test_impact: Tests that cover it.
         sql: The statements, without the header.
         checksum: ``sha256:<hex>`` of ``sql``.
+        compat: The ``compat`` header, or ``None`` when the file has none.
     """
 
     version: int
@@ -56,6 +71,7 @@ class Migration:
     test_impact: str
     sql: str
     checksum: str
+    compat: Compat | None = None
 
     def info(self) -> MigrationInfo:
         """Return the operator-facing summary.
@@ -85,11 +101,14 @@ class SchemaFamily:
             ``PRAGMA application_id``, which tells vakr's database kinds
             apart from each other and from foreign files.
         migrations: Versions 1..N in order.
+        compat_from: First version that must declare ``compat``; ``None``
+            when the family has no read-compatible versioning.
     """
 
     name: str
     application_id: int
     migrations: tuple[Migration, ...]
+    compat_from: int | None = None
 
     def __post_init__(self) -> None:
         """Validate the family.
@@ -101,11 +120,37 @@ class SchemaFamily:
             None
 
         Raises:
-            ValidationError: If the application ID is out of range or the
-                versions do not run 1..N.
+            ValidationError: If the application ID is out of range, the
+                versions do not run 1..N, or a migration from
+                ``compat_from`` on lacks its ``compat`` header.
         """
         require_int(self.application_id, "application_id", minimum=1, maximum=_MAX_APPLICATION_ID)
         require_sequence(self.migrations)
+        for m in self.migrations:
+            if self.compat_from is not None and m.version >= self.compat_from and not m.compat:
+                raise ValidationError(
+                    f"migration {m.version:04d} {m.name}: {self.name} migrations from "
+                    f"{self.compat_from:04d} on declare `-- compat: additive` or "
+                    "`-- compat: breaking` (E.14)", field="compat")  # fmt: skip
+
+    def additive(self, version: int) -> bool:
+        """Tell whether this release's migration ``version`` is read-compatible (E.14).
+
+        Args:
+            version: Schema version.
+
+        Returns:
+            bool: ``True`` only for a migration from ``compat_from`` on that
+            declares ``additive``; everything before counts as breaking.
+
+        Raises:
+            None
+        """
+        found = self.migration(version)
+        start = self.compat_from
+        if found is None or start is None or version < start:
+            return False
+        return found.compat is Compat.ADDITIVE
 
     @property
     def supported(self) -> SchemaRange:

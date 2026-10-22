@@ -51,7 +51,13 @@ NEXT = CURRENT + 1
 
 
 def synthetic(
-    version: int, name: str, sql: str, *, destructive: bool = False, transactional: bool = True
+    version: int,
+    name: str,
+    sql: str,
+    *,
+    destructive: bool = False,
+    transactional: bool = True,
+    compat: str | None = None,
 ) -> Migration:
     """Build a migration as a later release would ship it.
 
@@ -61,6 +67,7 @@ def synthetic(
         sql: Its statements.
         destructive: Whether it removes data.
         transactional: Whether it runs in one transaction.
+        compat: The ``compat`` header value (E.14), or ``None`` for none.
 
     Returns:
         Migration: The parsed migration.
@@ -75,7 +82,8 @@ def synthetic(
         "-- recovery: Restore the backup taken before migrating.\n"
         "-- data-volume: Tiny test data.\n"
         "-- test-impact: MIG-002, MIG-003, MIG-005.\n"
-        f"\n{sql}\n"
+        + (f"-- compat: {compat}\n" if compat is not None else "")
+        + f"\n{sql}\n"
     )
     return parse_migration(f"{version:04d}_{name}.sql", text)
 

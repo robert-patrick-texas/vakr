@@ -13,8 +13,11 @@ migration::
     -- recovery: How to recover if it fails part-way.
     -- data-volume: How its duration grows with the data.
     -- test-impact: Which tests cover it.
+    -- compat: additive
 
 A value continues on lines that start with ``--`` and three spaces.
+``compat`` (``additive`` or ``breaking``, E.14) is required by a family with
+read-compatible versioning from its ``compat_from`` version on.
 ``transactional`` is optional and defaults to ``true``; set it to ``false``
 only for statements SQLite refuses inside a transaction, such as ``VACUUM``.
 The runner owns transactions, so a file must not contain ``BEGIN``,
@@ -44,14 +47,15 @@ import hashlib
 import re
 from importlib.resources.abc import Traversable
 
-from vakr.adapters.sqlite.migrations.model import Migration, require_sequence
+from vakr.adapters.sqlite.migrations.model import Compat, Migration, require_sequence
 from vakr.domain.errors import ValidationError
 
 _FILE_NAME = re.compile(r"(?P<version>[0-9]{4})_(?P<name>[a-z0-9]+(?:_[a-z0-9]+)*)\.sql")
 _HEADER_KEY = re.compile(r"-- (?P<key>[a-z][a-z-]*): (?P<value>\S.*)")
 _CONTINUATION = re.compile(r"-- {3,}(?P<value>\S.*)")
 _REQUIRED = ("description", "destructive", "recovery", "data-volume", "test-impact")
-_KNOWN = frozenset({*_REQUIRED, "transactional"})
+_KNOWN = frozenset({*_REQUIRED, "transactional", "compat"})
+_COMPAT = {c.value: c for c in Compat}
 # Statement-initial transaction control. A trigger body's BEGIN is followed by
 # statements, not by ";" or a transaction mode, so triggers stay allowed.
 _TX_CONTROL = re.compile(
@@ -86,6 +90,9 @@ def parse_migration(file_name: str, text: str) -> Migration:
         raise ValidationError(f"{file_name}: no SQL after the header")
     if _TX_CONTROL.search(sql):
         raise ValidationError(f"{file_name}: the runner owns transactions; remove BEGIN/COMMIT")
+    compat = fields.get("compat")
+    if compat is not None and compat not in _COMPAT:
+        raise ValidationError(f"{file_name}: compat must be additive or breaking", field="compat")
     return Migration(
         version=int(match["version"]),
         name=match["name"],
@@ -97,6 +104,7 @@ def parse_migration(file_name: str, text: str) -> Migration:
         test_impact=fields["test-impact"],
         sql=sql,
         checksum="sha256:" + hashlib.sha256(sql.encode("utf-8")).hexdigest(),
+        compat=_COMPAT[compat] if compat is not None else None,
     )
 
 

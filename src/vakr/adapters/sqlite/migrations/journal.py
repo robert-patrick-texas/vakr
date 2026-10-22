@@ -9,7 +9,10 @@ and the next start sees it (MIG-003). The file header's
 the journal, so a file with a journal but the wrong ID is not ours.
 
 The journal's shape never changes. An older release must be able to read
-a newer database's journal in order to refuse it (MIG-004).
+a newer database's journal in order to refuse it (MIG-004). Read-compatible
+versioning (E.14) lives beside it in ``schema_compat``: one row per applied
+migration that declared ``compat``. A journalled version without a row is
+breaking, so files written before the table existed keep their meaning.
 
 Dependencies:
     sqlite3: Statements on the caller's connection and transaction.
@@ -21,16 +24,24 @@ Safety:
 
 Example:
     >>> conn = sqlite3.connect(":memory:", autocommit=True)
-    >>> read_facts(conn, 1)
-    DatabaseFacts(application_id=0, object_count=0, has_journal=False, entries=())
+    >>> read_facts(conn, 1).has_journal
+    False
 """
 
 import sqlite3
 from dataclasses import dataclass
 
-from vakr.adapters.sqlite.migrations.model import Migration
+from vakr.adapters.sqlite.migrations.model import Compat, Migration
 
 JOURNAL_TABLE = "schema_migrations"
+COMPAT_TABLE = "schema_compat"
+
+_CREATE_COMPAT = """
+CREATE TABLE IF NOT EXISTS schema_compat (
+    version INTEGER NOT NULL PRIMARY KEY CHECK (version >= 1),
+    compat  TEXT    NOT NULL CHECK (compat IN ('additive', 'breaking'))
+) STRICT
+"""
 
 _CREATE = """
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -81,12 +92,30 @@ class DatabaseFacts:
         object_count: Tables, indexes, views, and triggers besides the journal.
         has_journal: Whether ``schema_migrations`` exists.
         entries: Journal rows by version; empty unless the ID matched.
+        additive: Versions ``schema_compat`` records as additive (E.14).
     """
 
     application_id: int
     object_count: int
     has_journal: bool
     entries: tuple[JournalEntry, ...]
+    additive: frozenset[int] = frozenset()
+
+    @property
+    def floor(self) -> int:
+        """The lowest schema version a release must support to use this file (E.14).
+
+        Args:
+            None
+
+        Returns:
+            int: The newest applied version that is not additive; 0 for none.
+
+        Raises:
+            None
+        """
+        return max((e.version for e in self.entries if e.applied
+                    and e.version not in self.additive), default=0)  # fmt: skip
 
 
 def read_facts(conn: sqlite3.Connection, application_id: int) -> DatabaseFacts:
@@ -108,12 +137,17 @@ def read_facts(conn: sqlite3.Connection, application_id: int) -> DatabaseFacts:
     names = [n for n in names if not n.startswith("sqlite_")]
     has_journal = JOURNAL_TABLE in names
     entries: tuple[JournalEntry, ...] = ()
+    additive: frozenset[int] = frozenset()
     if has_journal and found == application_id:
         entries = tuple(
             JournalEntry(row[0], row[1], row[2], row[3] == "applied", row[4], row[5], row[6])
             for row in conn.execute(_SELECT)
         )
-    return DatabaseFacts(found, len(names) - has_journal, has_journal, entries)
+        if COMPAT_TABLE in names:
+            query = "SELECT version FROM schema_compat WHERE compat = 'additive'"
+            additive = frozenset(int(r[0]) for r in conn.execute(query))
+    objects = len(names) - has_journal - (COMPAT_TABLE in names)
+    return DatabaseFacts(found, objects, has_journal, entries, additive)
 
 
 def stamp(conn: sqlite3.Connection, application_id: int) -> None:
@@ -176,6 +210,27 @@ def mark_applied(conn: sqlite3.Connection, version: int, *, at_us: int) -> None:
         "UPDATE schema_migrations SET state = 'applied', finished_at = ? "
         "WHERE version = ? AND state = 'in_progress'",
         (at_us, version),
+    )
+
+
+def record_compat(conn: sqlite3.Connection, version: int, compat: Compat) -> None:
+    """Record a migration's ``compat``, inside the transaction that marks it applied.
+
+    Args:
+        conn: Connection holding the write lock.
+        version: The migration's version.
+        compat: What its header declared.
+
+    Returns:
+        None
+
+    Raises:
+        sqlite3.Error: If the table or row cannot be written.
+    """
+    conn.execute(_CREATE_COMPAT)
+    conn.execute(
+        "INSERT OR REPLACE INTO schema_compat (version, compat) VALUES (?, ?)",
+        (version, compat.value),
     )
 
 

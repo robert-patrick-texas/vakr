@@ -2,11 +2,11 @@
 
 Every database vakr owns has a schema version, and each release publishes
 the range it supports (``SchemaRange``): it upgrades from ``oldest`` and runs
-only on ``newest``. Startup preflight (``require_current``) refuses anything
-else, above all a schema from a newer release, whose changes an older binary
-cannot know (MIG-004). ``migrate`` applies pending migrations in order,
-detects one that never finished (MIG-003), and runs destructive steps only
-with operator confirmation and a verified backup (MIG-005).
+on ``newest``. Startup preflight (``require_current``) refuses anything else,
+above all a newer release's schema (MIG-004), unless that release's later
+changes were additive and the file says so (``CURRENT`` above ``newest``, E.14).
+``migrate`` applies pending migrations in order, detects one that never
+finished (MIG-003), and gates destructive steps on a verified backup (MIG-005).
 
 Dependencies:
     dataclasses, datetime, enum, pathlib, typing: Read models and the protocol.
@@ -34,7 +34,7 @@ from vakr.domain.errors import DomainError
 class SchemaState(StrEnum):
     """How a database's schema relates to what this release supports."""
 
-    CURRENT = "current"  # at ``SchemaRange.newest``; the service may start
+    CURRENT = "current"  # at ``newest``, or newer and read-compatible (E.14); may start
     PENDING = "pending"  # older; ``migrate`` upgrades it
     MISSING = "missing"  # no database yet (fresh install); ``migrate`` creates it
     TOO_NEW = "too_new"  # written by a newer release (MIG-004)

@@ -39,7 +39,7 @@ def test_packaged_initial_migration_carries_every_5_6_note() -> None:
     Raises:
         None
     """
-    initial, reviews, auth, *_ = metadata_family().migrations
+    initial, reviews, auth, *later = metadata_family().migrations
     assert (initial.version, initial.name) == (1, "initial")
     assert (reviews.version, reviews.name) == (2, "identity_review")
     assert (auth.version, auth.name) == (3, "local_auth")
@@ -59,6 +59,10 @@ def test_packaged_initial_migration_carries_every_5_6_note() -> None:
     assert initial.checksum.startswith("sha256:")
     assert "CREATE TRIGGER" in initial.sql  # trigger bodies are not transaction control
     assert initial.info().recovery == initial.recovery
+    for migration in later:  # every later migration carries the 5.6 notes too
+        assert migration.recovery
+        assert migration.data_volume
+        assert "MIG-002" in migration.test_impact
 
 
 @pytest.mark.parametrize(

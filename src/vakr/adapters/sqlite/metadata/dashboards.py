@@ -1,6 +1,6 @@
 """SQLite custom-dashboard repository (UI-004, DASH-007, DB-003).
 
-Dashboards live in ``dashboard`` (migration ``0004_dashboards``), unique by
+Dashboards live in ``dashboard`` (migration ``0005_dashboards``), unique by
 ID and name. Widgets are one canonical-JSON column beside the
 ``widget_schema`` that wrote it; reading decodes them through
 ``vakr.domain.dashboard_codec``, which upgrades an older schema, and every

@@ -4,7 +4,7 @@ The suites are used unchanged; the fixture comes from this directory's conftest.
 
 Dependencies:
     tests.contract.contract_metadata_crud, contract_metadata_rules, contract_metadata_identity,
-    contract_auth_users, contract_auth_sessions.
+    contract_auth_users, contract_auth_sessions, contract_metadata_operations.
 
 Example:
     $ uv run pytest tests/contract/sqlite_metadata/test_sqlite_metadata_contracts.py
@@ -15,6 +15,7 @@ from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_dashboards import DashboardsContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
+from tests.contract.contract_metadata_operations import OperationsContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 
 
@@ -40,3 +41,7 @@ class TestSqliteAuthSessions(AuthSessionsContract):
 
 class TestSqliteDashboards(DashboardsContract):
     """UI-004, DASH-007, DB-003: custom dashboards on a SQLite metadata file."""
+
+
+class TestSqliteOperations(OperationsContract):
+    """API-011, DISC-T03, API-T06: admin operations on a SQLite metadata file."""

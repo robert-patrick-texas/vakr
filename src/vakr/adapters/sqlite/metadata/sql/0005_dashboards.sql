@@ -1,12 +1,12 @@
--- description: Add custom dashboards: named, ordered widget lists that admins define (UI-004,
---   DASH-007, Appendix E.31).
+-- description: Metadata schema 5: add custom dashboards, named, ordered widget lists that
+--   admins define (UI-004, DASH-007, Appendix E.31).
 -- destructive: false
 -- transactional: true
 -- recovery: Adds one table in one transaction; on failure nothing changes and
---   the database stays at the previous schema. Fix the cause and rerun `vakr db migrate`, or
+--   the database stays at schema 4. Fix the cause and rerun `vakr db migrate`, or
 --   restore the backup `vakr db migrate` took first.
 -- data-volume: Creates an empty table; existing rows are not touched. Finishes in milliseconds.
--- test-impact: MIG-002 (the previous schema upgrades with data intact); the dashboards contract
+-- test-impact: MIG-002 (schema 4 upgrades with data intact); the dashboards contract
 --   suite (UI-004, DB-003) runs on this schema.
 
 -- Custom dashboards (5.x Dashboard). `widgets` is a JSON array in the version `widget_schema`

@@ -38,6 +38,7 @@ TABLES = (
     "device", "interface", "site", "tag", "group", "policy", "collector",
     "identity_history", "audit", "review", "user", "session", "kiosk_token", "login_failure",
     "dashboard",
+    "operation",
 )  # fmt: skip
 UNIQUE = {
     "device": "name", "site": "name", "tag": "name", "group": "name", "policy": "name",

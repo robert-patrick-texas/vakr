@@ -187,6 +187,9 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/interfaces/{interface_uuid}/history/status` | operator | Admin and oper state as segments, last 7 days of the range |
 | `GET /api/v1/interfaces/{interface_uuid}/identity-history` | operator | Every identity decision, oldest first; paged |
 | `POST /api/v1/interfaces/{interface_uuid}/identity-resolution` | admin | Answers an identity review (below) |
+| `POST /api/v1/devices/{device_uuid}/rediscovery` | admin | A manual rediscovery (below): 202 with the queued operation and `Location`, or 200 with the one already queued or running; 409 `refused` with the reason |
+| `GET /api/v1/operations` | operator | Admin operations newest first; `device`, `state` (repeatable); paged |
+| `GET /api/v1/operations/{operation_uuid}` | operator | One operation: state, requester, times, collector, and the result or the reason |
 | `GET /api/v1/identity-reviews` | operator | Open reviews with candidates, oldest first; `device`; paged |
 | `GET /api/v1/sites`, `/tags`, `/groups` | operator | Name-ordered pages; their UUIDs are the `site`, `tag`, `group` filters |
 | `GET /api/v1/collectors` | operator | Each polling position with its latest health report and spool level; paged |
@@ -212,9 +215,11 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 
 **Identity resolution.** When discovery cannot tell which existing interface a row is, it opens a review ([inventory](inventory.md)). An admin answers it with `POST /api/v1/interfaces/{interface_uuid}/identity-resolution` and `{"review_id": "...", "decision": "map"}` (the row is this interface; its history continues) or `"decision": "new"` (the row is a different interface and gets its own identity; the interface in the path must be on the review's device). It is the same decision as `vakr interface review map|new`: one transaction updates identities, closes the review, writes identity history and an audit record that name the admin. A closed review or an interface on another device is 409.
 
+**Manual rediscovery.** `POST /api/v1/devices/{device_uuid}/rediscovery` (no body) answers at once and never waits for SNMP (DISC-010): 202 with an operation in state `queued` and `Location: /api/v1/operations/{id}`. Follow that address: `running` once a collector claimed it, then `succeeded` with `result` (`interfaces`, `new`, `renumbered`, `missing`, `reviews_opened`, `capability_changes`, `partial`, `duration_ms`), or `failed` or `expired` with `error`. A request for a device that already has one queued or running answers 200 with that operation. A device no collector would discover (disabled, retired, no SNMP credential, `icmp_only`) and a full queue (1,000 active operations) answer 409 `refused` with the reason. Each request is audited with the admin's name; the bounds are in Appendix E.32 of the blueprint. `vakr inventory rediscover` does the same on the node ([inventory](inventory.md#rediscovering-a-device-now)).
+
 ## Not in this release
 
-These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), rediscovery requests, inventory imports, policies, dashboard publication (`POST /dashboards/{uuid}/publish`), events, asynchronous operations and exports (`/operations`, `/exports/{operation_uuid}`), the server-sent event stream, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`.
+These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), inventory imports, policies, dashboard publication (`POST /dashboards/{uuid}/publish`), events, asynchronous exports (`/exports/{operation_uuid}`), the server-sent event stream, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`.
 
 ## OpenAPI document
 

@@ -6,13 +6,16 @@ Header: name and state (colour, icon, words), poll address, site, tags,
 collector and latest poll age, admin state, each position's own verdict.
 Summary: every fact the API gives (ICMP, latency and jitter, SNMP, agent
 uptime with its disclaimer, intervals, discovery, quality), warnings, and
-notes. Then the reachability graph, the interfaces (table or graph cards),
-and the device's open identity reviews. Facts from stale evidence say so.
+notes. Then, for admins only, "Rediscover now" with the newest manual
+rediscovery's progress or outcome (DISC-003). Then the reachability graph,
+the interfaces (table or graph cards), and the device's open identity
+reviews. Facts from stale evidence say so.
 -->
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
+	import { isAdmin } from '#lib/api/session.svelte.ts';
 	import { deviceQuery } from '#lib/query/reads.ts';
 	import { reviewsQuery } from '#lib/query/reads-catalog.ts';
 	import { reachabilityQuery } from '#lib/query/reads-history.ts';
@@ -23,6 +26,7 @@ and the device's open identity reviews. Facts from stale evidence say so.
 	import PageStatus from '#lib/components/PageStatus.svelte';
 	import RangePicker from '#lib/components/RangePicker.svelte';
 	import ReachabilitySection from '#lib/components/ReachabilitySection.svelte';
+	import RediscoverPanel from '#lib/components/RediscoverPanel.svelte';
 	import ReadingText from '#lib/components/ReadingText.svelte';
 	import StatusBadge from '#lib/components/StatusBadge.svelte';
 
@@ -114,6 +118,8 @@ and the device's open identity reviews. Facts from stale evidence say so.
 			</dl>
 			{#each d.notes as n (n)}<p class="muted note">{n}</p>{/each}
 		</section>
+
+		{#if isAdmin()}<RediscoverPanel deviceId={id} />{/if}
 
 		<section aria-labelledby="reach-h">
 			<h2 id="reach-h">Reachability</h2>

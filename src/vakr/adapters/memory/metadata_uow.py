@@ -7,8 +7,8 @@ discards the transaction, so a failed operation commits nothing.
 Dependencies:
     vakr.adapters.memory.metadata_store, metadata_repos, metadata_interfaces,
     metadata_reviews, metadata_specs, metadata_users, metadata_failures,
-    metadata_sessions, metadata_kiosk, metadata_dashboards: Storage, repositories,
-    and table rules.
+    metadata_sessions, metadata_kiosk, metadata_operations, metadata_dashboards:
+    Storage, repositories, and table rules.
 
 Safety:
     Uncommitted changes are visible only to their own unit of work.
@@ -29,6 +29,7 @@ from vakr.adapters.memory.metadata_interfaces import (
     MemoryInterfaceRepository,
 )
 from vakr.adapters.memory.metadata_kiosk import MemoryKioskTokenRepository
+from vakr.adapters.memory.metadata_operations import MemoryOperationRepository
 from vakr.adapters.memory.metadata_repos import MemoryDeviceRepository, MemoryTable
 from vakr.adapters.memory.metadata_reviews import MemoryReviewRepository, change_counter
 from vakr.adapters.memory.metadata_sessions import MemorySessionRepository
@@ -59,6 +60,7 @@ class MemoryUnitOfWork:
         sessions: Login sessions.
         kiosk_tokens: Kiosk display tokens.
         dashboards: Custom dashboards.
+        operations: Admin operations (E.32).
     """
 
     def __init__(self, store: MemoryMetadataStore) -> None:
@@ -92,6 +94,7 @@ class MemoryUnitOfWork:
         self.sessions = MemorySessionRepository(self._tx)
         self.kiosk_tokens = MemoryKioskTokenRepository(self._tx)
         self.dashboards = MemoryDashboardRepository(self._tx)
+        self.operations = MemoryOperationRepository(self._tx)
 
     def change_counter(self) -> int:
         """Return the metadata change counter; see ``MetadataUnitOfWork``.

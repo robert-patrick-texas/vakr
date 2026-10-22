@@ -28,7 +28,7 @@ Example:
     >>> from vakr.adapters.memory import memory_telemetry_factory, memory_uow_factory
     >>> view = OverviewQueries(memory_uow_factory(), memory_telemetry_factory()).overview()
     >>> view.devices.total, [f.available for f in view.events]
-    (0, [True, False, True, False])
+    (0, [True, True, True, False])
 """
 
 from collections.abc import Callable, Sequence

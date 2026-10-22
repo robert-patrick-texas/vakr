@@ -74,7 +74,7 @@ class EventRow:
     """One recent event.
 
     Attributes:
-        kind: ``restart``, ``identity_review``, or ``telemetry_loss``.
+        kind: ``restart``, ``rediscovery``, ``identity_review``, or ``telemetry_loss``.
         at: When it happened or was detected (UTC).
         subject: What it concerns, such as a device name or a spool.
         device_id: The device, when the event concerns one.

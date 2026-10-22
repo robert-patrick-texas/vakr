@@ -12,6 +12,7 @@ from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_dashboards import DashboardsContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
+from tests.contract.contract_metadata_operations import OperationsContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 from tests.contract.contract_ranking_projection import RankingProjectionContract
 from tests.contract.contract_rollup_source import RollupSourceContract
@@ -59,6 +60,10 @@ class TestMemoryAuthSessions(AuthSessionsContract):
 
 class TestMemoryDashboards(DashboardsContract):
     """UI-004, DASH-007, DB-003: custom dashboards on the memory adapter."""
+
+
+class TestMemoryOperations(OperationsContract):
+    """API-011, DISC-T03, API-T06: admin operations on the memory adapter."""
 
 
 class TestMemoryTelemetryHistory(TelemetryHistoryContract):

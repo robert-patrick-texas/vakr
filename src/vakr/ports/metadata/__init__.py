@@ -4,7 +4,7 @@ Import everything an adapter or a use case needs from here.
 
 Dependencies:
     vakr.ports.metadata.filters, repository, reviews, users, sessions, auth,
-    unit_of_work: The definitions.
+    operations, unit_of_work: The definitions.
 
 Safety:
     See ``vakr.ports``: no driver types cross these interfaces.
@@ -17,6 +17,7 @@ Example:
 
 from vakr.ports.metadata.dashboards import DashboardRepository
 from vakr.ports.metadata.filters import AuditFilter, DeviceFilter, InterfaceFilter, NoFilter
+from vakr.ports.metadata.operations import OperationFilter, OperationRepository
 from vakr.ports.metadata.repository import (
     AuditRepository,
     CollectorRepository,
@@ -52,6 +53,8 @@ __all__ = [
     "MetadataUnitOfWorkFactory",
     "NamedRepository",
     "NoFilter",
+    "OperationFilter",
+    "OperationRepository",
     "PolicyRepository",
     "ReviewFilter",
     "SessionRepository",

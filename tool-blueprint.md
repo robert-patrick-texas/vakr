@@ -1907,11 +1907,12 @@ GET    /api/v1/dashboards
 POST   /api/v1/dashboards
 GET    /api/v1/dashboards/{dashboard_uuid}
 PATCH  /api/v1/dashboards/{dashboard_uuid}
-DELETE /api/v1/dashboards/{dashboard_uuid}            # M4 (E.31 #16)
-GET    /api/v1/dashboards/{dashboard_uuid}/view       # M4: every widget resolved (E.31 #16)
+DELETE /api/v1/dashboards/{dashboard_uuid}            # M4 (E.31 #17)
+GET    /api/v1/dashboards/{dashboard_uuid}/view       # M4: every widget resolved (E.31 #17)
 POST   /api/v1/dashboards/{dashboard_uuid}/publish    # deferred with public dashboards (27.4)
 GET    /api/v1/collectors
 GET    /api/v1/collectors/{collector_uuid}/health
+GET    /api/v1/operations
 GET    /api/v1/operations/{operation_uuid}
 GET    /api/v1/events
 POST   /api/v1/imports/inventory
@@ -4108,6 +4109,7 @@ A MAC is strong only when it is a six-octet unicast address, not all zeros or on
 | Collector-health observation | At start, then every min(60 s, `polling.default_interval`, the shortest effective interval scheduled) | OBS-001; the views read a report older than its E.3 threshold as collector unavailable |
 | Inventory change-counter read | Every 5 s, in a worker thread | 6.2 |
 | Discovery concurrency | 2 at once, outside the scheduler's workers | DISC-001 |
+| Manual rediscovery | Claimed only into a free discovery slot, ahead of every scheduled discovery; picked up within one `change_poll_s` (5 s) pass | DISC-003, E.32 |
 | First discovery | Within 60 s, placed by the E.11 hash of `collector_name/device UUID/discovery` | DISC-001 |
 | Rediscovery after a success | One full interval later: the device override or `snmp.rediscovery_interval`, clamped to E.18's 30 s to 30 d, even when inventory still has no poll plan for the device (an agent with no interfaces) | DISC-002 |
 | Rediscovery after a restart | Slot `k × interval + (hash mod interval)` after the Unix epoch, for devices with a plan; outcomes are not persisted | DISC-002 |
@@ -4189,7 +4191,7 @@ Decisions taken with the M4 query services:
 8. **Loss in buckets.** Rollup buckets compute loss from summed probe counts (RET-008). Native buckets average per-poll loss percentages, which is equal to counted loss when every poll sent the same number of probes. That holds at the E.9 default of 5; a mixed probe count would need a probe-count series.
 9. **Smoke.** Every probe is shown for windows of at most 1,200 polls. Longer windows show the band between the lowest and highest per-poll median in each bucket. Re-bucketed rollups do not show their p95, because the p95 values of different buckets cannot be combined.
 10. **Inventory index.** Search, lists, and rankings read a bounded in-memory index of the inventory, reused until `change_counter()` moves; collectors are reread every time. At MVP scale this meets 12.9 without a storage-side search port. A port is the enterprise-scale follow-up.
-11. **Overview events.** Restarts come from the status snapshot: management-agent restarts within `status.recent_restart_window`. Identity reviews come from the review repository. Telemetry-loss incidents come from a reader the caller injects. Rediscovery runs are not recorded by any store yet, so that feed reports "not available".
+11. **Overview events.** Restarts come from the status snapshot: management-agent restarts within `status.recent_restart_window`. Identity reviews come from the review repository. Telemetry-loss incidents come from a reader the caller injects. Manual rediscoveries are admin operations (E.32): the feed lists those requested in the last 24 hours, newest first, with their outcome. Scheduled rediscoveries are not recorded as events; each device shows its discovery age.
 12. **Browsing by provider.** `browse(DeviceScope(provider=...))` lists devices that have at least one interface of that provider.
 
 ### E.29 Status CLI and TUI (TUI-001 to TUI-008, 7.7, 13, STATE-003, TIME-005)
@@ -4306,6 +4308,7 @@ The web UI is the static SvelteKit app of ADR-035 in `web/`, served by `vakr-api
 | Refresh: device and interface detail, collector health | 30 s | collector health is stale after 150 s at the 60 s default interval (E.3) |
 | Refresh: graphs and latency | 60 s | a native point arrives at most once per 60 s poll |
 | Refresh: rankings, identity reviews | 60 s | ranking windows end on a 1- or 5-minute boundary (E.28) |
+| Refresh: an admin operation while queued or running | 2 s | none once it ended; a list of operations polls at 2 s only while a row is active (decision 16) |
 | Sites, tags, groups | cached 5 min, no polling | search runs only when asked |
 | Retries of reads | at most 2, after 1 s and 2 s (4 s cap) | only when vakr-api did not answer or answered 502, 503, or 504; every 4xx and 500 is final; writes never retry (ADR-035 #6) |
 | Answers kept in memory | 5 min after the last page that used them; refetched on revisit after 10 s | bounds the browser's cache |
@@ -4322,10 +4325,10 @@ The web UI is the static SvelteKit app of ADR-035 in `web/`, served by `vakr-api
 | Kiosk `window` (overview, rankings) | `15m` | `15m`, `1h`, `6h`, `24h` (E.28) |
 | Kiosk reads per refresh | overview, high priority, WAN: 1; rankings: 2 | DASH-T06; the high-priority page shows the first 100 interfaces, the WAN page the API's first page, rankings 10 rows each |
 | Rotation `every` (time each dashboard is shown) | 60 s | 15 s to 1 h, whole seconds (decision 15) |
-| Rotation `pages` | none; required | 2 to 8 names of `overview`, `high-priority`, `wan`, `rankings`, or `dashboard:<uuid>` (decision 16), comma-separated; repeats allowed, so a dashboard can be shown more often; an unknown name is a full-screen error |
+| Rotation `pages` | none; required | 2 to 8 names of `overview`, `high-priority`, `wan`, `rankings`, or `dashboard:<uuid>` (decision 17), comma-separated; repeats allowed, so a dashboard can be shown more often; an unknown name is a full-screen error |
 | Rotation read-ahead | 5 s before a switch | the next dashboard's reads, made early instead of at the switch: no extra requests |
 | Kiosk token expiry warning | 7 days before | shown on the display, so an admin can hand over a new token in time |
-| Custom dashboards | at most 200 | constant (`vakr.domain.dashboards.MAX_DASHBOARDS`); one bounded list read (decision 16) |
+| Custom dashboards | at most 200 | constant (`vakr.domain.dashboards.MAX_DASHBOARDS`); one bounded list read (decision 17) |
 | Dashboard name / description / widget title | 1–80 / 0–500 / 1–80 characters | names unique, compared exactly; one line, trimmed |
 | Widgets per dashboard | at most 12, of which at most 2 rankings | rankings scan samples; two keep a `/view` within 12.9's 2 s at the default 15-minute window |
 | Pinned interfaces per widget | 1 to 50, distinct, in the admin's order | UI-004 |
@@ -4334,7 +4337,7 @@ The web UI is the static SvelteKit app of ADR-035 in `web/`, served by `vakr-api
 | Dashboard `refresh_s` | 60 s | 15 s to 1 h; a kiosk `refresh` overrides it |
 | Graph cards on a dashboard page | at most 12, first live pinned interfaces in order | the UI-016 bound above, page-wide; 24-hour cards, lazy |
 | Requests per dashboard refresh | 1 (`GET /api/v1/dashboards/{uuid}/view`) | plus the lazy graph cards (each at the 60 s graph interval); DASH-T06 |
-| Widget schema | 1 | stored beside the widgets; older JSON is upgraded on read, newer JSON refused (DASH-007, decision 16) |
+| Widget schema | 1 | stored beside the widgets; older JSON is upgraded on read, newer JSON refused (DASH-007, decision 17) |
 
 Decisions taken with the M4 web UI:
 
@@ -4353,10 +4356,40 @@ Decisions taken with the M4 web UI:
 13. **No SBOM.** ADR-035 #17 lists bundled packages in the SBOM, but the repository generates none yet. The build records the bundled packages instead (`bundled` in `vakr-web.json`, from the client chunks' modules); `web/scripts/check-licenses.js` holds them to a permissive allowlist and fails when `packaging/copyright` does not name one, and the package ships their licence and notice files in `/opt/vakr/share/doc/web-licenses/`.
 14. **Kiosk mode (UI-013).** `/kiosk/overview`, `/kiosk/high-priority`, `/kiosk/wan`, and `/kiosk/rankings` show the built-in dashboards chrome-less: no navigation, no sign-in or sign-out, no admin links, larger type, and rows and names as plain text (a stray tap must not navigate a wall display away). They render the same tables and panels as the normal pages; a kiosk context turns their links into text. Each shows "Data as of HH:MM:SS · refreshes every N s". A refresh keeps the answer on screen and updates rows in place (no loading notice, no flashing, focus kept); a failed refresh keeps the rows with the pages' stale note (UI-015). Displays are set up at `/kiosk/setup` by pasting the token once (E.30 #17); there is deliberately no `#token=` or query form, so a token never lands in history, bookmarks, or a synced profile. A 401 at any request (the token expired or was revoked) drops the data and fills the screen with what to do; under `/kiosk` the app never redirects to the sign-in page. A kiosk principal is an operator (E.12): it can read every page an operator can, if someone navigates there. A value out of bounds or an unknown dashboard is a full-screen error, never a silent fallback, because a display is configured once and then left.
 15. **Dashboard rotation (owner decision 2026-10-21).** `/kiosk/rotate?pages=overview,wan,rankings&every=60` shows the named dashboards in turn. Only the dashboard on screen is mounted, so only its reads poll, each at its own interval (or the kiosk's `refresh`); rotation adds no load beyond the visible page (DASH-T06). Five seconds before a switch the next dashboard's reads are made ahead, so it appears with its data instead of a loading notice; they are the reads it would make at the switch, so the total is unchanged. The switch replaces one dashboard with the next in one update, without a transition, so nothing slides or flashes and `prefers-reduced-motion` has nothing to reduce. The header says "2 of 3 · next: WAN circuits in 40 s" (not a live region; the switch itself is announced politely). Rotation counts only time the tab is visible, and a Pause rotation button stops it. The freshness line, the stale note, and the signed-out screen behave on every rotated dashboard exactly as on a single one.
-16. **Custom dashboards (UI-004, DASH-006, DASH-007, DASH-010; 2026-10-21).** Admins define dashboards; everyone signed in, kiosk displays included, views them.
-    * **The record.** A metadata record (migration `0004_dashboards` on this branch, `DashboardRepository`, contract `tests/contract/contract_dashboards.py`): UUID, unique name, description, `refresh_s`, an ordered list of widgets, `managed_by` (META-008), `visibility`, `widget_schema`, created and updated by and at, and `version` for optimistic concurrency (DB-003: a change based on an older version is 409, never a silent overwrite). Dashboards are presentation, not inventory, so DELETE removes the row (no archive); the audit record keeps the name. Edits never move the collection change counter, so the collector never reloads its inventory for one.
+16. **Manual rediscovery in the web UI (DISC-003, 2026-10-21).** The device page shows admins a "Rediscover now" button with the device's newest operation: queued, running, or how it ended (the counts of E.32, or the reason). Operators never see it, and the API refuses them anyway. While the operation is active the button is disabled and the page polls it every 2 s; when it ends, the device's data is refreshed. The Admin page lists the newest 25 operations.
+17. **Custom dashboards (UI-004, DASH-006, DASH-007, DASH-010; 2026-10-21).** Admins define dashboards; everyone signed in, kiosk displays included, views them.
+    * **The record.** A metadata record (migration `0005_dashboards`, metadata schema 5, `DashboardRepository`, contract `tests/contract/contract_dashboards.py`): UUID, unique name, description, `refresh_s`, an ordered list of widgets, `managed_by` (META-008), `visibility`, `widget_schema`, created and updated by and at, and `version` for optimistic concurrency (DB-003: a change based on an older version is 409, never a silent overwrite). Dashboards are presentation, not inventory, so DELETE removes the row (no archive); the audit record keeps the name. Edits never move the collection change counter, so the collector never reloads its inventory for one.
     * **Widgets (schema 1).** `pinned_interfaces` (UI-004: up to 50 interfaces across devices, in the admin's order, optionally with graph cards), `interface_selection` (site, tag, group, provider, WAN, or interest filters; at least one), `device_selection` (site, tag, or group; status order), and `ranking` (top utilization or top errors within the same filters; the ranking queries already accept that scope, so it costs what the rankings page costs). Widgets name inventory by UUID only, so a rename never breaks a dashboard. A write that names an interface, site, tag, or group that does not exist is 422 with the widget's field path. A pinned interface that is later retired, or that a restore no longer holds, keeps its place with "retired" or "no longer exists" and no values; it never disappears silently and never fails the dashboard.
     * **Schema upgrades (DASH-007).** Widgets are stored as JSON beside the schema that wrote them. `vakr.domain.dashboard_upgrades.UPGRADES[n]` turns schema-*n* JSON into *n + 1*; reading older JSON applies the steps and the next write stores the current schema. JSON from a newer schema than the release knows is refused as unusable, not guessed at.
     * **One request per refresh (DASH-T06).** `GET /api/v1/dashboards/{uuid}/view` resolves every widget server-side with the services the built-in pages use, for one position (MPOS-008), within the bounds above; the page adds only its lazy graph cards. The page refreshes at the dashboard's `refresh_s`.
     * **Kiosk.** `/kiosk/dashboard/{uuid}` shows a custom dashboard chrome-less, with decision 14's freshness, stale, and signed-out behaviour; rotations accept `dashboard:{uuid}` entries (decision 15's bounds unchanged) and read a custom dashboard's `/view` ahead like a built-in one's reads. A deleted dashboard, or an entry that is not `dashboard:` plus a UUID, takes the whole screen. The kiosk chooser lists custom dashboards.
     * **Gaps recorded.** File-managed dashboards (`/etc/vakr/dashboards.toml`, 11.1, META-008): every dashboard is API-managed in this release, and the stored `managed_by` lets file-managed ones arrive without a migration. Public publication (`POST /api/v1/dashboards/{uuid}/publish`, 14; UI-007) stays deferred with public dashboards (27.4), so `visibility` is always `private` and the route is not offered. No dashboard CLI: admins use the web UI or the API (the socket's admins included).
+
+### E.32 Admin operations (M4)
+
+Asynchronous admin requests (API-011), of which this release has one kind: the manual rediscovery (DISC-003, DISC-010). `POST /api/v1/devices/{device_uuid}/rediscovery`, the device page's button, and `vakr inventory rediscover` all call `vakr.operations.OperationService`; `vakr-collector` claims and runs them (`vakr.app.collector.operations`). Records live in the metadata table `operation` (migration `0004_operations.sql`). The guides are [inventory: rediscovering a device now](docs/operations/inventory.md#rediscovering-a-device-now) and [API](docs/operations/api.md).
+
+| Setting or bound | Default | Allowed range or notes |
+|---|---|---|
+| Active operations (queued or running), all devices | 1,000 | constant (`vakr.operations.limits.MAX_ACTIVE`); a request beyond is refused (409 `refused`, CLI exit 1) |
+| Active operations per device and kind | 1 | a second request answers 200 with the active one; a partial unique index enforces it in SQL too |
+| Pickup | within one `change_poll_s` pass (5 s) when a discovery slot is free | the collector reads at most 100 queued rows per pass, oldest first, and claims only as many as `discovery_concurrency` (2) has free |
+| Queued without a claim | 1 h, then `expired`: "no collector picked this up within 1 h; is vakr-collector running?" | checked on every read and every collector pass |
+| Running when the collector stopped | `failed`: "the collector restarted during the rediscovery" | at the collector's next start, 100 rows per statement |
+| Finished operations kept | 30 days, at most 10,000 rows | purged hourly by the collector, 500 rows per statement and at most 10 statements per pass, oldest first; one batch also at each request |
+| Error text / requester name | 500 / 128 characters | longer text is cut; a newline becomes a space |
+| Result counts | 0 to 1,000,000 each; duration up to 1,000,000 s | interfaces, new, renumbered (confident or probable), missing, identity reviews opened, capability changes, partial |
+| `vakr inventory rediscover --wait` | reads every 1 s; `--timeout` 300 s | 1 s to 3,600 s; exit 0 succeeded, 1 refused or failed, 3 expired, timed out, or no collector reporting |
+| `vakr inventory operations --limit` | 20 | 1 to 500 |
+| List page | E.19 (100, at most 500) | newest first by `(requested_at, id)` |
+
+Decisions taken with the M4 admin operations:
+
+1. **Generic records, one kind.** API-011 names rediscovery, import, projection rebuild, and maintenance. The record carries a `kind` (only `rediscovery` now), a state, the requester, the claiming collector, a bounded result, and a bounded error, so later kinds add a value, not a table. States move one way: `queued` → `running` → `succeeded` or `failed`, or `queued` → `expired`; a trigger refuses any change to a finished row.
+2. **Claimed by compare-and-set.** A collector moves an operation from `queued` to `running` with an update on `version`; of two collectors that try, exactly one commits and the other leaves it alone. In the MVP every position polls every device; with two positions (M5) the first position to claim runs the walk, and its result is written where every discovery is written.
+3. **Refused before queueing.** A device that is disabled or retired, has no SNMP credential, or is `icmp_only` (by override or by `polling.reachability_strategy`) is refused with the reason, because no collector would discover it and the request would only expire. A device a collector does not discover when it comes to claim it (it changed meanwhile) is claimed and failed with the reason, once the collector has its first plan.
+4. **The same discovery path.** A manual rediscovery goes through the scheduled one's runner: reconciliation, persistent identity, the identity-review cases, and capability refresh (DISC-009) are unchanged. It waits for a discovery of the same device that is already running, then runs, so the result is fresh. A success restarts the device's rediscovery interval (DISC-002); a failure counts toward the backoff like any failure.
+5. **No API worker waits (DISC-010).** The request stores the operation and answers at once; the API, the CLI, and the web UI follow its record. The collector's pass runs in a worker thread, beside the inventory watch.
+6. **Audited at the request (SEC-018).** Each request, including one that joins the active operation, appends `device.rediscover` with the requester: the username, `local:<account>` on the socket, or `cli:<login>` (with `(sudo)`). The outcome is the operation record; identity changes the walk makes are audited as every discovery's are (`discovery.reconcile`).
+7. **Operations are not inventory.** They never move the metadata change counter, so following one never makes the collector re-plan, and they are deleted after 30 days, unlike inventory records (META-009 does not apply to an operational log).
+8. **Gaps.** Scheduled rediscoveries are not recorded as operations or events. Cancelling a queued operation is not offered; it expires after an hour if no collector takes it.

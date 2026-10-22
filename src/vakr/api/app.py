@@ -41,6 +41,7 @@ from vakr.api import (
     routes_identity,
     routes_interfaces,
     routes_kiosk,
+    routes_operations,
     routes_views,
 )
 from vakr.api.context import ApiContext
@@ -76,6 +77,7 @@ TAGS = [
     {"name": "devices", "description": "Device list, device screen, reachability history."},
     {"name": "interfaces", "description": "Interface list, detail, and history graphs."},
     {"name": "identity", "description": "Interface identity history and reviews."},
+    {"name": "operations", "description": "Manual rediscovery and admin operations."},
     {"name": "catalog", "description": "Sites, tags, groups, and collectors."},
     {"name": "dashboards", "description": "Overview, rankings, WAN, high priority, search."},
     {"name": "exports", "description": "Bounded CSV and JSON downloads."},
@@ -88,7 +90,7 @@ COMMON_ERRORS: Responses = {
 }
 _ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_interfaces,
             routes_identity, routes_catalog, routes_views, routes_export,
-            routes_dashboards)  # fmt: skip
+            routes_dashboards, routes_operations)  # fmt: skip
 
 
 def create_app(context: ApiContext | None = None, *, web: WebMount | None = None) -> FastAPI:

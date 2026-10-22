@@ -25,6 +25,7 @@ from vakr.adapters.sqlite.metadata.dashboards import SqliteDashboardRepository
 from vakr.adapters.sqlite.metadata.interfaces import SqliteInterfaceRepository
 from vakr.adapters.sqlite.metadata.kiosk import SqliteKioskTokenRepository
 from vakr.adapters.sqlite.metadata.login_failures import SqliteLoginFailureRepository
+from vakr.adapters.sqlite.metadata.operations import SqliteOperationRepository
 from vakr.adapters.sqlite.metadata.reviews import SqliteReviewRepository, change_counter
 from vakr.adapters.sqlite.metadata.sessions import SqliteSessionRepository
 from vakr.adapters.sqlite.metadata.specs_interface import INTERFACE
@@ -59,6 +60,7 @@ class SqliteUnitOfWork:
         sessions: Login sessions.
         kiosk_tokens: Kiosk display tokens.
         dashboards: Custom dashboards.
+        operations: Admin operations (E.32).
     """
 
     def __init__(self, pool: ConnectionPool, gate: WriterGate) -> None:
@@ -93,6 +95,7 @@ class SqliteUnitOfWork:
         self.sessions = SqliteSessionRepository(self._tx)
         self.kiosk_tokens = SqliteKioskTokenRepository(self._tx)
         self.dashboards = SqliteDashboardRepository(self._tx)
+        self.operations = SqliteOperationRepository(self._tx)
 
     def change_counter(self) -> int:
         """Return the metadata change counter; see ``MetadataUnitOfWork``.

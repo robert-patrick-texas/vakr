@@ -2,7 +2,9 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
-## Unreleased
+## 0.5.0 - 2026-10-27
+
+Maintenance release. vakr now ships on the newest release of every tool and dependency, checked again when the release is cut, and holds one back only after it fails vakr's tests (ADR-036). This release bundles CPython 3.15.2 and updates FastAPI, Starlette, and pyasn1, the SNMP codec. It changes no database schema and adds no options. **This release is marked `manual-update-required`** so that nodes still on 0.2.x do not update by timer past the telemetry migrations of 0.3.x and 0.4.0 (see the notes for operators).
 
 ### Changed
 
@@ -13,7 +15,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
   - Nothing waits for a release to age. Dependabot's default 3-day cooldown is off for every ecosystem, `web/.npmrc` sets `min-release-age=0`, and the lockfile check overrides any local uv `exclude-newer`.
 - Toolchain and dependencies (TOOLS-001, TOOLS-002), every update `make updates` listed on 2026-10-27:
   - The package bundles CPython 3.15.2 (3.15.1 before), through uv 0.13.6 in the builder image (0.13.5 before).
-  - Runtime: FastAPI 0.162.0 (0.159.1), Starlette 1.10.0 (1.9.0), and certifi 2026.10.23. FastAPI's two breaking changes, in 0.160.0 and 0.162.0, concern parameter models and form fields, which vakr does not use.
+  - Runtime: FastAPI 0.162.0 (0.159.1), Starlette 1.10.0 (1.9.0), pyasn1 0.6.5 (0.6.4; published the day of this release), and certifi 2026.10.23. FastAPI's two breaking changes, in 0.160.0 and 0.162.0, concern parameter models and form fields, which vakr does not use.
   - Web UI: Svelte 5.57.3 and TanStack Svelte Query 6.3.6.
   - Developers: ruff 0.17.3, ty 0.0.92, coverage 7.17.0, hypothesis 6.170.12, eslint-plugin-jsdoc 65.4.2, svelte-eslint-parser 1.10.0, typescript-eslint 8.72.1, and `astral-sh/setup-uv` 10.3.2 in CI.
 
@@ -24,6 +26,13 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 ### Held dependencies (TOOLS-004)
 
 - **TypeScript 7.0.2** (staying on 6.0.3): typescript-eslint refuses TypeScript 7.0 (8.72.0 and 8.72.1 both), and SvelteKit 3.1.0 crashes loading `tsconfig.json`. Lint, svelte-check, the unit tests, the API-types check, and the build all fail; all pass on 6.0.3. Tested 2026-10-27; revisited with the next TypeScript release.
+
+### Notes for operators
+
+- **A new installation** needs nothing beyond the [install guide](docs/operations/install.md).
+- **This release is marked `manual-update-required`, although it migrates nothing.** Nodes on 0.2.x run an updater that reads the marker only on the release it installs. Without the marker here, their update timer would install 0.5.0 straight over the telemetry migrations of 0.3.x and 0.4.0, which need the manual steps in those releases' notes. The timer therefore skips 0.5.0 on every node: install it with `sudo vakr self-update`.
+  - **From 0.4.0** that command is the whole update, and `sudo vakr self-update --rollback` returns to 0.4.0, which reads the same schemas.
+  - **From 0.3.x or 0.2.x**, read the notes of 0.4.0 (and of 0.3.1, from 0.2.x) first; self-update applies their migrations in order.
 
 ## 0.4.0 - 2026-10-22
 

@@ -68,8 +68,8 @@ vakr self-update: available: 7.4.0 is available (installed 7.3.0)
 |---|---|
 | `sudo vakr self-update` | Installs the newest release on the channel, if it is newer than the installed version. It asks for confirmation first. |
 | `sudo vakr self-update --yes` | Same, without asking. Without a terminal and without `--yes`, nothing is installed. |
-| `sudo vakr self-update --version 0.5.0` | Installs that release, even if it is older or the same (a downgrade or reinstall). It accepts `0.5.0-rc.1`, `0.5.0rc1`, `0.5.0~rc.1`, and `v0.5.0-rc.1`. |
-| `sudo vakr self-update --version 0.5.0 --if-newer` | Installs that release only if it is newer than the installed version. |
+| `sudo vakr self-update --version 1.4.0` | Installs that release, even if it is older or the same (a downgrade or reinstall). It accepts `1.4.0-rc.1`, `1.4.0rc1`, `1.4.0~rc.1`, and `v1.4.0-rc.1`. |
+| `sudo vakr self-update --version 1.4.0 --if-newer` | Installs that release only if it is newer than the installed version. |
 | `sudo vakr self-update --channel stable` | Overrides `update.channel` for this run only. |
 
 Automatic selection never downgrades. To go back a version, use `--version` or `--rollback`.
@@ -280,7 +280,7 @@ Copy them to the host (for example with `scp`) and install:
 $ sudo vakr self-update --file vakr_0.5.0_amd64.deb --sums SHA256SUMS --sig SHA256SUMS.sig
 ```
 
-The package's file name must be `vakr_<version>_amd64.deb`. Both the Debian spelling `0.5.0~rc.1` and GitHub's `0.5.0.rc.1` are accepted. The three files are first copied into the root-owned package cache and verified there, and the verified copy is what gets installed, so nobody with write access to the directory you copied them to can swap the package after verification. Verification, backup, hooks, and rollback work exactly as for an online update, with no network access. Because the files stay in the cache, the version can later serve as a rollback target.
+The package's file name must be `vakr_<version>_amd64.deb`. Both the Debian spelling `1.4.0~rc.1` and GitHub's `1.4.0.rc.1` are accepted. The three files are first copied into the root-owned package cache and verified there, and the verified copy is what gets installed, so nobody with write access to the directory you copied them to can swap the package after verification. Verification, backup, hooks, and rollback work exactly as for an online update, with no network access. Because the files stay in the cache, the version can later serve as a rollback target.
 
 To verify by hand before copying, run:
 

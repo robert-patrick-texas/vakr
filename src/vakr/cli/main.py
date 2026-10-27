@@ -40,6 +40,7 @@ COMMAND_MODULES: tuple[str, ...] = (
     "vakr.cli.cmd_status",
     "vakr.cli.cmd_tui",
     "vakr.cli.cmd_inventory",
+    "vakr.cli.cmd_device",
     "vakr.cli.cmd_interface",
     "vakr.cli.cmd_collector",
     "vakr.cli.cmd_api",

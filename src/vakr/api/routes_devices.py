@@ -234,7 +234,7 @@ async def device_interfaces(
         device_uuid: The device.
         _: The caller.
         context: The services.
-        filters: Retired interfaces and interest class (UI-017).
+        filters: Retired interfaces, interest class (UI-017), not yet classified.
         search: Substring of interface name, alias, description, provider, or circuit.
         sort: ``priority``, ``name``, ``traffic``, or ``utilization``.
         collector: Position whose current values to show.
@@ -251,7 +251,8 @@ async def device_interfaces(
     if not await call(device_exists, context, device_id):
         raise missing(device_uuid)
     scope = InterfaceScope(device_id=device_id, include_retired=filters.include_retired,
-                           interest=filters.interest)  # fmt: skip
+                           interest=filters.interest,
+                           unclassified=filters.unclassified)  # fmt: skip
     request = InterfaceListRequest(search, scope, sort, offset_of(cursor), limit,
                                    collector_id(collector))  # fmt: skip
     view = await call(context.overview.catalog.interface_list, request)

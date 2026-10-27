@@ -3,9 +3,10 @@
 A peer's metadata is a copy of its primary's, replaced at every pull, so a
 local edit would be lost and would diverge meanwhile. ``refused_on_peer``
 wraps the handlers that write replicated metadata (``vakr user`` changes,
-``vakr inventory apply``, ``vakr interface claim``, identity-review
-decisions, and manual rediscovery); it runs inside ``guarded``, which turns
-the refusal into ``vakr: <message>`` and exit status 1.
+``vakr inventory apply``, ``vakr device add|set|remove``, ``vakr interface
+claim|annotate|tag``, identity-review decisions, and manual rediscovery);
+it runs inside ``guarded``, which turns the refusal into ``vakr: <message>``
+and exit status 1.
 
 Dependencies:
     vakr.config: The effective configuration and the node rules.

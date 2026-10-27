@@ -252,7 +252,11 @@ export interface paths {
          */
         get: operations["devices_api_v1_devices_get"];
         put?: never;
-        post?: never;
+        /**
+         * Add a device (admin)
+         * @description Create an API-managed device (SEC-018: audited with the administrator).
+         */
+        post: operations["create_api_v1_devices_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -273,10 +277,18 @@ export interface paths {
         get: operations["device_api_v1_devices__device_uuid__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Retire a device (admin; soft delete)
+         * @description Retire a device (META-009); its history and interface identities stay.
+         */
+        delete: operations["retire_api_v1_devices__device_uuid__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Change a device (admin; carries its version)
+         * @description Change a device, if a file does not manage it and nobody changed it since ``version``.
+         */
+        patch: operations["change_api_v1_devices__device_uuid__patch"];
         trace?: never;
     };
     "/api/v1/devices/{device_uuid}/history/reachability": {
@@ -311,6 +323,26 @@ export interface paths {
          * @description Return one page of a device's interfaces.
          */
         get: operations["device_interfaces_api_v1_devices__device_uuid__interfaces_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/devices/{device_uuid}/record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A device's editable record
+         * @description Return the fields an edit sets, the owner, and the version.
+         */
+        get: operations["record_api_v1_devices__device_uuid__record_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -539,6 +571,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/interfaces/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add and remove vakr tags on many interfaces (admin)
+         * @description Add and remove vakr tags on up to 500 interfaces, all or nothing (META-013).
+         */
+        post: operations["tag_api_v1_interfaces_tags_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/interfaces/{interface_uuid}": {
         parameters: {
             query?: never;
@@ -557,6 +609,30 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/interfaces/{interface_uuid}/annotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An interface's annotation and vakr tags
+         * @description Return an interface's owned fields.
+         */
+        get: operations["annotation_api_v1_interfaces__interface_uuid__annotation_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Annotate an interface (admin; carries its version)
+         * @description Change an interface's annotation, if nobody changed it since ``version`` (DB-003).
+         */
+        patch: operations["annotate_api_v1_interfaces__interface_uuid__annotation_patch"];
         trace?: never;
     };
     "/api/v1/interfaces/{interface_uuid}/history/errors": {
@@ -1048,11 +1124,119 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /**
+         * AddressFamily
+         * @description IP address family of a poll target or interface address (ICMP-011).
+         * @enum {string}
+         */
+        AddressFamily: "ipv4" | "ipv6";
+        /**
          * AdminState
          * @description Operator-set device state (7.5); controls scheduling, not observation.
          * @enum {string}
          */
         AdminState: "enabled" | "maintenance" | "disabled" | "retired";
+        /**
+         * AnnotationOut
+         * @description An interface's owned fields (META-007, META-011, META-013).
+         */
+        AnnotationOut: {
+            /** Capacity Override Bps */
+            capacity_override_bps: number | null;
+            /** Changes */
+            changes: string[];
+            /** Circuit Id */
+            circuit_id: string | null;
+            /**
+             * Classified
+             * @description False: not yet classified (META-013).
+             */
+            classified: boolean;
+            /** Comment */
+            comment: string;
+            /** Contracted Bps */
+            contracted_bps: number | null;
+            /**
+             * Description Tags
+             * @description Tags from description keywords.
+             */
+            description_tags: string[];
+            /** Device */
+            device: string;
+            /**
+             * Device Id
+             * Format: uuid
+             */
+            device_id: string;
+            /** Editable */
+            editable: boolean;
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** If Name */
+            if_name: string;
+            interest: components["schemas"]["InterestClass"];
+            /** Lifecycle */
+            lifecycle: string;
+            managed_by: components["schemas"]["ManagedByKind"];
+            /** Managed By Source */
+            managed_by_source: string;
+            /** Provider */
+            provider: string | null;
+            /** Sticky */
+            sticky: boolean;
+            /**
+             * Tags
+             * @description Tags added in vakr.
+             */
+            tags: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+            /** Wan Circuit */
+            wan_circuit: boolean;
+        };
+        /**
+         * AnnotationPatch
+         * @description Body of ``PATCH /api/v1/interfaces/{uuid}/annotation``.
+         */
+        AnnotationPatch: {
+            /** Capacity Override Bps */
+            capacity_override_bps?: number | null;
+            /** Circuit Id */
+            circuit_id?: string | null;
+            /** Comment */
+            comment?: string | null;
+            /** Contracted Bps */
+            contracted_bps?: number | null;
+            /**
+             * High Priority
+             * @description Alias: true is primary.
+             */
+            high_priority?: boolean | null;
+            interest?: components["schemas"]["InterestClass"] | null;
+            /** Provider */
+            provider?: string | null;
+            /** Sticky */
+            sticky?: boolean | null;
+            /**
+             * Tags
+             * @description vakr tags; replaces the set.
+             */
+            tags?: string[] | null;
+            /**
+             * Version
+             * @description The version this change is based on (DB-003).
+             */
+            version: number;
+            /** Wan Circuit */
+            wan_circuit?: boolean | null;
+        };
         /**
          * BucketCounts
          * @description How many matching devices fall in each bucket.
@@ -1409,6 +1593,46 @@ export interface components {
             widgets: components["schemas"]["WidgetView"][];
         };
         /**
+         * DeviceCreate
+         * @description Body of ``POST /api/v1/devices``.
+         */
+        DeviceCreate: {
+            /**
+             * Address
+             * @description IP literal or DNS name to poll.
+             */
+            address: string;
+            address_family?: components["schemas"]["AddressFamily"] | null;
+            /** Admin State */
+            admin_state?: ("enabled" | "maintenance" | "disabled") | null;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Credential
+             * @description SNMP credential name, not secret.
+             */
+            credential?: string | null;
+            /** Discovery Interval */
+            discovery_interval?: string | null;
+            /** Groups */
+            groups?: string[] | null;
+            /**
+             * Interval
+             * @description Poll interval override.
+             */
+            interval?: string | null;
+            /** Name */
+            name: string;
+            reachability?: components["schemas"]["ReachabilityStrategy"] | null;
+            /**
+             * Site
+             * @description An existing site's name.
+             */
+            site?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+        };
+        /**
          * DeviceCriteriaIn
          * @description Which devices a device selection covers; absent fields do not filter.
          */
@@ -1488,6 +1712,116 @@ export interface components {
             total: number;
             /** Truncated */
             truncated: boolean;
+        };
+        /**
+         * DevicePatch
+         * @description Body of ``PATCH /api/v1/devices/{uuid}``: ``version`` plus what changes.
+         */
+        DevicePatch: {
+            /** Address */
+            address?: string | null;
+            address_family?: components["schemas"]["AddressFamily"] | null;
+            /** Admin State */
+            admin_state?: ("enabled" | "maintenance" | "disabled") | null;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Credential
+             * @description SNMP credential name, not secret.
+             */
+            credential?: string | null;
+            /** Discovery Interval */
+            discovery_interval?: string | null;
+            /** Groups */
+            groups?: string[] | null;
+            /**
+             * Interval
+             * @description Poll interval override.
+             */
+            interval?: string | null;
+            /** Name */
+            name?: string | null;
+            reachability?: components["schemas"]["ReachabilityStrategy"] | null;
+            /**
+             * Site
+             * @description An existing site's name.
+             */
+            site?: string | null;
+            /** Tags */
+            tags?: string[] | null;
+            /**
+             * Version
+             * @description The version this change is based on (DB-003).
+             */
+            version: number;
+        };
+        /**
+         * DeviceRecordOut
+         * @description A device's editable record, as the record endpoint and every write answer it.
+         */
+        DeviceRecordOut: {
+            /** Address */
+            address: string;
+            address_family: components["schemas"]["AddressFamily"] | null;
+            /**
+             * Admin State
+             * @enum {string}
+             */
+            admin_state: "enabled" | "maintenance" | "disabled" | "retired";
+            /**
+             * Changes
+             * @description What this write changed; empty for a read.
+             */
+            changes: string[];
+            /** Comment */
+            comment: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Credential */
+            credential: string | null;
+            /** Discovery Interval */
+            discovery_interval: string | null;
+            /**
+             * Editable
+             * @description False when a file manages it (META-008).
+             */
+            editable: boolean;
+            /** Groups */
+            groups: string[];
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Interval */
+            interval: string | null;
+            managed_by: components["schemas"]["ManagedByKind"];
+            /**
+             * Managed By Source
+             * @description The managing file, or `api`.
+             */
+            managed_by_source: string;
+            /** Name */
+            name: string;
+            reachability: components["schemas"]["ReachabilityStrategy"] | null;
+            /** Site */
+            site: string | null;
+            /** Site Id */
+            site_id: string | null;
+            /** Tags */
+            tags: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+            /** Warnings */
+            warnings: components["schemas"]["FieldNote"][];
         };
         /**
          * DeviceRow
@@ -1755,6 +2089,16 @@ export interface components {
          * @enum {string}
          */
         ExportFormat: "csv" | "json";
+        /**
+         * FieldNote
+         * @description Advice about one field that did not block the change.
+         */
+        FieldNote: {
+            /** Field */
+            field: string;
+            /** Message */
+            message: string;
+        };
         /**
          * FieldProblem
          * @description One refused input.
@@ -2531,6 +2875,12 @@ export interface components {
             username: string;
         };
         /**
+         * ManagedByKind
+         * @description Which source owns a configurable record (META-008, blueprint 11.2).
+         * @enum {string}
+         */
+        ManagedByKind: "file" | "api";
+        /**
          * MarkerKind
          * @description Why part of a series is missing or needs context (12.6, RATE-004).
          * @enum {string}
@@ -3065,6 +3415,12 @@ export interface components {
          */
         RankingWindow: "15m" | "1h" | "6h" | "24h";
         /**
+         * ReachabilityStrategy
+         * @description How ICMP results gate SNMP collection for a device (ICMP-006..014).
+         * @enum {string}
+         */
+        ReachabilityStrategy: "icmp_gated" | "snmp_fallback" | "icmp_only" | "snmp_only";
+        /**
          * Reading
          * @description One displayed value.
          *
@@ -3576,6 +3932,28 @@ export interface components {
             row: number | null;
             /** Severity */
             severity: number;
+        };
+        /**
+         * TagChange
+         * @description Body of ``POST /api/v1/interfaces/tags``: add and remove vakr tags on many interfaces.
+         */
+        TagChange: {
+            /** Add */
+            add?: string[];
+            /** Interfaces */
+            interfaces: string[];
+            /** Remove */
+            remove?: string[];
+        };
+        /**
+         * TagChangeOut
+         * @description What a tag change did.
+         */
+        TagChangeOut: {
+            /** Changed */
+            changed: string[];
+            /** Unchanged */
+            unchanged: string[];
         };
         /**
          * TimelineView
@@ -4746,6 +5124,84 @@ export interface operations {
             };
         };
     };
+    create_api_v1_devices_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeviceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRecordOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such device */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description managed by a file, a stale version, or a peer */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
     device_api_v1_devices__device_uuid__get: {
         parameters: {
             query?: never;
@@ -4786,6 +5242,165 @@ export interface operations {
             };
             /** @description no such device */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    retire_api_v1_devices__device_uuid__delete: {
+        parameters: {
+            query?: {
+                /** @description Refuse if changed since. */
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                device_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRecordOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such device */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description managed by a file, a stale version, or a peer */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    change_api_v1_devices__device_uuid__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DevicePatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRecordOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such device */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description managed by a file, a stale version, or a peer */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4907,6 +5522,8 @@ export interface operations {
                 include_retired?: boolean;
                 /** @description primary = high priority. */
                 interest?: components["schemas"]["InterestClass"] | null;
+                /** @description Only not yet classified (META-013). */
+                unclassified?: boolean;
             };
             header?: never;
             path: {
@@ -4923,6 +5540,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InterfaceListPage"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such device */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    record_api_v1_devices__device_uuid__record_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRecordOut"];
                 };
             };
             /** @description not signed in */
@@ -5677,6 +6361,8 @@ export interface operations {
                 limit?: number;
                 /** @description `page.next_cursor` of the previous page. */
                 cursor?: string | null;
+                /** @description Only not yet classified (META-013). */
+                unclassified?: boolean;
                 /** @description Site UUID. */
                 site?: string | null;
                 /** @description Tag UUID. */
@@ -5717,6 +6403,84 @@ export interface operations {
             };
             /** @description role, CSRF, or socket peer refused */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    tag_api_v1_interfaces_tags_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TagChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TagChangeOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such interface */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description managed by a file, a stale version, or a peer */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5787,6 +6551,153 @@ export interface operations {
             };
             /** @description no such interface */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    annotation_api_v1_interfaces__interface_uuid__annotation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interface_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such interface */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description a parameter is out of bounds */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description metadata database unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+        };
+    };
+    annotate_api_v1_interfaces__interface_uuid__annotation_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                interface_uuid: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnotationPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnotationOut"];
+                };
+            };
+            /** @description not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description role, CSRF, or socket peer refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description no such interface */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description managed by a file, a stale version, or a peer */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

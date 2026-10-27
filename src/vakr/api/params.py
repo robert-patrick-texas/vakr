@@ -20,11 +20,12 @@ Example:
     1200
 """
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Query
+from fastapi import Depends, Query
 
 from vakr.api.paging import DEFAULT_PAGE_LIMIT, MAX_CURSOR_LENGTH, MAX_PAGE_LIMIT
 from vakr.domain.enums import AdminState, InterestClass, InterfaceLifecycle
@@ -141,6 +142,25 @@ def interface_scope(
         lifecycle=lifecycle,
         include_retired=include_retired,
     )
+
+
+def interface_list_scope(
+    scope: Annotated[InterfaceScope, Depends(interface_scope)],
+    unclassified: Annotated[bool, Query(description="Only not yet classified (META-013).")] = False,
+) -> InterfaceScope:
+    """Build the interface list's scope: the shared filters plus "not yet classified".
+
+    Args:
+        scope: The shared interface filters.
+        unclassified: Only interfaces with no annotation, vakr tag, or keyword tag.
+
+    Returns:
+        InterfaceScope: The scope.
+
+    Raises:
+        None
+    """
+    return replace(scope, unclassified=unclassified)
 
 
 def device_scope(

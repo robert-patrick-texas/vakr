@@ -148,7 +148,7 @@ A partition needs nothing from you: the peer polls on with its last-known metada
    | `this node never copied the primary's metadata` | No pull ever succeeded, so the node would start with no inventory or accounts. | Pass `--force` only if you mean to rebuild the inventory here. |
 
    Then it rewrites `[node]` for you, in whichever file sets it (`config.toml` or a `conf.d` drop-in). It sets `role = "primary"`, removes `primary_url`, and sets `peer_url` to the old primary, so observations keep replicating both ways. A timestamped backup goes to `/var/lib/vakr/config-backups/`, and the old values go to `/var/lib/vakr/replication/node-role.json`. The audit gets a `node.promote` record. Only `vakr-collector` and `vakr-api` restart; `--no-restart` leaves that to you, and `--yes` skips the question.
-4. **Point people at the new primary.** Metadata edits are now accepted here. Accounts and their passwords are the ones replicated from the old primary. Sessions are node-local, so users sign in again.
+4. **Point people at the new primary.** Metadata edits are now accepted here. Accounts and their passwords are the ones replicated from the old primary. Sessions are node-local, so people who used the old primary sign in again here; kiosk displays pointed at the old primary need a kiosk token from this node.
 5. **Check:** `sudo vakr check health` and `vakr node status`. The `replication` check reports the observation lag towards the old primary, which grows while it is gone. That is expected.
 
 ## When the old primary comes back

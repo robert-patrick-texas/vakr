@@ -30,6 +30,37 @@ from vakr.domain.errors import StorageError
 _US = 1_000_000
 
 
+def _shared_summary(payload: bytes) -> tuple[int, int, int] | None:
+    """Read the common payload in which every metric shares the first one's counts.
+
+    A bucket's metrics summarise the same observations, so they usually share
+    the expected count, sample count, and quality, and every sample is valid.
+    Then the first three varints after the header answer for the whole row and
+    no value needs stepping over, which keeps a 14-day scan of 1,600 interfaces
+    within the field kit's two minutes.
+
+    Args:
+        payload: The stored blob.
+
+    Returns:
+        tuple[int, int, int] | None: As ``payload_summary``; ``None`` when not that shape.
+
+    Raises:
+        StorageError: If the payload ends early.
+    """
+    present, shared, valid_is_sample = payload[0], payload[1], payload[2]
+    first = present & -present
+    if not present or shared != present & ~first or valid_is_sample != present:
+        return None
+    if len(payload) > 5 and payload[3] < 0x80 and payload[4] < 0x80 and payload[5] < 0x80:
+        sample = payload[4]  # one-byte varints: expected, sample, quality
+        return sample, present if sample > 0 else 0, payload[5]
+    reader = PayloadReader(payload, 3)
+    reader.varint()
+    sample, quality = reader.varint(), reader.varint()
+    return sample, present if sample > 0 else 0, quality
+
+
 def payload_summary(payload: object) -> tuple[int, int, int]:
     """Return a rollup payload's largest sample count, presence bits, and quality union.
 
@@ -45,6 +76,8 @@ def payload_summary(payload: object) -> tuple[int, int, int]:
     """
     if not isinstance(payload, bytes) or len(payload) < 3:
         raise StorageError("a stored rollup payload is damaged", retryable=False)
+    if (common := _shared_summary(payload)) is not None:
+        return common
     present, shared, valid_is_sample = payload[0], payload[1], payload[2]
     reader = PayloadReader(payload, 3)
     samples = available = quality = sample = 0

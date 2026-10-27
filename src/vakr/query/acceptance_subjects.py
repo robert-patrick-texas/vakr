@@ -168,6 +168,8 @@ def missing_slots(
     Raises:
         StorageError: If the store is unavailable.
     """
+    if not spans:
+        return [], False
     # A sample belongs to the latest poll that ran at or before it, so a poll
     # that overran its slot still owns the sample it took after that slot.
     ran = [i for i, s in enumerate(slots) if s.kind in RAN_KINDS]

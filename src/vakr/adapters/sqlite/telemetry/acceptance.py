@@ -56,6 +56,28 @@ _EXECUTION = {code_of(m): m for m in PollExecution}
 _POLL_COLUMNS = ("ts_us, observation_uuid, effective_interval_s, execution, quality_flags, "
                  "started_offset_us, completed_offset_us")  # fmt: skip
 _METRICS = {ObservationType.INTERFACE: INTERFACE_METRICS, ObservationType.ICMP: ICMP_METRICS}
+_QUALITY: dict[int, Quality] = {}
+
+
+def _quality(bits: int) -> Quality:
+    """Return the ``Quality`` of stored bits, built once per distinct value.
+
+    A report reads millions of rows that share a handful of flag values, and
+    building an ``IntFlag`` costs more than the rest of a row.
+
+    Args:
+        bits: The stored integer.
+
+    Returns:
+        Quality: The flags.
+
+    Raises:
+        ValueError: If the bits are not a valid ``Quality``.
+    """
+    found = _QUALITY.get(bits)
+    if found is None:
+        found = _QUALITY.setdefault(bits, Quality(bits))
+    return found
 
 
 def _presence(observation_type: ObservationType) -> str:
@@ -113,7 +135,7 @@ class SqliteAcceptanceQuery:
         rows = self._native("obs_poll", _POLL_COLUMNS, device_id, collector_id, window, limit,
                             descending=False)  # fmt: skip
         marks = [
-            PollMark(ts, interval, _EXECUTION[code], Quality(flags),
+            PollMark(ts, interval, _EXECUTION[code], _quality(flags),
                      None if start is None else ts + start, None if end is None else ts + end)
             for ts, _uuid, interval, code, flags, start, end in rows[:limit]
         ]  # fmt: skip
@@ -144,7 +166,7 @@ class SqliteAcceptanceQuery:
         family = FAMILY_OF[observation_type]
         rows = self._native(family, columns, subject_id, collector_id, window, limit,
                             descending=newest_first)  # fmt: skip
-        marks = [SampleMark(ts, Quality(flags), bits) for ts, _u, flags, bits in rows[:limit]]
+        marks = [SampleMark(ts, _quality(flags), bits) for ts, _u, flags, bits in rows[:limit]]
         return Marks(tuple(marks), len(rows) > limit)
 
     def bucket_marks(
@@ -187,7 +209,7 @@ class SqliteAcceptanceQuery:
                         continue  # ends at or before the rollup horizon: expired
                     if len(found) > limit:
                         break
-                    found.append(BucketMark(start, *_summary(payload)))
+                    found.append(_bucket(start, payload))
         return Marks(tuple(found[:limit]), len(found) > limit)
 
     def _native(
@@ -226,6 +248,28 @@ class SqliteAcceptanceQuery:
             return conn.execute(sql, params).fetchall()
 
 
+def _bucket(start: int, payload: bytes) -> BucketMark:
+    """Build one bucket mark, reading the common one-byte payload inline.
+
+    Args:
+        start: Bucket start.
+        payload: The stored blob.
+
+    Returns:
+        BucketMark: The mark.
+
+    Raises:
+        StorageError: If the payload is damaged.
+    """
+    if len(payload) > 5 and payload[2] == payload[0] and payload[3] < 0x80:
+        present = payload[0]
+        shared_rest = payload[1] == present & ~(present & -present)
+        if present and shared_rest and payload[4] < 0x80 and payload[5] < 0x80:
+            sample = payload[4]  # as rollup_summary's shared case, without the calls
+            return BucketMark(start, sample, present if sample else 0, _quality(payload[5]))
+    return BucketMark(start, *_summary(payload))
+
+
 def _summary(payload: object) -> tuple[int, int, Quality]:
     """Return a payload's sample count, presence bits, and quality as ``BucketMark`` fields.
 
@@ -239,4 +283,4 @@ def _summary(payload: object) -> tuple[int, int, Quality]:
         StorageError: If the payload is damaged.
     """
     samples, available, quality = payload_summary(payload)
-    return samples, available, Quality(quality)
+    return samples, available, _quality(quality)

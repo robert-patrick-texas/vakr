@@ -42,6 +42,32 @@ from vakr.query.acceptance_limits import (
 from vakr.query.acceptance_views import Overlap
 
 _DEVICE_TROUBLE = (PollExecution.PARTIAL, PollExecution.FAILED)
+_DEGRADED, _MAINTENANCE = int(Quality.COLLECTOR_DEGRADED), int(Quality.MAINTENANCE)
+_BITS: dict[Quality, int] = {}
+
+
+def _has(quality: Quality, bit: int) -> bool:
+    """Tell whether flags hold a bit, without ``IntFlag`` arithmetic per poll.
+
+    A week holds a million polls with a handful of distinct flag values, and
+    ``Flag.__and__`` costs more than the rest of the tally.
+
+    Args:
+        quality: The flags.
+        bit: One flag as an integer.
+
+    Returns:
+        bool: Whether the bit is set.
+
+    Raises:
+        None
+    """
+    value = _BITS.get(quality)
+    if value is None:
+        value = _BITS.setdefault(quality, int(quality))
+    return bool(value & bit)
+
+
 MAX_OVERLAP_ROWS = 100
 """Overlaps listed per collector; every one is counted."""
 
@@ -58,10 +84,11 @@ def device_trouble(mark: PollMark) -> bool:
     Raises:
         None
     """
-    if mark.execution in _DEVICE_TROUBLE and not mark.quality & Quality.COLLECTOR_DEGRADED:
+    if mark.execution in _DEVICE_TROUBLE and not _has(mark.quality, _DEGRADED):
         return True
-    duration = mark.duration_us
-    return duration is not None and duration > mark.interval_s * US
+    if mark.started_us is None or mark.completed_us is None:
+        return False
+    return mark.completed_us - mark.started_us > mark.interval_s * US
 
 
 def unhealthy_reason(mark: PollMark, previous: PollMark | None) -> str | None:
@@ -77,7 +104,7 @@ def unhealthy_reason(mark: PollMark, previous: PollMark | None) -> str | None:
     Raises:
         None
     """
-    if mark.quality & Quality.MAINTENANCE:
+    if _has(mark.quality, _MAINTENANCE):
         return "maintenance"
     if mark.started_us is not None and device_trouble(mark):
         return "device_trouble"

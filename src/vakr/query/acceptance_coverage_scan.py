@@ -113,8 +113,15 @@ class CoverageScan:
             if state in by_state:
                 by_state[state].append(f"{label}/{family}")
         if any(by_state.values()):
-            self.rows.append(CoverageRow(device, name, tuple(by_state["missing"]),
-                                         tuple(by_state["gap"]), tuple(by_state["pending"])))
+            self.rows.append(
+                CoverageRow(
+                    device,
+                    name,
+                    tuple(by_state["missing"]),
+                    tuple(by_state["gap"]),
+                    tuple(by_state["pending"]),
+                )
+            )
         self._events(device, iface, name)
 
     def _events(self, device: str, iface: InterfaceId, name: str) -> None:
@@ -141,8 +148,17 @@ class CoverageScan:
             names = ", ".join(f.name.lower() for f in Quality if f and f in flags)
             detail = ("rate across the event, or over capacity just after it" if spike
                       else "no rate stored: the graph shows a gap")  # fmt: skip
-            self.events.append(EventRow("discontinuity", device, name, as_time(at_us),
-                                        int(reset), int(spike), f"{names}: {detail}"))
+            self.events.append(
+                EventRow(
+                    "discontinuity",
+                    device,
+                    name,
+                    as_time(at_us),
+                    int(reset),
+                    int(spike),
+                    f"{names}: {detail}",
+                )
+            )
 
     def device_reloads(
         self, device: DeviceId, name: str, monitored: list[tuple[InterfaceId, str]],
@@ -164,14 +180,25 @@ class CoverageScan:
         """
         for reload_us in self._reload_times(device):
             self.reloads += 1
-            verdicts = Counter(reload_check(self.backend.acceptance, i, self.collector,
-                                            reload_us, interval_s) for i, _ in monitored)
+            verdicts = Counter(
+                reload_check(self.backend.acceptance, i, self.collector, reload_us, interval_s)
+                for i, _ in monitored
+            )
             self.spikes += verdicts["spike"]
             detail = (f"{verdicts['reset']} interfaces reset, {verdicts['spike']} carried a "
                       f"rate across the reload, {verdicts['unsampled']} not sampled within "
                       "10 minutes")  # fmt: skip
-            self.events.append(EventRow("reload", name, "", as_time(reload_us),
-                                        verdicts["reset"], verdicts["spike"], detail))
+            self.events.append(
+                EventRow(
+                    "reload",
+                    name,
+                    "",
+                    as_time(reload_us),
+                    verdicts["reset"],
+                    verdicts["spike"],
+                    detail,
+                )
+            )
 
     def _reload_times(self, device: DeviceId) -> list[int]:
         """Return the times SNMP detected the device's agent restarting in the event window.
@@ -190,8 +217,11 @@ class CoverageScan:
         spans = [(split, end)] if split < end else []
         if split > start:
             rolled = self.backend.acceptance.bucket_marks(
-                ObservationType.ICMP, device, self.collector, TimeWindow(as_time(start),
-                                                                         as_time(split)))
+                ObservationType.ICMP,
+                device,
+                self.collector,
+                TimeWindow(as_time(start), as_time(split)),
+            )
             spans = [(b.start_us, b.start_us + BUCKET_US) for b in rolled.items
                      if b.quality & Quality.BASELINE_UPTIME_RESET] + spans  # fmt: skip
         found: list[int] = []
@@ -202,9 +232,12 @@ class CoverageScan:
                 ObservationType.SNMP_DEVICE, device, w, p, collector_id=self.collector),
                 MAX_SNMP_READ)  # fmt: skip
             self.truncated += cut
-            found.extend(to_epoch_us(o.timestamp) for o in obs
-                         if isinstance(o, SnmpDeviceObservation)
-                         and o.uptime_continuity is UptimeContinuity.RESET_DETECTED)
+            found.extend(
+                to_epoch_us(o.timestamp)
+                for o in obs
+                if isinstance(o, SnmpDeviceObservation)
+                and o.uptime_continuity is UptimeContinuity.RESET_DETECTED
+            )
         return sorted(found)
 
     def result(self, name: str, limit: int, notes: tuple[str, ...]) -> CollectorCoverage:

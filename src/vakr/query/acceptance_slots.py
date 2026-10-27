@@ -23,8 +23,8 @@ Example:
 
 from bisect import bisect_right
 from collections.abc import Sequence
-from dataclasses import dataclass
 from enum import StrEnum
+from typing import NamedTuple
 
 from vakr.domain.enums import ObservationType, PollExecution
 from vakr.domain.quality import Quality
@@ -77,8 +77,7 @@ _KIND = {
 _POLLS = ObservationType.DEVICE_POLL.value
 
 
-@dataclass(frozen=True, slots=True)
-class Slot:
+class Slot(NamedTuple):
     """One slot of a device's timeline.
 
     Attributes:
@@ -142,14 +141,20 @@ def device_slots(marks: Sequence[PollMark], window: tuple[int, int]) -> list[Slo
         lead = (first.scheduled_us - window[0]) // period
         out.extend(Slot(first.scheduled_us - k * period, first.interval_s, SlotKind.NO_RECORD,
                         None) for k in range(lead, 0, -1))  # fmt: skip
+    times = [m.scheduled_us for m in marks]
+    times.append(window[1] + marks[-1].interval_s * US)
+    previous = None
     for i, mark in enumerate(marks):
-        if i and mark.scheduled_us == marks[i - 1].scheduled_us:
+        at = times[i]
+        if at == previous:
             continue  # a slot recorded twice is one slot (the schedule report counts it)
-        out.append(Slot(mark.scheduled_us, mark.interval_s, _KIND[mark.execution], mark))
-        nxt = marks[i + 1].scheduled_us if i + 1 < len(marks) else None
-        _fill(mark.scheduled_us, window[1] + mark.interval_s * US if nxt is None else nxt,
-              mark.interval_s, out)  # fmt: skip
-    return [s for s in out if window[0] <= s.at_us < window[1]]
+        previous = at
+        out.append(Slot(at, mark.interval_s, _KIND[mark.execution], mark))
+        if times[i + 1] - at > GAP_FACTOR * mark.interval_s * US:
+            _fill(at, times[i + 1], mark.interval_s, out)
+    if out and (out[0].at_us < window[0] or out[-1].at_us >= window[1]):
+        return [s for s in out if window[0] <= s.at_us < window[1]]
+    return out
 
 
 def slot_index(times: Sequence[int], at_us: int) -> int:
@@ -208,18 +213,20 @@ def device_cause(slot: Slot, collector: CollectorEvidence, device: DeviceEvidenc
     Raises:
         None
     """
+    # A device that did not exist yet, or was not scheduled, expected no poll at
+    # all, so the inventory explains the slot before the collector's state does.
     at = slot.at_us
     if slot.kind is not SlotKind.NO_RECORD:
         cause = _recorded_cause(slot, collector)
+    elif device.created_us > at:
+        cause = GapCause.INVENTORY_CHANGE
+    elif device.offline_since(at):
+        cause = GapCause.ADMIN_STATE
     elif collector.loss(at, _POLLS) is not None:
         cause = GapCause.TELEMETRY_LOSS
     elif collector.silent(at):
         lagging = not collector.local and collector.silent_to_end(at)
         cause = GapCause.STORAGE if lagging else GapCause.COLLECTOR_STOPPED
-    elif device.created_us > at:
-        cause = GapCause.INVENTORY_CHANGE
-    elif device.offline_since(at):
-        cause = GapCause.ADMIN_STATE
     else:
         cause = GapCause.UNEXPLAINED
     return cause

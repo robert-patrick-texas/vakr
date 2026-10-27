@@ -96,8 +96,12 @@ class DayTally:
             None
         """
         day = scheduled_us // DAY_US
-        self.offsets.setdefault(day, array("d")).append(offset_us)
-        self.phases.setdefault(day, array("d")).append(phase_us)
+        offsets = self.offsets.get(day)
+        if offsets is None:
+            offsets = self.offsets[day] = array("d")
+            self.phases[day] = array("d")
+        offsets.append(offset_us)
+        self.phases[day].append(phase_us)
 
     def days(self) -> list[tuple[int, int, float, float]]:
         """Return each day's index, poll count, median offset, and median phase, oldest first.

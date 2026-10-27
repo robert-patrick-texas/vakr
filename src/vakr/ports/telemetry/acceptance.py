@@ -4,7 +4,8 @@ The acceptance reports judge a 7- to 14-day run of a whole node: about a
 million poll records per collector and week, and 1,600 interfaces whose
 native samples are far too many to rebuild as observations (ADR-021
 measured 0.84 µs warm and 4 µs cold per native sample read). This port
-returns only what the reports need, as integers:
+returns only what the reports need, as integers in immutable named tuples
+(cheaper to build by the million than frozen dataclasses):
 
 - ``poll_marks``: one device's poll records from one collector, with
   scheduled, start, and completion times in epoch microseconds.
@@ -41,7 +42,7 @@ Example:
 """
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import NamedTuple, Protocol
 from uuid import UUID
 
 from vakr.domain.checks import require_int
@@ -79,8 +80,7 @@ def check_request(observation_type: ObservationType | None, limit: int) -> None:
         )
 
 
-@dataclass(frozen=True, slots=True)
-class PollMark:
+class PollMark(NamedTuple):
     """One poll record reduced to its timing and outcome. Immutable.
 
     Attributes:
@@ -117,8 +117,7 @@ class PollMark:
         return self.completed_us - self.started_us
 
 
-@dataclass(frozen=True, slots=True)
-class SampleMark:
+class SampleMark(NamedTuple):
     """One native interface or ICMP observation reduced to time, flags, and presence. Immutable.
 
     Attributes:
@@ -132,8 +131,7 @@ class SampleMark:
     available: int
 
 
-@dataclass(frozen=True, slots=True)
-class BucketMark:
+class BucketMark(NamedTuple):
     """One 15-minute rollup bucket reduced to counts, presence, and flags. Immutable.
 
     Attributes:

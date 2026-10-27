@@ -39,6 +39,10 @@ from vakr.ports.clock import Clock
 from vakr.ports.telemetry.replication import ReplicaWriter
 from vakr.replication import observation_status as rec
 from vakr.replication.client import EgressError, PartnerError, PartnerReader
+from vakr.replication.role_record import PARTNER_FILE, note_partner
+
+PARTNER = PARTNER_FILE.rsplit("/", 1)[-1]
+"""The partner's role record, beside the pull record (two primaries, E.39)."""
 
 PAGE_LIMIT = 10_000
 """Observations asked for per page (E.13)."""
@@ -95,8 +99,9 @@ class ObservationPuller:
         status = rec.read_status(self._record) or rec.blank()
         status.partner_url, status.last_attempt_at = self._client.base_url, self._now()
         try:
-            stored = 0
-            for source in _collectors(self._client.get_json("observations/state"), self._local):
+            stored, state = 0, self._client.get_json("observations/state")
+            note_partner(self._record.with_name(PARTNER), state, status.last_attempt_at)
+            for source in _collectors(state, self._local):
                 if self._register is not None:
                     self._register(source)
                 stored += self._drain(source, status, budget - stored)

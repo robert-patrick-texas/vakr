@@ -1,8 +1,9 @@
 """Replication endpoints a partner node pulls from (MPOS-003, MPOS-006, ADR-024, E.13).
 
 - ``GET /api/v1/replication/metadata/state``: the replicated metadata's
-  schema version, digest, and row counts, plus this node's role and
-  position. A peer polls it every 60 s and pulls only when the digest moved.
+  schema version, digest, and row counts, plus this node's role,
+  position, and newest promotion (``{at, fork_at}`` or ``null``, E.39).
+  A peer polls it every 60 s and pulls only when the digest moved.
 - ``GET /api/v1/replication/metadata?kind=&cursor=&limit=``: one page of
   one replicated table (``kind`` is the table), in primary-key order.
 
@@ -76,9 +77,10 @@ async def state(_: MetadataReader, context: Context) -> Any:
         ApiError: 503 when the store cannot replicate.
     """
     found: ReplicaState = await call(_replica, context, "state")
-    node = context.node
+    node, promotion = context.node, await call(context.promotion)
     return view_response({"schema": found.schema, "digest": found.digest, "rows": dict(found.rows),
-                          "role": node.role, "position": node.position})  # fmt: skip
+                          "role": node.role, "position": node.position,
+                          "promotion": promotion})  # fmt: skip
 
 
 @router.get("/replication/metadata", summary="One page of replicated metadata (replication token)")

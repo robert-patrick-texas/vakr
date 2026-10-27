@@ -3,7 +3,8 @@
 ``replication_reader`` returns the callable the status queries put in
 ``HealthView.replication``: on a node with a partner, how old the peer's
 metadata is and how far behind the other position's observations are, with
-the backlog and any gap; ``None`` on a node without a partner, so a single
+the backlog and any gap, and ``TWO PRIMARIES`` when a primary's partner
+is a primary too (E.39); ``None`` on a node without a partner, so a single
 node's header is unchanged. ``vakr status``, the TUI header, and the web UI
 health panel all show it. The numbers come from the records the collector
 writes after every pull; nothing here contacts the partner.
@@ -32,6 +33,7 @@ from vakr.query.text import age_text
 from vakr.query.views import Reading
 from vakr.replication import observation_status as obs
 from vakr.replication import status
+from vakr.replication.conflict import conflict_at
 
 
 def replication_reader(state_dir: Path, node: NodeSettings) -> Callable[[], Reading | None]:
@@ -64,6 +66,8 @@ def replication_reader(state_dir: Path, node: NodeSettings) -> Callable[[], Read
             return None
         now = datetime.now(UTC)
         parts = [_metadata(state_dir, now)] if node.is_peer else []
+        if conflict_at(state_dir, node):
+            parts.append("TWO PRIMARIES: the partner is a primary too; see vakr node status")
         record = obs.read_status(state_dir / obs.FILE)
         lag = None if record is None else record.lag_s(now)
         if record is None or lag is None:

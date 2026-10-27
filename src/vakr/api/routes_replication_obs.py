@@ -1,8 +1,10 @@
 """Observation replication endpoints the other position pulls from (MPOS-004, MPOS-005, E.13).
 
-- ``GET /api/v1/replication/observations/state``: this node's role and
-  position, and each of its own collectors with the oldest and newest seq
-  its replication log holds. Every node serves it, primary and peer alike.
+- ``GET /api/v1/replication/observations/state``: this node's role,
+  position, and newest promotion, and each of its own collectors with the
+  oldest and newest seq its replication log holds. Every node serves it,
+  primary and peer alike; a primary that finds its partner a primary too
+  reports two primaries (E.39).
 - ``GET /api/v1/replication/observations?collector=&after=&limit=``: one
   page of a local collector's observations after ``after``, oldest first,
   as checksummed envelopes (``vakr.replication.serving``).
@@ -72,8 +74,8 @@ async def state(_: ObservationReader, context: Context) -> Any:
         ApiError: 503 without an observation source.
     """
     collectors = await call(_source(context).state)
-    node = context.node
-    return view_response({"role": node.role, "position": node.position,
+    node, promotion = context.node, await call(context.promotion)
+    return view_response({"role": node.role, "position": node.position, "promotion": promotion,
                           "collectors": collectors})  # fmt: skip
 
 

@@ -150,6 +150,7 @@ class ApiContext:
         observations: Serves this node's observations to its partner (MPOS-004).
         inventory_checks: Credential names and target guardrails for manual device
             edits, read at each edit (``checks_for``); tests and schema builds get none.
+        promotion: Reads this node's newest promotion for the partner (E.39), or ``None``.
     """
 
     auth: AuthServices
@@ -170,6 +171,7 @@ class ApiContext:
     node: NodeSettings = field(default_factory=NodeSettings)
     observations: ObservationSource | None = None
     inventory_checks: Callable[[], Checks] = field(default=lambda: NO_CHECKS)
+    promotion: Callable[[], dict[str, str | None] | None] = lambda: None
 
 
 def get_context(request: Request) -> ApiContext:

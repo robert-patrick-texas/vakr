@@ -30,6 +30,8 @@ from typing import Any, Protocol
 
 type Cell = int | float | str | dict[str, str] | None
 """One encoded column value; ``{"b": "<base64>"}`` stands for ``bytes``."""
+MAX_DISCARDED = 1000
+"""Discarded rows one replacing apply lists (E.39); the total is always counted."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,16 +67,37 @@ class ReplicaPage:
 
 
 @dataclass(frozen=True, slots=True)
+class DiscardedRow:
+    """A local row a replacing apply removed or overwrote (``vakr node demote``, ADR-024).
+
+    Attributes:
+        table: The replicated table.
+        key: The row's key as text (UUIDs in their usual form).
+        label: A name to recognise it by (name, username, label), or ``""``.
+        change: ``removed`` (the snapshot has no such row) or ``replaced``.
+    """
+
+    table: str
+    key: str
+    label: str
+    change: str
+
+
+@dataclass(frozen=True, slots=True)
 class ApplyResult:
     """What applying a snapshot changed on the peer.
 
     Attributes:
         written: Rows inserted or updated, per table.
-        removed: Rows removed, per table (membership and dashboards only).
+        removed: Rows removed, per table (membership and dashboards; any table when replacing).
+        discarded: Local rows a replacing apply removed or overwrote, at most ``MAX_DISCARDED``.
+        discarded_total: How many there were in all.
     """
 
     written: Mapping[str, int]
     removed: Mapping[str, int]
+    discarded: tuple[DiscardedRow, ...] = ()
+    discarded_total: int = 0
 
 
 class MetadataReplica(Protocol):
@@ -126,12 +149,16 @@ class MetadataReplica(Protocol):
         """
         ...
 
-    def apply(self, snapshot: Mapping[str, tuple[ReplicaPage, ...]], digest: str) -> ApplyResult:
+    def apply(self, snapshot: Mapping[str, tuple[ReplicaPage, ...]], digest: str, *,
+              replace: bool = False) -> ApplyResult:  # fmt: skip
         """Make this store's replicated metadata equal to a pulled snapshot, atomically.
 
         Args:
             snapshot: Every page of every table, by table.
             digest: The digest the primary advertised for it.
+            replace: Also remove or overwrite every local row the snapshot does
+                not hold exactly, entity rows and closed reviews included: the
+                resync of a demoted primary (ADR-024). Collector records stay.
 
         Returns:
             ApplyResult: What changed.

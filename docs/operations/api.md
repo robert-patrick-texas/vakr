@@ -211,9 +211,9 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/exports/interfaces/{interface_uuid}/history/{kind}` | operator | The graph as a CSV or JSON file (`format`); same parameters as the graph |
 | `GET /api/v1/exports/devices/{device_uuid}/history/reachability` | operator | Latency and loss as a file |
 | `GET /api/v1/exports/rankings/{utilization\|errors}` | operator | A ranking as a file |
-| `GET /api/v1/replication/metadata/state` | replication token | The replicated metadata's schema version, digest, and row counts, and this node's role and position (MPOS-003) |
+| `GET /api/v1/replication/metadata/state` | replication token | The replicated metadata's schema version, digest, and row counts, and this node's role, position, and newest promotion (`{at, fork_at}` or `null`, E.39) (MPOS-003) |
 | `GET /api/v1/replication/metadata?kind=&cursor=&limit=` | replication token | One page (1 to 1,000 rows) of one replicated table, `kind`, in key order; pages carry password hashes, so nothing else may read them |
-| `GET /api/v1/replication/observations/state` | replication token | This node's role and position, and each of its own collectors with the oldest and newest sequence number its replication log holds (MPOS-004) |
+| `GET /api/v1/replication/observations/state` | replication token | This node's role, position, and newest promotion, and each of its own collectors with the oldest and newest sequence number its replication log holds (MPOS-004) |
 | `GET /api/v1/replication/observations?collector=&after=&limit=` | replication token | Up to 10,000 of a local collector's observations logged after `after`, oldest first, as checksummed envelopes, and at most 6 MiB; `next_after`, `has_more`, `oldest_seq`, `newest_seq`, and `missing` (observations retention removed before they were asked for). Another node's collector is 404 |
 | `GET /api/v1/dashboards` | operator | Custom dashboards by name (name, description, widget count, refresh, last change, version); paged |
 | `POST /api/v1/dashboards` | admin | `{"name", "description", "refresh_s", "widgets": [...]}`: 201 with the definition; 409 for a taken name; 422 naming the field (such as `widgets[1].criteria.site_id`) for a bound or an interface, site, tag, or group that does not exist |

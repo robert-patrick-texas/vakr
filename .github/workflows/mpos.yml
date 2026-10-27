@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       features:
-        description: "MPOS_FEATURES: comma list of roles, replication (empty: single-node checks only)"
+        description: "MPOS_FEATURES: comma list of roles, replication, promote (empty: single-node checks only)"
         required: false
         default: ""
 

@@ -6,7 +6,9 @@ read. Otherwise it reads every page of every replicated table (bounded by
 E.13), and applies the snapshot in one transaction only if it hashes to the
 digest the primary advertised: a snapshot torn by an edit during the pull
 is discarded and pulled again next time. On any failure the peer keeps its
-last-known metadata and keeps polling with it (MPOS-002).
+last-known metadata and keeps polling with it (MPOS-002). On a demoted
+primary the first successful pull replaces instead, after a backup, and
+reports what it discarded (``vakr.replication.resync``).
 
 Dependencies:
     vakr.replication.client, status: The partner client and the pull record.
@@ -31,7 +33,8 @@ from vakr.lifecycle.egress.errors import EgressError
 from vakr.ports.clock import Clock
 from vakr.ports.metadata.replica import ReplicaPage
 from vakr.replication import status
-from vakr.replication.client import PartnerClient, PartnerError
+from vakr.replication.client import PartnerError, PartnerReader
+from vakr.replication.resync import Resync
 
 _LOG = logging.getLogger(__name__)
 PAGE_ROWS = 1000
@@ -71,8 +74,8 @@ def _page(doc: Any, table: str) -> ReplicaPage:
 class MetadataPuller:
     """Pulls the primary's replicated metadata into this peer."""
 
-    def __init__(self, client: PartnerClient, uow_factory: Callable[[], Any], record: Path,
-                 clock: Clock) -> None:  # fmt: skip
+    def __init__(self, client: PartnerReader, uow_factory: Callable[[], Any], record: Path,
+                 clock: Clock, resync: Resync | None = None) -> None:  # fmt: skip
         """Bind the puller.
 
         Args:
@@ -80,6 +83,7 @@ class MetadataPuller:
             uow_factory: Opens metadata units of work that offer ``replica``.
             record: The pull record file (``status.FILE`` under the state directory).
             clock: Time source.
+            resync: A demoted primary's pending resync: replace, even when unchanged.
 
         Returns:
             None
@@ -88,6 +92,7 @@ class MetadataPuller:
             None
         """
         self._client, self._uow, self._record, self._clock = client, uow_factory, record, clock
+        self._resync = resync
 
     def pull_once(self) -> str:
         """Pull once and record the result.
@@ -108,11 +113,13 @@ class MetadataPuller:
             local = self._local_state()
             _same_schema(schema, local.schema)
             if local.digest == digest:
+                if self._resync is not None:
+                    self._resync.finish(None, remote)
                 status.record(self._record, "unchanged", self._clock.now_utc(), digest=digest,
                               position=position)  # fmt: skip
                 return "unchanged"
-            self._apply(self._snapshot(), digest)
-        except (PullError, PartnerError, EgressError, DomainError) as exc:
+            self._apply(self._snapshot(), digest, remote)
+        except (PullError, PartnerError, EgressError, DomainError, OSError) as exc:
             why = str(exc) or type(exc).__name__
             status.record(self._record, "failed", self._clock.now_utc(), error=why,
                           position=position)  # fmt: skip
@@ -179,23 +186,30 @@ class MetadataPuller:
             snapshot[table] = tuple(pages)
         return snapshot
 
-    def _apply(self, snapshot: dict[str, tuple[ReplicaPage, ...]], digest: str) -> None:
-        """Apply a snapshot in one transaction.
+    def _apply(self, snapshot: dict[str, tuple[ReplicaPage, ...]], digest: str,
+               remote: Any) -> None:  # fmt: skip
+        """Apply a snapshot in one transaction; replacing, after a backup, while a resync is due.
 
         Args:
             snapshot: Pages by table.
             digest: The primary's digest.
+            remote: The primary's state answer, for the resync report.
 
         Returns:
             None
 
         Raises:
             ValidationError: Incomplete or torn snapshot (nothing written).
-            StorageError: If the write fails (nothing written).
+            StorageError: If the backup or the write fails (nothing written).
+            OSError: If the resync report cannot be written (the resync is done again).
         """
+        if self._resync is not None:
+            self._resync.before_apply()
         with self._uow() as uow:
-            uow.replica.apply(snapshot, digest)
+            result = uow.replica.apply(snapshot, digest, replace=self._resync is not None)
             uow.commit()
+        if self._resync is not None:
+            self._resync.finish(result, remote)
 
 
 def _same_schema(primary: int, peer: int) -> None:

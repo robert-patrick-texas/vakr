@@ -3222,7 +3222,7 @@ The [ADR-021 benchmark](docs/performance/adr021-compact-sqlite-benchmark.md) and
 Goal: during a network partition, each position keeps collecting from every device it can still reach. Once the partition heals, both positions end up with complete history.
 
 1. Each position runs a complete vakr node: collector, Compact storage, API/web, and TUI. Each node polls the full inventory from its own vantage point under its own collector UUID. Every device is therefore watched twice; the extra SNMP load is a few PDUs per device per minute, which is negligible at MVP scale.
-2. One node is the metadata primary (`[node] role = "primary"`). The peer (`role = "peer"`) pulls inventory, policies, annotations, and users from the primary's API every 60 seconds. If the primary is unreachable, the peer keeps polling with its last-known metadata. A peer refuses metadata edits with a message that names the primary. Promoting a peer is a documented manual command (`vakr node promote`).
+2. One node is the metadata primary (`[node] role = "primary"`). The peer (`role = "peer"`) pulls inventory, policies, annotations, and users from the primary's API every 60 seconds. If the primary is unreachable, the peer keeps polling with its last-known metadata. A peer refuses metadata edits with a message that names the primary. Promoting a peer is a documented manual command (`vakr node promote`); a returning old primary becomes a peer with `vakr node demote`, and two primaries are reported as node health (ADR-024 decisions 23 to 30, E.39).
 3. Each observation belongs to the collector that made it, so replication has no write conflicts. Each node pulls the other's observations from `/api/v1/replication/observations` in bounded batches. The per-collector spool sequence serves as the cursor, and observation UUIDs make inserts idempotent. A partition only delays replication; after it heals, the backlog drains oldest-first without starving local ingestion.
 4. Peer traffic uses HTTPS (directly or through the documented reverse proxy) with a dedicated replication credential. That credential can reach only the replication and metadata-read endpoints. ADR-024 and Appendix E.13 fix the credential (`vkr_` tokens), the metadata endpoints, and the bounds.
 5. Views show per-position state side by side. The composite device status (Appendix E.2) is "Down" only when every fresh collector reports the device down. A device that is down from one position and up from the other shows amber "Reachable from <position> only", which is often the first sign of a partition.
@@ -3247,6 +3247,7 @@ Goal: during a network partition, each position keeps collecting from every devi
 | MPOS-T02 | System | Restore connectivity. | Replication backfills in both directions, oldest first. Per-collector row counts match the source, with no duplicate observation UUIDs. | MPOS-004, MPOS-005 |
 | MPOS-T03 | System | Primary unreachable; an operator edits metadata on the peer. | The peer keeps polling with last-known inventory and refuses the edit, naming the primary. | MPOS-003 |
 | MPOS-T04 | System | 60 ms emulated inter-position RTT (netem). | Latency graphs show separate east and west series, with no merged statistics. | MPOS-008 |
+| MPOS-T05 | System | The primary is lost: promote the peer (`vakr node promote`), edit metadata on both nodes, restore connectivity, then demote the old primary (`vakr node demote`). Added 2026-10-27 (ADR-024 decisions 23 to 30, E.39). | Promotion is refused while the primary answers. After healing, both nodes report two primaries as CRITICAL node health while every device keeps its state. After demotion, the old primary's replicated metadata equals the new primary's, and its partition edits are reported and backed up. | MPOS-003, MPOS-006 |
 
 ### 27.6 MVP acceptance criteria
 
@@ -4609,3 +4610,33 @@ Decisions taken with the import and export (2026-10-27):
 3. E.30 decision 10's formula prefix is one-way, which suits ranking reports. Inventory exports are meant to be imported again, so here the prefix is removed on import, and a value that itself starts with `'` gets one more (above).
 4. `inventory.toml` gains an optional `uuid` on `[[interface_annotations]]`, so an export of file-managed records is a valid `inventory.toml` that plans as no changes. The change only adds a key: every existing file stays valid, so no configuration migration is needed (28.4).
 5. **Gaps.** Sites have no CSV of their own; they come from a TOML import or `inventory.toml`. A device a file manages cannot become API-managed, or the reverse, without a new identity; an explicit, audited transfer like `vakr interface claim` would close that.
+
+### E.39 Promotion, demotion, and two primaries (MPOS-003, MPOS-006, M6)
+
+`sudo vakr node promote` makes a peer the metadata primary when the primary is lost. `sudo vakr node demote` makes a returning old primary a peer of its successor. `vakr node status` shows the role, the primary, the newest pull, any conflict, and the newest resync. The design is ADR-024 decisions 23 to 30, and the runbook is [losing the primary](docs/operations/two-positions.md#losing-the-primary).
+
+| Setting or bound | Default | Allowed range or notes |
+|---|---|---|
+| Who runs them | root (`sudo`) on an installed node | They write `/etc/vakr` and restart units; the audit write runs as `vakr` in a child process |
+| Old-primary check on promote | `GET metadata/state` with the replication token, through the partner client (20 s, E.13) | An HTTP answer means up. A failure at DNS, TCP, or the proxy's CONNECT means unreachable. Anything else means it cannot be told |
+| Promote refuses without `--force` | when the old primary answers as a primary, when it cannot be told, or when no metadata pull ever succeeded | It always refuses on a primary. A partner answering as a peer (a planned swap) is allowed |
+| `[node]` after promote | `role = "primary"`, no `primary_url`, `peer_url` = the old primary | So observation replication keeps working both ways with the installed tokens |
+| `[node]` after demote | `role = "peer"`, `primary_url` = `--primary-url` or the old `peer_url`, no `peer_url` | Needs `node.position`; never needs `--force` |
+| Where keys are written | the highest file setting the key, else the file setting `node.role`, else `config.toml`; removed keys go from every file | Validated whole before writing; timestamped backup in `/var/lib/vakr/config-backups/` (CFGM-002) |
+| Units restarted | `vakr-collector.service`, `vakr-api.service` (`systemctl try-restart`, 120 s) | `--no-restart` skips it; nothing else reads the role |
+| Role record | `/var/lib/vakr/replication/node-role.json`, mode 0640, owned like its directory | The newest 20 changes: time, actor, forced, `[node]` before and after, the newest pull, the partner's answer, files, and backup |
+| Promotion served to the partner | `promotion: {at, fork_at}` in both replication state answers, else `null` | `fork_at` is the newest successful metadata pull before the promotion |
+| Partner role record | `/var/lib/vakr/replication/partner.json`, written by every observation pull | Role, position, promotion time, and when it was seen |
+| Two primaries | `replication` check CRITICAL, perfdata `replication_primaries=2`; `TWO PRIMARIES` in the health line | Node health only; no device's state changes (MPOS-006) |
+| Resync marker | `/var/lib/vakr/replication/resync.json`, written by demote | Removed by the collector after the resync report is written |
+| Resync backup | verified online copy of `metadata.db` in `/var/lib/vakr/backups/` | Taken just before the replacing apply; a failed backup applies nothing |
+| Resync report | `/var/lib/vakr/replication/resync-report.json`, mode 0640 | At most 1,000 discarded rows (total always counted) and 500 audited edits; audit read in at most 100 pages of 100 |
+| Edits reported | this node's audited actions since `fork_at` minus 60 s, newest first | `auth.*`, `kiosk.*`, `replication.*`, `node.*`, and `user.revoke_sessions` are node-local and left out; without `fork_at`, the newest 500 |
+
+Decisions taken with promotion (2026-10-27):
+
+1. **Manual, never automatic.** A partition looks the same as a dead primary, so neither node changes its own role. The commands report what they found and refuse when promoting would make two live primaries.
+2. **CRITICAL, not WARNING, for two primaries.** Each primary accepts edits that the other never copies, and the demoted one's edits are discarded, so the loss grows until an operator acts.
+3. **The new primary wins.** Edits made on the old primary during the partition are not merged. The resync removes or overwrites them, lists them by table, key, and name (never by value), and keeps them in the backup for the operator to make again.
+4. **Replace mode.** Only the resync may delete entity rows, rewrite closed identity reviews, or change identity history. It does so by dropping the replicated tables' guard triggers inside its transaction and creating them again from their stored SQL before the commit. It also removes sessions of removed accounts and operations on removed devices. Collector records are never removed.
+5. **Gap.** An old primary without `node.peer_url` cannot see the conflict itself. The new primary always does, since promotion sets its `peer_url`.

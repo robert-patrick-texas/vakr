@@ -1,6 +1,6 @@
 # Two-position system tests
 
-`make mpos-test` runs MPOS-T01 to MPOS-T04 (blueprint 27.5) against the packaged product: two complete vakr nodes, `east` and `west`, and a simulated IOS XE fleet, in containers, with traffic cut and delayed between them. It is opt-in and never part of `make check`. The design it tests is ADR-024, "two positions" (blueprint Appendix C and 27.5; M5 part A records it in `docs/adr/`).
+`make mpos-test` runs MPOS-T01 to MPOS-T05 (blueprint 27.5) against the packaged product: two complete vakr nodes, `east` and `west`, and a simulated IOS XE fleet, in containers, with traffic cut and delayed between them. It is opt-in and never part of `make check`. The design it tests is ADR-024, "two positions" (blueprint Appendix C and 27.5; M5 part A records it in `docs/adr/`).
 
 Contents:
 
@@ -20,6 +20,7 @@ $ make mpos-test MPOS_QUICK=1                        # about 7 minutes, plus the
 $ make mpos-test                                     # the full run: a 30-minute partition
 $ make mpos-test MPOS_QUICK=1 DEB=dist/vakr_<version>_amd64.deb   # skip the package build
 $ make mpos-test MPOS_QUICK=1 MPOS_FEATURES=roles,replication     # the whole of M5
+$ make mpos-test MPOS_QUICK=1 MPOS_FEATURES=roles,replication,promote   # and MPOS-T05 (M6)
 ```
 
 | Variable | Default | Quick (`MPOS_QUICK=1`) | Meaning |
@@ -28,7 +29,7 @@ $ make mpos-test MPOS_QUICK=1 MPOS_FEATURES=roles,replication     # the whole of
 | `MPOS_PARTITION_SECONDS` | 1800 | 120 | How long MPOS-T01 keeps the partition |
 | `MPOS_HOLD_SECONDS` | 300 | 120 | MPOS-T01's composite window, MPOS-T02's backfill window, and MPOS-T03's outage |
 | `MPOS_DEVICES` | 8 | 8 | Simulated devices (2 to 200); west is cut from the first half |
-| `MPOS_FEATURES` | none | none | `roles`, `replication`: turn on the checks that need M5 parts A and B |
+| `MPOS_FEATURES` | none | none | `roles`, `replication`: turn on the checks that need M5 parts A and B; `promote` (with both) runs MPOS-T05 |
 | `MPOS_KEEP` | 0 | 0 | 1 keeps the containers afterwards, to look inside with `docker exec` |
 
 The **Two positions** GitHub workflow (`.github/workflows/mpos.yml`) runs quick mode by hand only (Actions → Two positions → Run workflow), with an optional features list. It uploads the logs when it fails.
@@ -68,6 +69,19 @@ The tests run in this order after a warm-up in which both nodes must show every 
 | MPOS-T02 | Heal everything. | Neither node holds a duplicate observation UUID. | Each node holds at least every observation the other's collector had made when the backfill window began, family by family. Each node's observation pull record shows no error, no gap, and every partner collector within 300 s. Oldest-first order is the source log's seq order, asserted by `test_e13_budget_paces_a_backfill_oldest_first`: a packaged node's 50,000-observation pass drains a quick-mode backfill at once, so the harness checks the end state. |
 | MPOS-T03 | Cut east (the primary) from west (the peer) for `MPOS_HOLD_SECONDS`. | West kept polling with its last-known inventory. | West refuses an inventory edit with a message naming the primary. |
 
+MPOS-T05, losing the primary (ADR-024 decisions 23 to 30, E.39), runs last, and only with `MPOS_FEATURES=roles,replication,promote`. Otherwise it prints one `SKIP` (`tests/system/mpos/promote.sh`):
+
+| Step | Check |
+|---|---|
+| With east answering, `vakr node promote --yes` on west | Refused, exit 1, "still answers" and the `--force` remedy; nothing changed |
+| Cut east from west; `vakr node promote --yes` on west | It reports the newest metadata pull, and west's `vakr node status --json` says `primary` |
+| Edit the inventory on west (the new primary) and on east (the old primary, cut off) | Both `vakr inventory apply` runs succeed: two primaries accept edits |
+| Heal | Within one window, `vakr check health` on each node says "two primaries" (CRITICAL), and both still show every device Active |
+| `vakr node demote --yes` on east | East becomes a peer of west (its old `peer_url`) |
+| Wait | Within one window, east's replicated-metadata digest equals west's (`probe.py digest`, run as `vakr`); the resync marker is gone; east's report lists replaced device rows, at least one audited edit, the fork point, and a backup; neither node reports two primaries any more; east shows every device Active |
+
+The command output of the promote, refusal, and demote steps is printed indented under the run, so a failing step shows what the command said.
+
 ## Checks that wait for M5 parts A and B
 
 Without `MPOS_FEATURES`, the nodes run as two independent single nodes with the same inventory, and the checks above that need roles or replication print `SKIP` with the part they wait for. `roles` (part A) makes east the metadata primary and west the peer, and exchanges replication tokens in `configure_roles` (`tests/system/mpos/lib.sh`). That function follows part A's contract ([two positions](../operations/two-positions.md), ADR-024):
@@ -91,6 +105,12 @@ These were decided with the harness (2026-10-22):
 6. **One responder, many addresses.** snmpsim answers by community, so one responder bound to every device address serves the whole fleet, and per-device cuts are per-address firewall rules. Its Python and pysnmp come from the package itself (`dpkg-deb -x`), and snmpsim, pure Python, from the wheel `uv.lock` pins, with its SHA-256 checked.
 7. **Cuts drop what arrives, not what leaves.** An nftables drop in the output hook makes the collector's own sends fail. vakr reports that, rightly, as its collector degraded (OBS-003), and then every device reads "Unknown — collector degraded" instead of the cut ones Down. A real partition loses packets in the network, so the harness drops only in the input hook: requests leave, nothing comes back, and the collector sees timeouts.
 8. **Fixed names.** Containers and networks have literal names (`vakr-mpos-east`, `vakr-mpos-west`, `vakr-mpos-sim`, `vakr-mpos-inter`, `vakr-mpos-dev`), removed before a run and in its exit trap.
+
+Decided with MPOS-T05 (2026-10-27):
+
+9. **The cut makes the old primary unreachable, not refused.** The nftables cut drops what arrives, so west's check of east times out at TCP connect, which promotion counts as unreachable. A stopped `vakr-api` behind a live reverse proxy would answer 502, which counts as "still answers" and needs `--force`. The harness tests the partition case, which is the one the command exists for.
+10. **Edits on both sides.** Each node appends a different `comment` to every device in its own `/etc/vakr/inventory.toml` and applies it. West's edit must survive and east's must be reported as discarded. The two digests are compared through the replica itself (`probe.py digest`), which is exactly what the pull compares.
+11. **The digest probe runs as `vakr`.** Opening the metadata store as root could leave root-owned journal files that the services cannot write, so the probe runs under `runuser -u vakr`.
 
 ## When it fails
 

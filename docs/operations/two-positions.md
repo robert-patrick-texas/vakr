@@ -15,6 +15,9 @@ Contents:
 - [What a peer refuses](#what-a-peer-refuses)
 - [Observation replication](#observation-replication)
 - [During a partition](#during-a-partition)
+- [Losing the primary](#losing-the-primary)
+- [When the old primary comes back](#when-the-old-primary-comes-back)
+- [Swapping the roles on purpose](#swapping-the-roles-on-purpose)
 - [Watching replication](#watching-replication)
 - [Rotating and revoking the token](#rotating-and-revoking-the-token)
 - [Troubleshooting](#troubleshooting)
@@ -110,16 +113,106 @@ A node rolled back onto schema 3 by a release that predates replication keeps po
 - When the partition heals, each node backfills what the other collected, oldest first. A 30-minute partition at the MVP workload is about 57,000 observations a direction, one or two passes. A month-long one takes at least 14 hours.
 - A failed pull is reported as node health (`replication` check, below), never as any device's state.
 
+## Losing the primary
+
+A partition needs nothing from you: the peer polls on with its last-known metadata, and replication catches up when the link returns. Promote the peer only when the primary is **gone**, for example its host or disk is lost, and the people who change inventory, accounts, or dashboards need to keep working. Promotion is manual on purpose, because from the peer a partition looks just like a dead primary. Neither node ever changes its own role (ADR-024 decisions 23 to 30, Appendix E.39).
+
+1. **Make sure the primary is really out of service.** If its host may come back on its own, stop it there if you can (`sudo systemctl stop vakr.target`), or keep it cut off. Anything changed on it from now on is discarded later.
+2. **Look at the peer:**
+
+   ```console
+   $ vakr node status
+   role peer, position west
+   primary https://vakr-east.example.net (east)
+   newest metadata pull: 2026-10-27T09:58:12+00:00 (42 min ago)
+   ```
+
+   Edits made on the primary after that pull are not on the peer.
+3. **Promote the peer:**
+
+   ```console
+   $ sudo vakr node promote
+   newest metadata pull: 2026-10-27T09:58:12+00:00 (42 min ago); edits made on the old primary after it are not on this node
+   old primary https://vakr-east.example.net: tcp: cannot connect to vakr-east.example.net:443: timed out
+   Promote this node now? [y/N]: y
+   promoted: node.role = primary in /etc/vakr/config.toml; backup /var/lib/vakr/config-backups/20261027T104012Z
+   restarted vakr-collector.service and vakr-api.service (if they were running)
+   ```
+
+   The command asks the old primary whether it is still up, with the replication token, over the usual HTTPS path. It refuses, and changes nothing, in these cases:
+
+   | Refusal | Why | What to do |
+   |---|---|---|
+   | `the primary at ... still answers` | Promoting would make two primaries that each accept edits. | Demote it first (`sudo vakr node demote` there), cut it off, or pass `--force` if it answers but is beyond use, for example its database is lost. |
+   | `it cannot be told whether the primary ... is up` | Its address answered TLS, the exchange broke, or the token file is missing. | Find out. Pass `--force` once you know it is down. |
+   | `this node never copied the primary's metadata` | No pull ever succeeded, so the node would start with no inventory or accounts. | Pass `--force` only if you mean to rebuild the inventory here. |
+
+   Then it rewrites `[node]` for you, in whichever file sets it (`config.toml` or a `conf.d` drop-in). It sets `role = "primary"`, removes `primary_url`, and sets `peer_url` to the old primary, so observations keep replicating both ways. A timestamped backup goes to `/var/lib/vakr/config-backups/`, and the old values go to `/var/lib/vakr/replication/node-role.json`. The audit gets a `node.promote` record. Only `vakr-collector` and `vakr-api` restart; `--no-restart` leaves that to you, and `--yes` skips the question.
+4. **Point people at the new primary.** Metadata edits are now accepted here. Accounts and their passwords are the ones replicated from the old primary. Sessions are node-local, so people who used the old primary sign in again here; kiosk displays pointed at the old primary need a kiosk token from this node.
+5. **Check:** `sudo vakr check health` and `vakr node status`. The `replication` check reports the observation lag towards the old primary, which grows while it is gone. That is expected.
+
+## When the old primary comes back
+
+When the old primary returns still configured as a primary, the two nodes would both accept edits. They detect this from each other's replication state at the next observation pull (30 s). Each one reports it:
+
+- **`vakr check health`:** `replication` is CRITICAL: "two primaries: this node and west both have node.role = primary ...". It names the node that looks like the old primary, the one promoted earlier or never, and the command to run there. Performance data `replication_primaries=2`.
+- **`vakr status`, the TUI header, and the web UI health panel:** `TWO PRIMARIES`.
+- **`vakr node status`:** the same, as a `CRITICAL` line.
+
+It is node health only: every device keeps the state its evidence gives it (MPOS-006). The old primary sees the conflict only through its own observation pull, so it needs its `peer_url`, as every two-position setup has. The new primary always sees it.
+
+Make the old primary a peer of the new one:
+
+```console
+$ sudo vakr node demote
+new primary https://vakr-west.example.net: answers as primary
+Demote this node now? [y/N]: y
+demoted: node.role = peer in /etc/vakr/config.toml; backup /var/lib/vakr/config-backups/20261027T120301Z
+the collector replaces this node's metadata with https://vakr-west.example.net's at its next successful pull, after a backup; `vakr node status` reports it
+restarted vakr-collector.service and vakr-api.service (if they were running)
+```
+
+`--primary-url URL` names the new primary when `node.peer_url` is not set. The node needs a `node.position`. At its first successful pull, normally within a minute, the demoted node's collector:
+
+1. writes a verified backup of `metadata.db` to `/var/lib/vakr/backups/`;
+2. replaces its replicated metadata with the new primary's, exactly. **The new primary wins:** anything changed on the old primary during the partition is removed or overwritten;
+3. writes `/var/lib/vakr/replication/resync-report.json`, which lists the backup, every row it removed or overwrote (table, key, and name, never a value), and this node's own metadata edits from the audit since the new primary's last pull from it, minus one minute.
+
+`vakr node status` summarizes the report, and `vakr node status --json` has all of it:
+
+```console
+$ vakr node status
+role peer, position east
+primary https://vakr-west.example.net (west)
+newest metadata pull: 2026-10-27T12:04:10+00:00 (20 s ago)
+newest role change: demote at 2026-10-27T12:03:01+00:00 by cli:alice (sudo)
+resynced at 2026-10-27T12:03:15+00:00 from https://vakr-west.example.net: 3 local row(s) discarded, 2 metadata edit(s) here since 2026-10-27T09:58:12+00:00; backup /var/lib/vakr/backups/metadata-20261027T120315Z.db
+  discarded replaced device edge-sw1
+  discarded removed device lab-r7
+  edit 2026-10-27T11:20:05+00:00 cli:bob (sudo) device.create: ...
+```
+
+To keep a discarded edit, make it again on the new primary. The rows are in the backup if you need the old values: `vakr db status --database FILE` checks it.
+
+## Swapping the roles on purpose
+
+To move the primary role without a partition, demote first, then promote:
+
+1. On the primary (east): `sudo vakr node demote --primary-url https://vakr-west.example.net`. East's pulls are refused ("names another peer") until west is promoted. East keeps its metadata and keeps polling meanwhile.
+2. On the peer (west): `sudo vakr node promote`. East now answers as a peer, so no `--force` is needed.
+3. Within a minute east resyncs from west. The report should list nothing discarded, apart from edits made on east in the last minute before the swap.
+
 ## Watching replication
 
 | Where | What it shows |
 |---|---|
-| `sudo vakr check health` | `replication`: the metadata pull on a peer, WARNING when the newest successful pull is 5 minutes old, CRITICAL at 30 minutes or when none has succeeded. On a node with a partner URL, also the observation pull: WARNING while nothing has arrived, when the newest partner observation is 5 minutes old, when gaps were found, or when the newest pull failed; CRITICAL at 30 minutes (Appendix E.13). The worse of the two decides. Performance data `replication_metadata_age_s`, `replication_observation_lag_s`, `replication_backlog`, `replication_gaps`. |
+| `sudo vakr check health` | `replication`: the metadata pull on a peer, WARNING when the newest successful pull is 5 minutes old, CRITICAL at 30 minutes or when none has succeeded. On a node with a partner URL, also the observation pull: WARNING while nothing has arrived, when the newest partner observation is 5 minutes old, when gaps were found, or when the newest pull failed; CRITICAL at 30 minutes (Appendix E.13). The worse of the two decides. On a primary whose partner says it is a primary too: CRITICAL, two primaries (E.39). Performance data `replication_metadata_age_s`, `replication_observation_lag_s`, `replication_backlog`, `replication_gaps`, and `replication_primaries` with two primaries. |
 | `vakr replication status [--json]` | Role, position, the partner, the newest metadata pull, and a line on observations: how far behind, the backlog, and any loss. `--json` has both records. |
+| `vakr node status [--json]` | Role, position, the primary and its position, the newest metadata pull and its age, the partner's role as last seen, two primaries, the newest role change, a pending resync, and the newest resync report ([losing the primary](#losing-the-primary)). |
 | Self-metrics | `vakr_replication_metadata_age_seconds`, `vakr_replication_metadata_pulls_total{result}`, `vakr_replication_observation_lag_seconds`, `vakr_replication_backlog`, `vakr_replication_gaps_total`, `vakr_replication_observations_total{result}`, and `vakr_replication_observation_pulls_total{result}` ([self-metrics](metrics.md)). |
 | `vakr status`, the TUI header, the web UI health panel | A `replication` part of the health line: for example `replication east 42 s behind (backlog 0)`. |
 | Web UI and TUI headers | The position and role of the node you are looking at. |
-| Journal | `journalctl -u vakr-collector`: `replication.metadata_applied`, `replication.metadata_failed`, `replication.observations`, and `replication.observations_failed` events. |
+| Journal | `journalctl -u vakr-collector`: `replication.metadata_applied`, `replication.metadata_failed`, `replication.observations`, `replication.observations_failed`, and, after a demotion, `replication.resync_done` events. |
 
 The lag is the age of the newest partner observation held here. It grows during a partition, and also when the partner itself stops polling: both are node health. A lag never changes a device's state (MPOS-006).
 
@@ -141,4 +234,5 @@ The lag is the age of the newest partner observation held here. It grows during 
 | `the primary runs metadata schema N and this peer M` | The releases differ. | Update the other node to the same release. |
 | `node.primary_url names another peer` | The URL points at a peer. | Point it at the primary. |
 | `does not match the primary's digest` (once) | Metadata changed on the primary during the pull. | Nothing: the next pull copies it whole. |
+| `two primaries: ...` (CRITICAL) | A promoted peer and a returning old primary are both primaries. | `sudo vakr node demote` on the node the message names ([when the old primary comes back](#when-the-old-primary-comes-back)). |
 | a unique-name conflict (`name`) | Two records swapped names in one change. | Rename through an intermediate name on the primary. |

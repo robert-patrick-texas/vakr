@@ -172,3 +172,33 @@ def test_version_reports_role_and_position(parts: ApiParts) -> None:
         assert login.status_code == 200, login.text
         doc = client.get("/api/v1/version").json()
     assert (doc["role"], doc["position"]) == ("primary", "east")
+
+
+def test_e39_both_state_answers_carry_the_newest_promotion(parts: ApiParts) -> None:
+    """E.39: metadata and observation state name this node's newest promotion and fork point.
+
+    Args:
+        parts: The API parts.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    from vakr.replication import role_record
+
+    bearer = {"Authorization": f"Bearer {_token(parts)}"}
+    record = InstallPaths.from_environment().state_dir / role_record.ROLE_FILE
+    with TestClient(create_app(parts.context), base_url="http://127.0.0.1") as client:
+        doc = client.get("/api/v1/replication/metadata/state", headers=bearer).json()
+        assert doc["promotion"] is None
+        change = {"action": "promote", "at": "2026-10-27T12:00:00+00:00",
+                  "last_pull_at": "2026-10-27T11:59:00+00:00"}  # fmt: skip
+        role_record.append_change(record, change)
+        doc = client.get("/api/v1/replication/metadata/state", headers=bearer).json()
+        assert doc["promotion"] == {"at": "2026-10-27T12:00:00+00:00",
+                                    "fork_at": "2026-10-27T11:59:00+00:00"}  # fmt: skip
+        obs = client.get("/api/v1/replication/observations/state", headers=bearer)
+        assert obs.status_code == 200, obs.text
+        assert obs.json()["promotion"]["at"] == "2026-10-27T12:00:00+00:00"

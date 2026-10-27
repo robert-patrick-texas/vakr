@@ -71,6 +71,7 @@ from vakr.ports.migrations import MigrationError
 from vakr.ports.telemetry import TelemetryBackend
 from vakr.query import HistoryQueries, OverviewQueries, settings_from_config
 from vakr.replication.overview import replication_reader
+from vakr.replication.role_record import promotion_reader
 
 type TelemetryOpener = Callable[[], TelemetryBackend]
 
@@ -284,6 +285,7 @@ def build_parts(
         context.operations = operation_service(uow, clock, config)
         context.metrics = api_metrics(paths, uow, overview)
         context.node = node_settings(config)
+        context.promotion = promotion_reader(paths.state_dir)
         context.observations, feed = observation_source(paths, uow)
         return ApiParts(context, config, local_groups(), [*closers, feed.close, metadata.close])
     except BaseException:

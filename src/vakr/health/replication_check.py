@@ -12,6 +12,8 @@ A failing pull is node health: the peer keeps polling every device with its
 last-known metadata, and no target ever changes state because of it. On a
 node with a partner URL the observation pull is judged too
 (``vakr.health.observation_check``), and the worse of the two answers.
+A primary whose partner reported itself a primary at the newest
+observation pull is CRITICAL: two primaries (``vakr node demote``, E.39).
 
 Dependencies:
     vakr.replication.status: The pull record the collector writes.
@@ -29,13 +31,14 @@ Example:
 from datetime import datetime, timedelta
 
 from vakr.config.loader import ConfigError, load_effective_config
-from vakr.config.node import node_settings
+from vakr.config.node import NodeSettings, node_settings
 from vakr.health import observation_check
 from vakr.health.model import CheckResult, PerfDatum, Status
 from vakr.paths import InstallPaths
 from vakr.ports.clock import SystemClock
 from vakr.replication import observation_status as obs_status
-from vakr.replication import status
+from vakr.replication import role_record, status
+from vakr.replication.promotion import two_primaries
 from vakr.replication.status import PullStatus
 
 NAME = "replication"
@@ -74,7 +77,33 @@ def check_replication() -> CheckResult:
     now = SystemClock().now_utc()
     since = _since(found, now)
     observed = observation_check.judge(found, None if found is None else found.lag_s(now), since)
-    return observed if metadata is None else _worse(metadata, observed)
+    result = observed if metadata is None else _worse(metadata, observed)
+    return _worse(conflict, result) if (conflict := two_primaries_check(paths, node)) else result
+
+
+def two_primaries_check(paths: InstallPaths, node: NodeSettings) -> CheckResult | None:
+    """Report CRITICAL when this primary's partner says it is a primary too (E.39).
+
+    Two primaries each accept metadata edits that the other never copies, and
+    the edits on the one demoted later are discarded; that needs the operator
+    now, so it is CRITICAL, not WARNING. It is node health only (MPOS-006).
+
+    Args:
+        paths: The installation layout.
+        node: This node's settings.
+
+    Returns:
+        CheckResult | None: The CRITICAL result, or ``None`` without a conflict.
+
+    Raises:
+        None
+    """
+    partner = role_record.read_json(paths.state_dir / role_record.PARTNER_FILE)
+    own = role_record.promotion(paths.state_dir / role_record.ROLE_FILE)
+    why = two_primaries(node, partner, own["at"] if own else None)
+    if why is None:
+        return None
+    return CheckResult(NAME, Status.CRITICAL, why, (PerfDatum("replication_primaries", 2),))
 
 
 def _since(record: obs_status.ObservationPullStatus | None, now: datetime) -> float:

@@ -13,6 +13,8 @@ peer applies them in one transaction with deferred foreign keys:
 
 The peer's own collector row and every node-local table (sessions, kiosk
 and replication tokens, login failures, audit, operations) are untouched.
+A demoted primary's first pull replaces instead (``replace=True``,
+``replica_replace``): every local row the snapshot lacks goes.
 
 Dependencies:
     hashlib, json: The snapshot digest.
@@ -31,6 +33,11 @@ Example:
 import hashlib
 from collections.abc import Mapping, Sequence
 
+from vakr.adapters.sqlite.metadata.replica_replace import (
+    discard_divergent,
+    drop_guards,
+    restore_guards,
+)
 from vakr.adapters.sqlite.metadata.replica_rows import (
     APPEND,
     MEMBERS,
@@ -46,7 +53,9 @@ from vakr.adapters.sqlite.metadata.transaction import SqliteTransaction
 from vakr.domain.errors import ValidationError
 from vakr.domain.paging import decode_cursor, encode_cursor
 from vakr.ports.metadata.replica import (
+    MAX_DISCARDED,
     ApplyResult,
+    DiscardedRow,
     ReplicaPage,
     ReplicaState,
     decode_cell,
@@ -195,15 +204,18 @@ class SqliteMetadataReplica:
         schema = max(m.version for m in metadata_family().migrations)
         return ReplicaState(schema, digest.hexdigest(), counts)
 
-    def apply(self, snapshot: Mapping[str, tuple[ReplicaPage, ...]], digest: str) -> ApplyResult:
+    def apply(self, snapshot: Mapping[str, tuple[ReplicaPage, ...]], digest: str, *,
+              replace: bool = False) -> ApplyResult:  # fmt: skip
         """Apply a pulled snapshot; see ``MetadataReplica.apply``. The caller commits.
 
         Args:
             snapshot: Pages by table.
             digest: The primary's advertised digest.
+            replace: Remove or overwrite every local row the snapshot lacks
+                (``vakr.adapters.sqlite.metadata.replica_replace``).
 
         Returns:
-            ApplyResult: Rows written and removed per table.
+            ApplyResult: Rows written and removed per table, and what was discarded.
 
         Raises:
             ValidationError: Incomplete, other columns, or a digest mismatch.
@@ -211,17 +223,23 @@ class SqliteMetadataReplica:
         rows = self._verified(snapshot, digest)
         self._tx.begin_write()
         self._tx.execute("PRAGMA defer_foreign_keys = ON")  # parents and children land together
+        guards = drop_guards(self._tx, self.tables()) if replace else []
         written: dict[str, int] = {}
         removed: dict[str, int] = {}
+        discarded: list[DiscardedRow] = []
         for table, mode in TABLES:
             cols, keys = self._columns(table)
             decoded = [tuple(decode_cell(v) for v in row) for row in rows[table]]
+            found = discard_divergent(self._tx, table, mode, cols, keys, decoded) if replace else []
+            discarded += found
+            removed[table] = sum(1 for d in found if d.change == "removed")
             if mode in (MEMBERS, MIRROR):
-                removed[table] = remove_absent(self._tx, table, cols, keys, decoded)
+                removed[table] += remove_absent(self._tx, table, cols, keys, decoded)
             written[table] = sum(
                 write_row(self._tx, table, mode, cols, keys, row) for row in decoded
             )
-        return ApplyResult(written, removed)
+        restore_guards(self._tx, guards)
+        return ApplyResult(written, removed, tuple(discarded[:MAX_DISCARDED]), len(discarded))
 
     def _verified(self, snapshot: Mapping[str, tuple[ReplicaPage, ...]], digest: str) -> dict:
         """Check completeness, columns, and the digest; return each table's rows.

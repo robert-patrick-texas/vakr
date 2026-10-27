@@ -35,6 +35,7 @@ from vakr.domain.ids import DeviceId
 from vakr.replication import status
 from vakr.replication.client import PartnerClient
 from vakr.replication.metadata_pull import MetadataPuller, PullError
+from vakr.replication.resync import Resync
 from vakr.replication.token_file import TokenFileError, read_token, token_path
 
 _LOG = logging.getLogger(__name__)
@@ -65,7 +66,30 @@ def _pull(service: Any) -> str:
         status.record(record, "failed", service.clock.now_utc(), error=str(exc))
         raise PullError(str(exc)) from None
     client = PartnerClient(node.primary_url, token, settings)
-    return MetadataPuller(client, parts.uow_factory, record, service.clock).pull_once()
+    return MetadataPuller(client, parts.uow_factory, record, service.clock,
+                          _resync(service)).pull_once()  # fmt: skip
+
+
+def _resync(service: Any) -> Resync | None:
+    """Return the resync a demotion left behind, or ``None`` (ADR-024, E.39).
+
+    Args:
+        service: The running collector service.
+
+    Returns:
+        Resync | None: Backs up ``metadata.db`` into ``backups/`` before replacing.
+
+    Raises:
+        None
+    """
+    from vakr.adapters.sqlite.metadata import METADATA_FILE, metadata_migrations
+
+    state = service.parts.paths.state_dir
+    if not Resync.pending(state):
+        return None
+    manager = metadata_migrations(state / METADATA_FILE)
+    return Resync(state, service.parts.uow_factory, lambda: manager.backup(state / "backups"),
+                  service.clock.now_utc)  # fmt: skip
 
 
 async def replication_loops(service: Any) -> None:

@@ -287,7 +287,7 @@ def run_status(args: argparse.Namespace) -> int:
     obs = obs_status.read_status(paths.state_dir / obs_status.FILE)
     data = {"role": node.role, "position": node.position, "primary_url": node.primary_url or None,
             "peer_url": node.peer_url or None, "token_file": str(paths.secrets_dir / TOKEN_FILE),
-            "metadata_pull": None if pull is None else vars(pull),
+            "metadata_pull": None if pull is None else asdict(pull),
             "observation_pull": None if obs is None else asdict(obs)}  # fmt: skip
     lines = [f"role {node.role}, position {node.position or '(none)'}"]
     if node.is_peer:

@@ -144,6 +144,7 @@ class ApiContext:
             without a collector snapshot or database readers.
         node: This node's role and position (MPOS-003); a primary by default.
         observations: Serves this node's observations to its partner (MPOS-004).
+        promotion: Reads this node's newest promotion for the partner (E.39), or ``None``.
     """
 
     auth: AuthServices
@@ -163,6 +164,7 @@ class ApiContext:
     metrics: MetricsService = field(default_factory=MetricsService)
     node: NodeSettings = field(default_factory=NodeSettings)
     observations: ObservationSource | None = None
+    promotion: Callable[[], dict[str, str | None] | None] = lambda: None
 
 
 def get_context(request: Request) -> ApiContext:

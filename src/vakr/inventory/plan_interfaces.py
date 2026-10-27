@@ -8,8 +8,9 @@ annotation was removed is released: its annotation returns to the defaults
 and it becomes API-managed again, so the UI can annotate it.
 
 An annotation names an interface by ``ifName`` as the device reports it
-(compared exactly, then case-insensitively). Two interfaces with that name
-on one device mean an identity review is open, and the annotation waits.
+(compared exactly, then case-insensitively), or by its ``uuid``, which
+keeps naming it after a rename (META-010, E.38). Two interfaces with that
+name on one device mean an identity review is open, and the annotation waits.
 
 Dependencies:
     vakr.inventory.ownership, plan_model, snapshot.
@@ -54,6 +55,33 @@ def wanted_annotation(entry: AnnotationEntry) -> InterfaceAnnotation:
     )  # fmt: skip
 
 
+ENTRY_LABEL = {"wan_circuit": "is_wan_circuit"}
+"""Diff label of an annotation entry field whose stored name differs (META-012)."""
+
+
+def interface_pairs(
+    entry: AnnotationEntry | None, stored: StoredInterface
+) -> list[tuple[str, object, object]]:
+    """Pair each owned interface field's stored value with the annotation's.
+
+    Args:
+        entry: The annotation, or ``None`` for the defaults a release restores.
+        stored: The stored interface.
+
+    Returns:
+        list[tuple[str, object, object]]: ``(field, stored, wanted)``; labels
+        are ``InterfaceAnnotation`` field names, then ``tags`` and ``comment``.
+
+    Raises:
+        None
+    """
+    want = wanted_annotation(entry) if entry else InterfaceAnnotation()
+    have = stored.interface.annotation
+    pairs = [(f.name, getattr(have, f.name), getattr(want, f.name)) for f in fields(have)]
+    tags, comment = (entry.tags, entry.comment) if entry else ((), "")
+    return [*pairs, ("tags", stored.tags, tags), ("comment", stored.interface.comment, comment)]
+
+
 def interface_diff(entry: AnnotationEntry | None, stored: StoredInterface) -> tuple[str, ...]:
     """List the owned fields in which a claimed interface differs from its annotation.
 
@@ -67,16 +95,11 @@ def interface_diff(entry: AnnotationEntry | None, stored: StoredInterface) -> tu
     Raises:
         None
     """
-    want = wanted_annotation(entry) if entry else InterfaceAnnotation()
-    have = stored.interface.annotation
-    pairs = [(f.name, getattr(have, f.name), getattr(want, f.name)) for f in fields(have)]
-    tags, comment = (entry.tags, entry.comment) if entry else ((), "")
-    owned = [("tags", stored.tags, tags), ("comment", stored.interface.comment, comment)]
-    return diff([*pairs, *owned])
+    return diff(interface_pairs(entry, stored))
 
 
-def _named(entry: AnnotationEntry, device_id: UUID, snapshot: Snapshot) -> list[StoredInterface]:
-    """Find the stored interfaces an annotation names.
+def named(entry: AnnotationEntry, device_id: UUID, snapshot: Snapshot) -> list[StoredInterface]:
+    """Find the stored interfaces an annotation names: by ``uuid`` when given, else by name.
 
     Args:
         entry: The annotation.
@@ -84,13 +107,17 @@ def _named(entry: AnnotationEntry, device_id: UUID, snapshot: Snapshot) -> list[
         snapshot: Stored records.
 
     Returns:
-        list[StoredInterface]: Non-retired matches, exact names first.
+        list[StoredInterface]: Non-retired matches on that device, exact
+        names first. With a ``uuid``, the one interface with that UUID, so
+        the annotation follows it across a rename and ``ifname`` is a label.
 
     Raises:
         None
     """
-    mine = [i for i in snapshot.interfaces if i.interface.device_id == device_id
-            and i.interface.lifecycle is not InterfaceLifecycle.RETIRED]  # fmt: skip
+    mine = [i for i in snapshot.interfaces_of(device_id)
+            if i.interface.lifecycle is not InterfaceLifecycle.RETIRED]  # fmt: skip
+    if entry.uuid is not None:
+        return [i for i in mine if i.interface.id == entry.uuid]
     exact = [i for i in mine if i.interface.if_name == entry.ifname]
     folded = entry.ifname.casefold()
     return exact or [i for i in mine if i.interface.if_name.casefold() == folded]
@@ -117,7 +144,9 @@ def resolve(
     stored, _ = match_device(device, snapshot)
     if stored is None:
         return Waiting(entry, "the device is created by this apply; wait for its discovery")
-    found = _named(entry, stored.device.id, snapshot)
+    found = named(entry, stored.device.id, snapshot)
+    if not found and entry.uuid is not None:
+        return Waiting(entry, f"no interface of {entry.device} has uuid {entry.uuid}")
     if not found:
         return Waiting(entry, "not discovered yet")
     if len(found) > 1:

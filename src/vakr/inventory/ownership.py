@@ -68,6 +68,30 @@ class Owned(Protocol):
         ...
 
 
+def locate_record[R: Owned](
+    entry: SiteEntry | DeviceEntry, find: Callable[[UUID | str], R | None], what: str
+) -> tuple[R | None, str | None]:
+    """Find the stored record an entry names: by ``uuid`` when given, else by name.
+
+    Args:
+        entry: The file or import entry.
+        find: Looks a record up by UUID or name.
+        what: ``site`` or ``device``.
+
+    Returns:
+        tuple[R | None, str | None]: The record (``None``: none yet) and a
+        conflict when the name belongs to another record's UUID.
+
+    Raises:
+        None
+    """
+    by_name = find(entry.name)
+    if entry.uuid is not None and by_name is not None and by_name.id != entry.uuid:
+        return None, (f"{what} name {entry.name!r} belongs to {what} {by_name.id} "
+                      f"({by_name.managed_by}), not to uuid {entry.uuid}")  # fmt: skip
+    return (find(entry.uuid) if entry.uuid is not None else by_name), None
+
+
 def match_record[R: Owned](
     entry: SiteEntry | DeviceEntry, find: Callable[[UUID | str], R | None], what: str
 ) -> tuple[R | None, str | None]:
@@ -85,11 +109,9 @@ def match_record[R: Owned](
     Raises:
         None
     """
-    by_name = find(entry.name)
-    if entry.uuid is not None and by_name is not None and by_name.id != entry.uuid:
-        return None, (f"{what} name {entry.name!r} belongs to {what} {by_name.id} "
-                      f"({by_name.managed_by}), not to uuid {entry.uuid}")  # fmt: skip
-    target = find(entry.uuid) if entry.uuid is not None else by_name
+    target, conflict = locate_record(entry, find, what)
+    if conflict is not None:
+        return None, conflict
     if target is not None and target.managed_by != FILE_OWNER:
         return None, f"{what} {target.id} is {target.managed_by}; {_CONF008}"
     return target, None

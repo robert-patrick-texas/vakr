@@ -99,7 +99,7 @@ def _duplicates[T](
             seen[value] = at(item).rsplit(".", 1)[0]
 
 
-def _unique(inv: InventoryFile, problems: list[Issue]) -> None:
+def unique_problems(inv: InventoryFile, problems: list[Issue]) -> None:
     """Check names, UUIDs, addresses, and annotation targets are unique in the file.
 
     Args:
@@ -116,10 +116,12 @@ def _unique(inv: InventoryFile, problems: list[Issue]) -> None:
     _duplicates(inv.sites, lambda s: s.uuid, lambda s: f"{s.at}.uuid", "uuid", problems)
     _duplicates(inv.devices, lambda d: d.name, lambda d: f"{d.at}.name", "device name", problems)
     _duplicates(inv.devices, lambda d: d.uuid, lambda d: f"{d.at}.uuid", "uuid", problems)
-    _duplicates(inv.devices, lambda d: d.address.lower(), lambda d: f"{d.at}.address",
+    # An import row may omit the address (E.38); an empty one is not a duplicate.
+    _duplicates(inv.devices, lambda d: d.address.lower() or None, lambda d: f"{d.at}.address",
                 "address", problems)  # fmt: skip
     _duplicates(inv.annotations, lambda a: (a.device, a.ifname), lambda a: f"{a.at}.ifname",
                 "this device and ifname", problems)  # fmt: skip
+    _duplicates(inv.annotations, lambda a: a.uuid, lambda a: f"{a.at}.uuid", "uuid", problems)
 
 
 def _devices(
@@ -192,7 +194,7 @@ def validate(inv: InventoryFile, snapshot: Snapshot, checks: Checks) -> Findings
         None
     """
     problems: list[Issue] = []
-    _unique(inv, problems)
+    unique_problems(inv, problems)
     for d in inv.devices:
         if (why := target_problem(d.address, checks.targets)) is not None:
             problems.append(Issue(f"{d.at}.address", f"{d.address} {why} (15.5)"))

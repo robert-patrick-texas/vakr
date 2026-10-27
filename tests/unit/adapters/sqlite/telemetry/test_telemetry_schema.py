@@ -190,8 +190,9 @@ def test_mig004_store_refuses_a_newer_or_older_schema(tmp_path: Path) -> None:
 
 FLOOR_LOGIC_ENTRY = "Read-compatible telemetry versioning"
 """The changelog entry of the release that first reads newer additive schemas (E.14)."""
-OLDEST_UPGRADE_SOURCE = (0, 1, 0)
-"""The oldest release self-update must still upgrade from: today every published one (E.14)."""
+OLDEST_UPGRADE_SOURCE = (0, 5, 0)
+"""The oldest release self-update must still upgrade from (E.14 decision 5): the owner confirmed
+on 2026-10-27 that no earlier release is in operation."""
 
 
 def floor_release(sections: list[str]) -> tuple[int, ...] | None:

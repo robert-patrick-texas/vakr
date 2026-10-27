@@ -50,7 +50,7 @@ When code in a newer release relies on an additive table or column, it must cope
 
 Releases before the floor logic refuse every newer telemetry schema. Until every release that self-update may still upgrade from has the floor logic, the release that ships any telemetry migration must carry `manual-update-required` in its changelog section. That section is the release notes, so the update timer skips it (UPD-005). A breaking migration always needs the marker, and the notes should say how to step back, as [the rollups guide](../operations/rollups.md#going-back-to-a-release-without-the-projection) does for 0002.
 
-The oldest release self-update must upgrade from is `OLDEST_UPGRADE_SOURCE` in `tests/unit/adapters/sqlite/telemetry/test_telemetry_schema.py`, which is every published release today. Raising it is an owner decision.
+The oldest release self-update must upgrade from is `OLDEST_UPGRADE_SOURCE` in `tests/unit/adapters/sqlite/telemetry/test_telemetry_schema.py`. Raising it is an owner decision. On 2026-10-27 the owner confirmed that no earlier release is in operation, and it was raised to the release published that day. Every release from 0.4.0 on has the floor logic, so today only a breaking migration needs the marker.
 
 ## Tests that guard this
 

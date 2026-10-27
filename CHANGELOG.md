@@ -4,7 +4,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## 0.5.0 - 2026-10-27
 
-Maintenance release. vakr now ships on the newest release of every tool and dependency, checked again when the release is cut, and holds one back only after it fails vakr's tests (ADR-036). This release bundles CPython 3.15.2 and updates FastAPI, Starlette, and pyasn1, the SNMP codec. It changes no database schema and adds no options. **This release is marked `manual-update-required`** so that nodes still on 0.2.x do not update by timer past the telemetry migrations of 0.3.x and 0.4.0 (see the notes for operators).
+Maintenance release. vakr now ships on the newest release of every tool and dependency, checked again when the release is cut, and holds one back only after it fails vakr's tests (ADR-036). This release bundles CPython 3.15.2 and updates FastAPI, Starlette, and pyasn1, the SNMP codec. It changes no database schema and adds no options. Upgrades are supported from 0.4.0 on, because no earlier release is in operation (owner, 2026-10-27), so this release carries no manual-update marker and the update timer installs it.
 
 ### Changed
 
@@ -19,6 +19,8 @@ Maintenance release. vakr now ships on the newest release of every tool and depe
   - Web UI: Svelte 5.57.3 and TanStack Svelte Query 6.3.6.
   - Developers: ruff 0.17.3, ty 0.0.92, coverage 7.17.0, hypothesis 6.170.12, eslint-plugin-jsdoc 65.4.2, svelte-eslint-parser 1.10.0, typescript-eslint 8.72.1, and `astral-sh/setup-uv` 10.3.2 in CI.
 
+- Upgrades are supported from 0.4.0 on (`OLDEST_UPGRADE_SOURCE`, Appendix E.14 decision 5). Every supported release reads newer additive telemetry schemas, so a release that adds only additive telemetry migrations no longer needs the manual-update marker; one with a breaking migration still does.
+
 ### Fixed
 
 - `vakr setup`'s closing checklist no longer says the web UI arrives in a later release. It now ends with starting `vakr-api` behind the HTTPS reverse proxy and signing in, then giving read-only people and monitoring agents the `vakr-view` group, as the [install guide](docs/operations/install.md#first-run) does.
@@ -30,9 +32,8 @@ Maintenance release. vakr now ships on the newest release of every tool and depe
 ### Notes for operators
 
 - **A new installation** needs nothing beyond the [install guide](docs/operations/install.md).
-- **This release is marked `manual-update-required`, although it migrates nothing.** Nodes on 0.2.x run an updater that reads the marker only on the release it installs. Without the marker here, their update timer would install 0.5.0 straight over the telemetry migrations of 0.3.x and 0.4.0, which need the manual steps in those releases' notes. The timer therefore skips 0.5.0 on every node: install it with `sudo vakr self-update`.
-  - **From 0.4.0** that command is the whole update, and `sudo vakr self-update --rollback` returns to 0.4.0, which reads the same schemas.
-  - **From 0.3.x or 0.2.x**, read the notes of 0.4.0 (and of 0.3.1, from 0.2.x) first; self-update applies their migrations in order.
+- **From 0.4.0** nothing is needed: the update timer installs 0.5.0, or run `sudo vakr self-update`. `sudo vakr self-update --rollback` returns to 0.4.0, which reads the same schemas.
+- **Releases before 0.4.0 are no longer upgrade sources**, because none is in operation. A 0.3.x node's timer would still stop at 0.4.0's marker, but a 0.2.x node's timer would install 0.5.0 straight over two telemetry migrations. Reinstall such a node from the install guide instead.
 
 ## 0.4.0 - 2026-10-22
 

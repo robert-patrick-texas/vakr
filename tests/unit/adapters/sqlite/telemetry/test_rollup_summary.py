@@ -17,9 +17,8 @@ from functools import reduce
 
 import pytest
 
-from vakr.adapters.sqlite.telemetry.acceptance import _bucket
 from vakr.adapters.sqlite.telemetry.rollup_codec import Aggregates, decode_payload, encode_payload
-from vakr.adapters.sqlite.telemetry.rollup_summary import payload_summary
+from vakr.adapters.sqlite.telemetry.rollup_summary import bucket_mark, payload_summary
 from vakr.domain.errors import StorageError
 
 
@@ -72,7 +71,7 @@ def test_e35_summary_matches_the_full_decoder(slots: dict[int, Aggregates]) -> N
         reduce(lambda q, a: q | a.quality, decoded.values(), 0),
     )
     assert payload_summary(payload) == expected
-    mark = _bucket(0, payload)
+    mark = bucket_mark(0, payload)
     assert (mark.samples, mark.available, int(mark.quality)) == expected
 
 

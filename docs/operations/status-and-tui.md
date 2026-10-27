@@ -4,6 +4,8 @@ Two read-only views show what vakr knows right now about every device. `vakr sta
 
 Run them on the monitoring node. Neither command ever creates a database: on a node where `metadata.db` does not exist yet, both say **no data yet** and exit with status 3.
 
+An interface's lifecycle follows each Stage 1 poll (blueprint E.6). When a link goes down, its row shows `inactive` and the state "not up/up (inactive)" within seconds, even though its last traffic sample still says up; it shows `active` again at the first Stage 1 that finds it up/up.
+
 ## Where the data comes from
 
 When [`vakr-api`](api.md) is running, both commands ask it over its local socket, `/run/vakr/api.sock` (`api.socket_path`). When it is not, they read the databases in `/var/lib/vakr` themselves. The answers are the same either way. Only the line that says where they came from differs.

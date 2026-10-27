@@ -33,6 +33,7 @@ from vakr.adapters.sqlite.telemetry.codec_probe import (
     encode_snmp,
 )
 from vakr.adapters.sqlite.telemetry.codec_rows import EncodedRow, UuidOf
+from vakr.adapters.sqlite.telemetry.codec_status import decode_status, encode_status
 from vakr.domain.errors import ValidationError
 from vakr.domain.observations import (
     CollectorHealthObservation,
@@ -42,6 +43,7 @@ from vakr.domain.observations import (
     Observation,
     SnmpDeviceObservation,
 )
+from vakr.domain.status_observations import InterfaceStatusObservation
 
 DECODERS: dict[str, Callable[[Sequence[object], UuidOf], Observation]] = {
     "obs_iface": decode_interface,
@@ -49,6 +51,7 @@ DECODERS: dict[str, Callable[[Sequence[object], UuidOf], Observation]] = {
     "obs_snmp": decode_snmp,
     "obs_poll": decode_poll,
     "obs_health": decode_health,
+    "obs_ifstat": decode_status,
 }
 """Native family to its row decoder."""
 
@@ -78,6 +81,8 @@ def encode(observation: Observation) -> EncodedRow:
                 return encode_poll(observation)
             case CollectorHealthObservation():
                 return encode_health(observation)
+            case InterfaceStatusObservation():
+                return encode_status(observation)
     except OverflowError:
         raise ValidationError("an observation has a number too large to store") from None
     raise ValidationError(f"{type(observation).__name__} is not an observation")

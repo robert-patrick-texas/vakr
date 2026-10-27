@@ -74,10 +74,20 @@ COLUMNS: dict[str, tuple[str, ...]] = {
         "spool_bytes", "spool_used_pct", "active_devices", "active_interfaces",
         "quality_flags",
     ),
+    "obs_ifstat": (
+        "poll_uuid", "device_key", "ifindex_observed", "admin_status", "oper_status", "baseline",
+        "quality_flags",
+    ),
 }  # fmt: skip
 """Columns after ``KEY_COLUMNS`` for each native family, in table order."""
 
 NATIVE_FAMILIES = tuple(COLUMNS)
+KEPT_FAMILIES = ("obs_ifstat",)
+"""Families that live in their ``_hot`` table for good (schema 4): never moved to day
+partitions, because a new partition template is breaking (E.14); retention deletes their rows
+behind the native horizon instead."""
+MOVED_FAMILIES = tuple(f for f in NATIVE_FAMILIES if f not in KEPT_FAMILIES)
+"""Families the staging mover drains into day partitions (E.21)."""
 ROLLUP_FAMILIES = ("roll_iface", "roll_icmp")
 ROLLUP_COLUMNS = ("series_key", "collector_key", "bucket_offset_s", "width_adj_s", "payload")
 """Columns of every rollup table; the first four are the primary key."""
@@ -88,6 +98,7 @@ FAMILY_OF: dict[ObservationType, str] = {
     ObservationType.SNMP_DEVICE: "obs_snmp",
     ObservationType.DEVICE_POLL: "obs_poll",
     ObservationType.COLLECTOR_HEALTH: "obs_health",
+    ObservationType.INTERFACE_STATUS: "obs_ifstat",
 }
 """Native family storing each observation type."""
 

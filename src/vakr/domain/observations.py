@@ -45,6 +45,7 @@ from vakr.domain.interface_observations import InterfaceObservation
 from vakr.domain.polls import CollectorHealthObservation, DevicePoll
 from vakr.domain.quality import Quality
 from vakr.domain.snmp_observations import SnmpDeviceObservation
+from vakr.domain.status_observations import InterfaceStatusObservation
 from vakr.domain.timestamps import require_utc
 
 __all__ = [
@@ -52,6 +53,7 @@ __all__ = [
     "DevicePoll",
     "IcmpObservation",
     "InterfaceObservation",
+    "InterfaceStatusObservation",
     "Observation",
     "SnmpDeviceObservation",
     "observation_subject",
@@ -218,6 +220,7 @@ type Observation = (
     | InterfaceObservation
     | DevicePoll
     | CollectorHealthObservation
+    | InterfaceStatusObservation
 )
 """Any observation an ``ObservationWriter`` accepts."""
 
@@ -227,6 +230,7 @@ _TYPES: dict[type, ObservationType] = {
     InterfaceObservation: ObservationType.INTERFACE,
     DevicePoll: ObservationType.DEVICE_POLL,
     CollectorHealthObservation: ObservationType.COLLECTOR_HEALTH,
+    InterfaceStatusObservation: ObservationType.INTERFACE_STATUS,
 }
 
 
@@ -261,7 +265,7 @@ def observation_subject(observation: Observation) -> UUID:
     Raises:
         None
     """
-    if isinstance(observation, InterfaceObservation):
+    if isinstance(observation, InterfaceObservation | InterfaceStatusObservation):
         return observation.interface_id
     if isinstance(observation, CollectorHealthObservation):
         return observation.collector_id

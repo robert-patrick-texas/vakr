@@ -42,7 +42,7 @@ from pathlib import Path
 
 from vakr.adapters.sqlite.connection import OpenMode, open_connection
 from vakr.adapters.sqlite.errors import translated
-from vakr.adapters.sqlite.telemetry.layout import NATIVE_FAMILIES, hot_table
+from vakr.adapters.sqlite.telemetry.layout import MOVED_FAMILIES, NATIVE_FAMILIES, hot_table
 from vakr.adapters.sqlite.telemetry.store import TELEMETRY_FILE, telemetry_migrations
 from vakr.adapters.sqlite.telemetry.tuning import MOVER_LAG_WARN, WAL_WARN_BYTES
 from vakr.domain.errors import StorageError
@@ -99,7 +99,7 @@ def measure(path: Path, now_s: float) -> Vitals:
     wal = path.with_name(f"{path.name}-wal")
     wal_bytes = wal.stat().st_size if wal.exists() else 0
     with closing(open_connection(path, mode=OpenMode.READ_ONLY)) as conn, translated():
-        oldest = [_oldest(conn, hot_table(f)) for f in NATIVE_FAMILIES]
+        oldest = [_oldest(conn, hot_table(f)) for f in MOVED_FAMILIES]
         problems = tuple(p for t in FIXED_TABLES for p in _check(conn, t))
     staged = [o for o in oldest if o is not None]
     lag = max(0.0, now_s - min(staged) / 1e6) if staged else 0.0

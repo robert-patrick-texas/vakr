@@ -38,7 +38,7 @@ from vakr.adapters.sqlite.encoding import decode_time, encode_time
 from vakr.adapters.sqlite.telemetry.layout import (
     DAY_US,
     KEY_COLUMNS,
-    NATIVE_FAMILIES,
+    MOVED_FAMILIES,
     all_columns,
     day_start,
     hot_table,
@@ -87,7 +87,7 @@ def maintain(store: SqliteTelemetryStore, now: datetime) -> MaintenanceReport:
     with store.writing() as conn:
         boundary = state(conn, BOUNDARY) or 0
         if target > boundary:
-            for family in NATIVE_FAMILIES:
+            for family in MOVED_FAMILIES:
                 moved += _move(conn, family, target)
             set_state(conn, BOUNDARY, target)
             boundary = target

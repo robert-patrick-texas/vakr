@@ -3179,7 +3179,7 @@ The load per position is about 24,000 SNMP varbinds and 500 ICMP probes per minu
 | ICMP rollups, days 1–400 | 100 × 96 × 400 ≈ 3.8 million |
 | **Total** | **≈ 143 million** |
 
-Rollups cover days 1–400, not 31–400, because each bucket is rolled up while its native rows still exist (E.10). With two positions, each node also stores its peer's observations.
+Rollups cover days 1–400, not 31–400, because each bucket is rolled up while its native rows still exist (E.10). With two positions, each node also stores its peer's observations. Interface status records (telemetry schema 4) are not in the table: they hold changes only, about 73 MB per node at a pessimistic rate (E.35 decision 5), inside the margin of the figures below.
 
 The [ADR-021 benchmark](docs/performance/adr021-compact-sqlite-benchmark.md) and the real adapter (its appendix B) measured the per-node worst case, just before a scheduled drop: 32 native day tables (about 24.8 GB at 799 MB a day) and up to 431 days of rollups (about 15.2 GB), because a month's rollup table is dropped only once all of it is past day 400. That is **40.1 GB per node**, with interface rollup values packed at float32 precision (ADR-021 amendment 3, relative error at most 6×10⁻⁸); lossless rollups would need about 52 GB. Provision at least 100 GB of SSD-class storage for `/var/lib/vakr` on each node. The remainder holds the metadata database, the spool (at most 4 GiB by default, E.24), logs, and one `VACUUM INTO` or backup copy of the telemetry file. Self-update does not copy the telemetry file (E.14).
 
@@ -3696,6 +3696,18 @@ With `prev` and `curr` in TimeTicks (hundredths of a second) and `elapsed` the w
 
 An interface returns to `ACTIVE` on the first up/up Stage 1 result, or when rediscovery reconciles it to an existing identity.
 
+Rules adopted when lifecycle began to follow each Stage 1 poll (M6, owner approval 2026-10-27). Until then only discovery wrote lifecycle, so a link that went down stayed `ACTIVE` until the next rediscovery (up to 24 h).
+
+| Rule | Value |
+|---|---|
+| Evidence | Each Stage 1 status change the collector records (E.35 status records), applied with the discovery rules (`vakr.logic.lifecycle`, source `stage1`) by `vakr.inventory.stage1_lifecycle` |
+| Batching | The collector keeps the newest change per interface (bounded by the interfaces planned) and hands at most 500 to the inventory every 5 s, in a worker thread; a failed batch is kept and retried |
+| Writes | Only interfaces whose state changes, in one transaction per batch; `RETIRED` never changes here |
+| Identity | By persistent UUID only; `ifIndex` plays no part (invariant 6) |
+| Order | Evidence older than the record's last change is ignored, so a late batch never rewinds a discovery's decision |
+
+Reading of this table (decision for the owner): "present in the latest discovery" is satisfied by Stage 1 evidence, because Stage 1 reads only interfaces in the device's plan, which discovery built. `NOT_DISCOVERED` and `STALE` stay discovery and timer decisions; a `STALE` interface, checked only at the discovery cadence (LIFE-004), returns to `ACTIVE` on its next up/up check. Each lifecycle change moves the inventory change counter, so the collector re-plans within 5 s; at MVP scale that is cheap, and status changes are rare.
+
 ### E.7 ICMP summary rounding
 
 Summary values (min, average, median, max, jitter) are computed in floating point from integer-microsecond samples and stored as integer microseconds, rounded half to even. Loss percent is stored to one decimal place, also rounded half to even.
@@ -3959,6 +3971,7 @@ Decisions taken with the M2 SQLite metadata adapter:
 | Retention pass | hourly; any interval works because each pass is idempotent and expires exactly by policy |
 | Downsampling ladder | 60 s, 2, 5, 10, 15, 30 min, 1, 2, 3, 4, 6, 8, 12 h, 1 d; the narrowest that fits the point cap, at least 15 min over rollups |
 | Interface-state poll lookup | the sample's poll is searched from 24 h before to 5 min after the sample |
+| Interface status records (schema 4) | one unpartitioned table, `obs_ifstat_hot`, never moved by the staging mover; retention deletes rows behind the native horizon, at most 100,000 per pass; about 170 bytes a record, about 73 MB per node at a pessimistic MVP rate (E.35 decision 5) |
 
 Decisions taken with the ADR-021 benchmark:
 
@@ -4534,7 +4547,9 @@ Decisions taken with the parallel-run comparison (2026-10-27):
 | Slot timeline | Poll records plus the record-less slots between consecutive records more than 1.5 intervals apart (E.19), before the first, and after the last; 60 s slots for a device with no record |
 | Collector silent | Health reports more than 150 s apart: max(2.5 × 60 s, 60 s + 30 s), the E.3 rule at the E.27 health cadence |
 | Spool full | A health report within one interval of a not-attempted slot showed `spool_used_pct` at or above 95 (the E.24 exhausted threshold) |
-| Gap causes | `collector_stopped`, `collector_busy`, `collector_fault`, `storage`, `telemetry_loss`, `poll_overrun`, `device_unreachable`, `snmp_timeout`, `snmp_error`, `admin_state`, `not_yet_discovered`, `interface_not_up`, `inventory_change`, `unexplained` (decisions 3 and 4) |
+| Gap causes | `collector_stopped`, `collector_busy`, `collector_fault`, `storage`, `telemetry_loss`, `poll_overrun`, `device_unreachable`, `snmp_timeout`, `snmp_error`, `admin_state`, `not_yet_discovered`, `interface_down`, `interface_not_up`, `inventory_change`, `unexplained` (decisions 3 and 4) |
+| Interface status record (schema 4) | `InterfaceStatusObservation` (`interface_status`): an interface's admin and oper status, written at Stage 1 when the pair differs from the last one this collector process recorded, and for every interface at its device's first Stage 1 after the collector starts (`baseline`). A status holds until the interface's next record from the same collector. It is not a sample: no rate, no zero, never in series, rollups, or rankings (E.27 #7 stands) |
+| `interface_down` | A slot whose poll answered SNMP but did not sample the interface, while its newest status record at or before that poll (looked back up to 30 days) says not up/up |
 | Inventory change near a gap | An audit event about the device, or an `inventory.apply`, within 2 intervals of an otherwise unexplained stretch |
 | Monitored interface | Lifecycle `active`, on a device that is enabled or in maintenance and polls SNMP |
 | Coverage ranges | 1 h, 24 h, 7 d, 30 d from native data; 400 d from 15-minute rollups (E.28 `auto`); families traffic, packets, errors (in or out has a value) |
@@ -4551,7 +4566,11 @@ Decisions taken with the acceptance reports:
 1. **Rollups find the quarter-hours worth reading.** Native samples of 1,600 interfaces for 14 days are too many to read in two minutes (ADR-021: 4 µs per cold sample). A subject's samples are counted per bucket from rollups before the rollup frontier (a bucket every subject has finished, E.10) and natively after it; only buckets holding fewer samples than the device had polls that ran are read natively, and one missing sample whose slot's sample landed just past the boundary is not suspect. Discontinuities are found the same way, from the rollup quality union. Measured on the Compact adapter, warm, scaled to the MVP workload with both positions: about 25 s (`schedule`, 7 d), 60 s (`gaps`, 14 d), and 35 s (`coverage`).
 2. **"Healthy device" is judged from the poll records,** not from ICMP state. A device that answers nothing completes its poll in about 2 s, so leaving it in only makes the measure stricter, and reading every ICMP result would double the cost. Owner review requested.
 3. **Inventory facts explain a record-less slot first.** A device not created yet, or disabled since before the slot, expected no poll, whatever the collector's state; then a loss incident, then collector silence. A peer collector's silence that lasts to the end of the window is `storage` (not replicated yet), never the devices being down (MPOS-006, invariant 2).
-4. **Evidence vakr does not hold.** An interface that is not up/up gets no sample and no stored status (E.27 #7), so a link that went down and came back while its device answered SNMP is `unexplained`; telling it apart needs a status record for unsampled interfaces, a telemetry schema change for the owner to decide. Admin-state history is not kept (only the current state and when the device last changed), so a disable-and-enable inside the window is explained only through its audit entries. A not-attempted poll does not record why; the spool fill level separates a full spool from a busy collector. Lifecycle is written only by discovery (`vakr.discovery.reconcile.persist`), not at each Stage 1 poll as E.6 says, so `interface_not_up` explains a down interface only after the next rediscovery (at most 24 h); this gap between E.6 and the code is left for the owner, not resolved here.
+4. **Evidence vakr does not hold.** Admin-state history is not kept (only the current state and when the device last changed), so a disable-and-enable inside the window is explained only through its audit entries. A not-attempted poll does not record why; the spool fill level separates a full spool from a busy collector. (The two limits recorded here first, a link flap on an answering device and lifecycle judged only at discovery, are closed by decisions 5 and 6.)
+5. **Interface status records, transitions only (owner approval 2026-10-27).** A record per interface per poll would cost as much as the traffic samples 27.3 sizes; changes plus a baseline per collector start explain every gap at a fraction of it. Measured on the Compact adapter: 170 bytes per record, table and both indexes included. At the MVP workload with a pessimistic rate (4,000 discovered interfaces re-baselined by one collector restart a day, and every one of the 1,600 active interfaces going down and up once a day) a collector writes 7,200 a day; with both positions on a node and 30 days of native retention that is 432,000 records, about 73 MB per node, 0.18% of the 40.1 GB envelope (27.3). The worst case, an interface flapping at every poll, costs one record per poll for that interface, as much as its traffic samples would.
+   - **Storage (E.21).** Telemetry migration `0004_interface_status.sql` is additive: one table `obs_ifstat_hot`, keyed `(series_key, collector_key, ts_us, observation_uuid)` for per-interface reads, with indexes by time and by `(device_key, poll_uuid)`. The family is never moved to day partitions, because a new partition template is breaking (E.14); retention deletes its rows behind the native horizon, at most 100,000 per pass.
+   - **Replication (MPOS-004).** `repl_log`'s family CHECK admits families 1 to 5 only, and changing it would be breaking, so status records are not logged. A node serves each poll's status records in the page's `attachments` member with the seq of that poll's SNMP device observation, which Stage 1 emits after them, so they are always stored no later than it. The partner verifies them like observations and stores them with the page; a partner that predates them ignores the member, and a page from one without them has none.
+6. **Lifecycle follows Stage 1 (E.6).** The same status changes reach the inventory in bounded batches (E.6 table), so state views and the TUI show an interface that went down as `inactive` (state "not up/up") within seconds, not at the next rediscovery.
 
 ### E.36 Resilience system tests (MVP-ACC-06, M6)
 

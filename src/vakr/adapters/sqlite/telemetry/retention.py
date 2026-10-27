@@ -39,6 +39,7 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from vakr.adapters.sqlite.encoding import decode_time, encode_time
+from vakr.adapters.sqlite.telemetry.kept import purge_kept
 from vakr.adapters.sqlite.telemetry.layout import NATIVE_FAMILIES, checked, hot_table
 from vakr.adapters.sqlite.telemetry.partitions import (
     HORIZON,
@@ -171,6 +172,7 @@ class SqliteRetentionManager:
             rollups = _advance_rollups(conn, encode_time(rollup_cut))
             prune(conn, encode_time(now))  # the ranking projection never outlives native data
             purge_log(conn, state(conn, HORIZON))  # nor the replication log (MPOS-005)
+            purge_kept(conn, state(conn, HORIZON))  # status records live outside partitions
         return RetentionReport(now, cutoff, rollup_cut, native, rollups)
 
 

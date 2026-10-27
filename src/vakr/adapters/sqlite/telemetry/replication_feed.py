@@ -18,10 +18,16 @@ Example:
     10000
 """
 
+# The status query interpolates fixed layout names only; values are bound parameters.
+# ruff: noqa: S608
+
+import sqlite3
+
 from vakr.adapters.sqlite.errors import translated
 from vakr.adapters.sqlite.telemetry.keys import find_key
+from vakr.adapters.sqlite.telemetry.layout import all_columns, hot_table
 from vakr.adapters.sqlite.telemetry.reads import decoder
-from vakr.adapters.sqlite.telemetry.replication_log import bounds, read_page
+from vakr.adapters.sqlite.telemetry.replication_log import LoggedRow, bounds, read_page
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.domain.errors import ValidationError
 from vakr.domain.ids import CollectorId
@@ -74,9 +80,10 @@ class SqliteObservationFeed:
             decoders = {f: decoder(conn, self._store.keys, f) for f in {e.family for e in logged}}
             entries = tuple(FeedEntry(e.seq, decoders[e.family](e.row))
                             for e in logged if e.row is not None)  # fmt: skip
+            attached = _attached(conn, self._store, key, logged)
         missing = tuple(e.seq for e in logged if e.row is None)
         last = logged[-1].seq if logged else after
-        return FeedPage(entries, last, more, oldest, newest, missing)
+        return FeedPage(entries, last, more, oldest, newest, missing, attached)
 
     def bounds(self, collector: CollectorId) -> tuple[int | None, int | None]:
         """Return the oldest and newest seq logged for ``collector``.
@@ -93,3 +100,38 @@ class SqliteObservationFeed:
         with self._store.reading() as conn, translated():
             key = find_key(conn, self._store.keys, "collector", collector)
             return (None, None) if key is None else bounds(conn, key)
+
+
+def _attached(
+    conn: sqlite3.Connection, store: SqliteTelemetryStore, collector_key: int,
+    logged: list[LoggedRow],
+) -> tuple[FeedEntry, ...]:  # fmt: skip
+    """Read the interface status records of each logged SNMP device observation's poll.
+
+    Stage 1 emits a poll's status records before its SNMP device observation, so they
+    are stored no later than it and are found whenever its log entry is (E.35).
+
+    Args:
+        conn: Connection inside the read transaction.
+        store: The store (for its key cache).
+        collector_key: The collector's key.
+        logged: The page's log entries followed to their rows.
+
+    Returns:
+        tuple[FeedEntry, ...]: Status records, each with its SNMP entry's seq.
+
+    Raises:
+        sqlite3.Error: If a query fails.
+    """
+    sql = (f"SELECT {', '.join(all_columns('obs_ifstat'))} FROM {hot_table('obs_ifstat')} "
+           "WHERE device_key = ? AND poll_uuid = ? AND collector_key = ? ORDER BY ts_us, "
+           "observation_uuid")  # fmt: skip
+    decode = decoder(conn, store.keys, "obs_ifstat")
+    found: list[FeedEntry] = []
+    for e in logged:
+        if e.family != "obs_snmp" or e.row is None:
+            continue
+        device_key, poll_uuid = e.row[0], e.row[4]
+        rows = conn.execute(sql, (device_key, poll_uuid, collector_key)).fetchall()
+        found.extend(FeedEntry(e.seq, decode(r)) for r in rows)
+    return tuple(found)

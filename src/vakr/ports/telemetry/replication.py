@@ -55,6 +55,9 @@ class FeedPage:
         newest_seq: Newest seq the log holds for it, or ``None``.
         missing: Seqs in this page's range whose observation retention
             already removed (they are reported, not served).
+        attached: Interface status records of the polls whose SNMP device
+            observations are in ``entries``, each with that entry's seq (schema 4,
+            E.35): ``repl_log`` admits only families 1 to 5, so they ride along.
     """
 
     entries: tuple[FeedEntry, ...]
@@ -63,6 +66,7 @@ class FeedPage:
     oldest_seq: int | None
     newest_seq: int | None
     missing: tuple[int, ...] = ()
+    attached: tuple[FeedEntry, ...] = ()
 
 
 class ObservationFeed(Protocol):

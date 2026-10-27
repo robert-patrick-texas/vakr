@@ -28,7 +28,7 @@ Example:
 from dataclasses import replace
 from typing import NamedTuple
 
-from vakr.domain.enums import Freshness, InterestClass
+from vakr.domain.enums import Freshness, InterestClass, InterfaceLifecycle
 from vakr.domain.interfaces import Interface
 from vakr.domain.quality import Quality
 from vakr.domain.state import CurrentInterfaceState
@@ -220,6 +220,12 @@ def interface_row(
         m = _Measured(*([missing(f"no sample from {position}")] * len(_Measured._fields)))
     else:
         m = _measured(state, cap, interface)
+    if interface.lifecycle is not InterfaceLifecycle.ACTIVE and (
+        state is None or state.observed_at < interface.updated_at
+    ):
+        # Stage 1 found it not up/up after its last sample (E.6); that sample's "up" is history.
+        word = interface.lifecycle.value
+        m = m._replace(state=Reading(f"not up/up ({word})", None, f"{word} since Stage 1"))
     return InterfaceRow(
         interface_id=interface.id,
         name=display_name(interface),

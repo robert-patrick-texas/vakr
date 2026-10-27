@@ -44,7 +44,12 @@ from datetime import UTC, datetime
 from vakr.adapters.sqlite.telemetry.codec import encode
 from vakr.adapters.sqlite.telemetry.codec_rows import EncodedRow
 from vakr.adapters.sqlite.telemetry.keys import KeyAllocator
-from vakr.adapters.sqlite.telemetry.layout import all_columns, day_start, hot_table
+from vakr.adapters.sqlite.telemetry.layout import (
+    KEPT_FAMILIES,
+    all_columns,
+    day_start,
+    hot_table,
+)
 from vakr.adapters.sqlite.telemetry.partitions import BOUNDARY, ensure_day, state
 from vakr.adapters.sqlite.telemetry.ranking_projection import forget_buckets
 from vakr.adapters.sqlite.telemetry.rankings import FAMILY
@@ -265,7 +270,7 @@ def _insert(
     days: dict[tuple[str, int], str] = {}
     for row in rows:
         keyed = _keyed(row, keys)
-        if row.ts_us >= boundary:
+        if row.ts_us >= boundary or row.family in KEPT_FAMILIES:
             groups[row.family, hot_table(row.family)].append(keyed)
             continue
         day = (row.family, day_start(row.ts_us))
@@ -278,7 +283,11 @@ def _insert(
         # series first for a day partition.
         hot = table.endswith("_hot")
         part.sort(key=(lambda r: (r[2], r[0], r[1], r[3])) if hot else (lambda r: r[:4]))
-        stored = store_part(conn, insert_sql(table, family), part, FAMILY_CODE[family], log)
+        # Kept families are not logged: repl_log admits families 1 to 5, so a status record
+        # replicates attached to its poll's SNMP device observation instead (E.35).
+        logged = log if family in FAMILY_CODE else None
+        stored = store_part(conn, insert_sql(table, family), part, FAMILY_CODE.get(family, 0),
+                            logged)  # fmt: skip
         samples += stored if family == FAMILY else 0
         inserted += stored
     if samples:

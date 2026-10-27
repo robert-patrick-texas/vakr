@@ -7,8 +7,7 @@ into the SQLite telemetry store (the only telemetry writer), discovery runs
 beside polling (with manual rediscoveries an administrator queued, picked up
 by the operation watcher), and timers checkpoint rate baselines every minute, write a
 collector-health observation every minute, and keep the telemetry store in
-shape. A watcher follows the inventory change counter, and SIGHUP reloads
-the configuration.
+shape. A watcher follows the inventory change counter; SIGHUP reloads config.
 
 Shutdown follows 16.4 in order: stop discovery and the timers; stop the
 scheduler, which gives running polls ``scheduler.shutdown_grace`` and
@@ -18,9 +17,8 @@ marker); stop the ingester after its last write; write the final baseline
 checkpoint; close the adapters and databases.
 
 Dependencies:
-    vakr.scheduler, vakr.ingest: Scheduling, spool, ingestion.
-    vakr.app.collector: Steps, plans, baselines, discovery, timers, health.
-    vakr.service.sdnotify: Readiness for ``Type=notify``.
+    vakr.scheduler, vakr.ingest, vakr.service.sdnotify: Scheduling, spool, readiness.
+    vakr.app.collector: Steps, plans, baselines, discovery, timers, health, lifecycle.
 
 Safety:
     Every blocking call runs in a worker thread; every queue is bounded.
@@ -52,6 +50,7 @@ from vakr.app.collector.replication_loop import replication_loops
 from vakr.app.collector.rollup_job import collector_job
 from vakr.app.collector.shutdown import shut_down
 from vakr.app.collector.snmp_step import CollectorSnmpStep
+from vakr.app.collector.status_tracker import lifecycle_loop
 from vakr.app.collector.tally import FaultTally
 from vakr.app.collector.timers import health_loop, repeat, write_checkpoint
 from vakr.app.collector.timings import EX_PREFLIGHT, ServiceTimings
@@ -260,7 +259,9 @@ class CollectorService:
             "health": health_loop(self),
             "metrics snapshot": metrics_loop(self),
             "replication": replication_loops(self),
-        }
+            "interface lifecycle": lifecycle_loop(self.loops_stop, self.snmp_step.status,
+                                                  self.parts.inventory),  # E.6
+        }  # fmt: skip
         return {name: asyncio.create_task(job, name=name) for name, job in jobs.items()}
 
     def health_interval_s(self) -> float:

@@ -54,6 +54,7 @@ from vakr.domain.observations import (
     DevicePoll,
     IcmpObservation,
     InterfaceObservation,
+    InterfaceStatusObservation,
     Observation,
     SnmpDeviceObservation,
 )
@@ -134,6 +135,10 @@ GOLDEN: dict[str, Observation] = {
         Quality.CLOCK_UNSYNCED, worker_id=WORKER, clock_offset_us=-250_000,
         event_loop_lag_us=1500, queue_depth=0, queue_capacity=4096, polls_completed=98,
         polls_late=2, polls_missed=0, spool_bytes=0, spool_used_pct=12.5,
+    ),
+    "interface_status_down": InterfaceStatusObservation(
+        _oid(10), POLL, COLLECTOR, DEVICE, INTERFACE, AT, 3, IfAdminStatus.UP,
+        IfOperStatus.LOWER_LAYER_DOWN, baseline=True, quality=Quality.MAINTENANCE,
     ),
 }  # fmt: skip
 """Golden observations by fixture name."""

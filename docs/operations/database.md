@@ -194,6 +194,8 @@ Other refusals name their cause: "not a vakr metadata database" or "not a vakr t
 
 Telemetry schema 3 (`0003_replication.sql`) adds observation replication's log and cursors ([two positions](two-positions.md#observation-replication)). It is additive, so a release with read-compatible versioning keeps running on it after a rollback. Releases from before read-compatible versioning (0.3.x) refuse it, so the release that adds it carries `manual-update-required`. To go back to such a release, remove schema 3 first. The two tables hold only the replication bookkeeping; every observation, local or replicated, stays:
 
+Telemetry schema 4 (`0004_interface_status.sql`) adds interface status records (E.35): one table, `obs_ifstat_hot`, that holds an interface's status each time Stage 1 finds it changed. It is additive and older releases never read it, so a rollback needs nothing. Its rows stay in that table (the staging mover leaves them), retention deletes them behind the native horizon, and replication serves them with their poll's SNMP observation instead of logging them.
+
 ```console
 $ sudo systemctl stop vakr-collector vakr-api
 $ sudo -u vakr /opt/vakr/venv/bin/python -c 'import sqlite3; c = sqlite3.connect("/var/lib/vakr/telemetry.db"); c.executescript("BEGIN; DROP TABLE repl_log; DROP TABLE repl_cursor; DELETE FROM schema_compat WHERE version = 3; DELETE FROM schema_migrations WHERE version = 3; COMMIT;")'

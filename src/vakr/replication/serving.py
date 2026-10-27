@@ -142,7 +142,11 @@ def _answer(collector: CollectorId, after: int, page: FeedPage) -> dict[str, Any
         last = entry.seq
     else:
         last = page.next_after  # entries skipped as missing still advance the cursor
+    # Status records ride with their poll's SNMP entry (schema 4, E.35); a partner that
+    # predates them ignores the member.
+    attached = [{"seq": a.seq, "envelope": envelope_to_dict(seal(a.observation, batch))}
+                for a in page.attached if a.seq <= last]  # fmt: skip
     return {"collector": str(collector), "after": after, "next_after": last, "has_more": more,
             "oldest_seq": page.oldest_seq, "newest_seq": page.newest_seq,
             "missing": sum(1 for seq in page.missing if seq <= last),
-            "observations": served}  # fmt: skip
+            "observations": served, "attachments": attached}  # fmt: skip

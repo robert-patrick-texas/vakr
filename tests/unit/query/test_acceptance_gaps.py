@@ -21,7 +21,13 @@ import pytest
 
 from tests.contract import contract_samples as s
 from tests.unit.query.acceptance_testkit import MINUTE, NOT_ATTEMPTED, OK, T0, Fleet, SlotPlan
-from vakr.domain.enums import AdminState, InterfaceLifecycle, PollExecution, SnmpState
+from vakr.domain.enums import (
+    AdminState,
+    IfOperStatus,
+    InterfaceLifecycle,
+    PollExecution,
+    SnmpState,
+)
 from vakr.domain.paging import PageRequest
 from vakr.domain.quality import Quality
 from vakr.domain.timestamps import to_epoch_us
@@ -261,3 +267,35 @@ def test_mvp_acc10_peer_silence_at_the_end_is_replication_not_target_down() -> N
     (section,) = f.queries(NOW, local="west").gaps(SIX_HOURS).collectors
     assert isinstance(section, CollectorGaps)
     assert rows_of(section) == {("device", "core1", (), "storage", 60, 300)}
+
+
+def test_mvp_acc10_a_link_flap_on_an_answering_device_is_explained_by_status_records() -> None:
+    """MVP-ACC-10, E.35: Stage 1's status records make a link flap ``interface_down``.
+
+    Args:
+        None
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    f = Fleet(rollups=True)
+    router = f.device("flap")
+    f.interface(router, "Gi1")
+    gi2 = f.interface(router, "Gi2")
+    f.run(router, T0, 360, lambda k: SlotPlan(sampled=GI1) if 200 <= k < 210 else OK)
+    stage1 = timedelta(seconds=7.2)  # Stage 1 reads status just after each slot
+    f.write([
+        s.status(router.id, gi2.id, f.collector.id, T0 + stage1, oper_status=IfOperStatus.UP),
+        s.status(router.id, gi2.id, f.collector.id, T0 + 200 * MINUTE + stage1, baseline=False),
+        s.status(router.id, gi2.id, f.collector.id, T0 + 210 * MINUTE + stage1,
+                 oper_status=IfOperStatus.UP, baseline=False),
+    ])  # fmt: skip
+    f.health(T0, 360)
+    f.rollup(T0 + timedelta(hours=4))
+    (section,) = f.queries(NOW).gaps(SIX_HOURS).collectors
+    assert isinstance(section, CollectorGaps)
+    assert rows_of(section) == {("interface", "flap", ("Gi2",), "interface_down", 10, 200)}
+    assert section.unexplained == 0

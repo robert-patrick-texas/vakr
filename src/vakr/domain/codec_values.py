@@ -149,6 +149,24 @@ def _float(field: Field, raw: object) -> float:
         raise ValidationError(f"{field.key} is too large", field=field.key) from None
 
 
+def _bool(field: Field, raw: object) -> bool:
+    """Decode a boolean.
+
+    Args:
+        field: The field being decoded.
+        raw: Parsed JSON value.
+
+    Returns:
+        bool: The value.
+
+    Raises:
+        ValidationError: If ``raw`` is not ``true`` or ``false``.
+    """
+    if not isinstance(raw, bool):
+        raise ValidationError(f"{field.key} must be true or false", field=field.key)
+    return raw
+
+
 def _str(field: Field, raw: object) -> str:
     """Decode a string.
 
@@ -216,4 +234,5 @@ _DECODERS: dict[str, Callable[[Field, Any], Any]] = {
     "str": _str,
     "enum": _enum,
     "rtts": _rtts,
+    "bool": _bool,
 }

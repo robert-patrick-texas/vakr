@@ -11,6 +11,7 @@ Example:
 """
 
 from tests.contract.contract_acceptance import AcceptanceContract
+from tests.contract.contract_interface_status import InterfaceStatusContract
 from tests.contract.contract_ranking_projection import RankingProjectionContract
 from tests.contract.contract_rollup_source import RollupSourceContract
 from tests.contract.contract_telemetry_history import TelemetryHistoryContract
@@ -45,3 +46,7 @@ class TestSqliteRankingProjection(RankingProjectionContract):
 
 class TestSqliteAcceptance(AcceptanceContract):
     """E.35, MVP-ACC-01/02/10 lean reads on a SQLite telemetry file."""
+
+
+class TestSqliteInterfaceStatus(InterfaceStatusContract):
+    """E.6, E.35 interface status records on a SQLite telemetry file (schema 4)."""

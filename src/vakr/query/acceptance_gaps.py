@@ -51,6 +51,7 @@ from vakr.query.acceptance_slots import (
 from vakr.query.acceptance_subjects import (
     as_time,
     bucket_samples,
+    down_slots,
     expected_per_bucket,
     missing_slots,
     snmp_by_slot,
@@ -197,13 +198,16 @@ class GapScan:
         evidence = dict(d.interfaces)
         for iface_id, missing in found.items():
             iface = evidence[iface_id]
+            down = down_slots(self.backend.acceptance, iface_id, self.collector, slots, missing,
+                              self.window)  # fmt: skip
 
-            def cause_of(i: int, f: InterfaceEvidence = iface) -> GapCause:
+            def cause_of(i: int, f: InterfaceEvidence = iface, d: set[int] = down) -> GapCause:
                 """Explain one missing slot of this interface.
 
                 Args:
                     i: Slot index.
                     f: The interface's evidence.
+                    d: Slots at which its status records say it was down.
 
                 Returns:
                     GapCause: The cause.
@@ -211,7 +215,7 @@ class GapScan:
                 Raises:
                     None
                 """
-                return interface_cause(slots[i], snmp.get(i), f)
+                return interface_cause(slots[i], snmp.get(i), f, i in d)
 
             for run in runs(missing, cause_of):
                 cause = refine(run, slots, d.evidence)

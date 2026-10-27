@@ -306,7 +306,7 @@ class Fleet:
             if getattr(o, "uptime_continuity", None) is UptimeContinuity.RESET_DETECTED:
                 restarts.add((getattr(o, "device_id", None), o.collector_id, start))  # RET-006
             subject = getattr(o, "interface_id", None)
-            if subject is None and type(o).__name__ != "IcmpObservation":
+            if type(o).__name__ not in ("InterfaceObservation", "IcmpObservation"):
                 continue
             if start + timedelta(seconds=ROLLUP_BUCKET_SECONDS) <= until:
                 for kind in INTERFACE_METRICS if subject is not None else ICMP_METRICS:

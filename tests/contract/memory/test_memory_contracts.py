@@ -11,6 +11,7 @@ from tests.contract.contract_acceptance import AcceptanceContract
 from tests.contract.contract_auth_sessions import AuthSessionsContract
 from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_dashboards import DashboardsContract
+from tests.contract.contract_interface_status import InterfaceStatusContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
 from tests.contract.contract_metadata_operations import OperationsContract
@@ -77,3 +78,7 @@ class TestMemoryRankingProjection(RankingProjectionContract):
 
 class TestMemoryAcceptance(AcceptanceContract):
     """E.35, MVP-ACC-01/02/10 lean reads on the in-memory telemetry store."""
+
+
+class TestMemoryInterfaceStatus(InterfaceStatusContract):
+    """E.6, E.35 interface status records on the in-memory telemetry store."""

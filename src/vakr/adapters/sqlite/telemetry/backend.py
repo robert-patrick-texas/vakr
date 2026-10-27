@@ -21,6 +21,7 @@ Example:
 
 from datetime import datetime
 
+from vakr.adapters.sqlite.telemetry.acceptance import SqliteAcceptanceQuery
 from vakr.adapters.sqlite.telemetry.history import SqliteHistoryQuery
 from vakr.adapters.sqlite.telemetry.maintenance import MaintenanceReport, maintain
 from vakr.adapters.sqlite.telemetry.ranking_projection import SqliteRankingProjection
@@ -58,6 +59,7 @@ class SqliteTelemetry:
         retention: Retention.
         history: Downsampled series and ranking summaries (M4, ``HistoryBackend``).
         ranking_projection: Exact per-bucket ranking partials (E.28, ``ProjectionBackend``).
+        acceptance: Lean reads for the acceptance reports (E.35, ``AcceptanceBackend``).
     """
 
     def __init__(self, store: SqliteTelemetryStore) -> None:
@@ -83,6 +85,7 @@ class SqliteTelemetry:
         self.retention = SqliteRetentionManager(store)
         self.history = SqliteHistoryQuery(store)
         self.ranking_projection = SqliteRankingProjection(store)
+        self.acceptance = SqliteAcceptanceQuery(store)
 
     def maintain(self, now: datetime) -> MaintenanceReport:
         """Move staged rows older than ``now - MOVE_LAG`` and truncate the WAL.

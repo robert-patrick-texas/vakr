@@ -6,7 +6,9 @@ shows a deterministic plan of what would change, and applies it through one
 metadata unit of work, marking every record ``file:inventory.toml``
 (META-008, META-010, CONF-008). Collectors read devices and poll plans
 through ``vakr.inventory.service.InventoryService``, which also stores
-reconciled discovery results (DISC-001, DISC-007).
+reconciled discovery results (DISC-001, DISC-007). ``vakr inventory import``
+reads devices and interface annotations from CSV or TOML as a bulk write of
+API-managed records, and ``export`` writes what is stored (E.38).
 
 Modules:
     model, parse, parse_fields, files, errors: The file format, its parser,
@@ -19,6 +21,10 @@ Modules:
     claim: The audited interface ownership transfer (E.19).
     planning, service: Poll plans and the collector-facing service.
     catalog, reads: Shared tag/group creation and bounded list reads.
+    csv_codec, csv_columns, import_file: CSV text, columns, and import files.
+    import_checks, import_plan, import_interfaces, import_apply: The import's
+        dry run and its audited apply.
+    export_data, export_render: The export, as TOML or CSV.
 
 Dependencies:
     vakr.ports.metadata, vakr.policy, vakr.discovery.reconcile.

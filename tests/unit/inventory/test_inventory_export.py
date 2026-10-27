@@ -156,6 +156,8 @@ def test_export_is_byte_identical_ordered_and_carries_uuids_and_owners() -> None
         f"edge1.example.net,{store.edge.id},file:inventory.toml,"
     )
     assert ",edge;wan,routers,Primary WAN router" in devices
+    partial = exported(store, "toml", "devices", "file").splitlines()[1]
+    assert partial.endswith("; only devices: not a whole inventory.toml.")
 
 
 def test_annotation_csv_lists_the_classification_worklist() -> None:

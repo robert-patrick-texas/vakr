@@ -7,7 +7,7 @@ empty versus absent) and that a CSV row fails exactly where the same
 TOML table fails, reported as ``row N, column C``.
 
 Dependencies:
-    pytest; vakr.inventory.
+    pytest, hypothesis; vakr.inventory.
 
 Example:
     $ uv run pytest tests/unit/inventory/test_inventory_csv.py
@@ -17,15 +17,18 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from vakr.domain.enums import InterestClass
 from vakr.inventory.csv_codec import guard, read_rows, unguard, write_rows
 from vakr.inventory.errors import InventoryError
+from vakr.inventory.export_render import toml_string
 from vakr.inventory.files import MAX_FILE_BYTES
 from vakr.inventory.import_file import parse_import, read_bounded
 from vakr.inventory.parse import parse_document
 
-DEVICES = b"name,address,tags,interval,credential\n"
+PROPERTY = settings(derandomize=True, database=None, max_examples=500, deadline=None)
 
 
 def problems(raw: bytes, name: str = "devices.csv", kind: str | None = None) -> list[str]:
@@ -272,3 +275,38 @@ def test_multiline_and_quoted_cells_survive() -> None:
     text = write_rows(["name", "address", "comment"], [["r1", "192.0.2.1", comment]])
     (device,) = parse_import(text.encode(), "d.csv", None, None).devices
     assert device.comment == comment
+
+
+@PROPERTY
+@given(st.text())
+def test_formula_guard_round_trips_any_text(text: str) -> None:
+    """E.38: ``unguard(guard(v)) == v`` for every string, and a guarded cell never runs.
+
+    Args:
+        text: Generated value.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    assert unguard(guard(text)) == text
+    assert not guard(text).startswith(("=", "+", "-", "@", "\t", "\r"))
+
+
+@PROPERTY
+@given(st.text(alphabet=st.characters(exclude_categories=["Cs"])))
+def test_toml_quoting_round_trips_any_text(text: str) -> None:
+    """E.38: exported TOML strings read back exactly, control characters included.
+
+    Args:
+        text: Generated value.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    assert tomllib.loads(f"k = {toml_string(text)}")["k"] == text

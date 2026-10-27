@@ -268,7 +268,7 @@ $ sudo vakr inventory export --format csv --kind devices > devices.csv
 $ sudo vakr inventory export --format csv --kind annotations --unannotated > interfaces.csv
 ```
 
-- `--owner file` lists only what `inventory.toml` manages. That output is a valid `inventory.toml`: `vakr inventory plan --file` on it shows no changes. Use it to rebuild a lost file or to start from what is stored.
+- `--owner file` lists only what `inventory.toml` manages. In TOML and without `--kind`, that output is a valid `inventory.toml`: `vakr inventory plan --file` on it shows no changes. Use it to rebuild a lost file or to start from what is stored. With `--kind devices` it lacks the annotations, and applying it as `inventory.toml` would hand every claimed interface back to the UI.
 - `--owner api` lists only what the UI and imports manage, and `--owner all` (the default) both. Each record shows its owner: a `managed_by` column in CSV, a comment above each entry in TOML.
 - Without `--unannotated`, the annotation export lists interfaces that have an annotation, a tag, or a comment. With it, it lists every interface, with its description in the `alias` column: fill in `interest` and `tags` in a spreadsheet and import the file to classify what the description keywords did not (META-013). The import does not read `alias`.
 - Disabled and retired devices, and retired interfaces, are left out, except a device whose interfaces `inventory.toml` still governs.

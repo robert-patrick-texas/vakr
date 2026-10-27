@@ -186,10 +186,12 @@ def export_toml(found: ExportSet, kind: str | None) -> str:
     sites = found.sites if kind != "annotations" else ()
     devices = found.devices if kind != "annotations" else ()
     notes = found.interfaces if kind != DEVICES else ()
+    # Without the annotations, applying a partial export as inventory.toml would release claims.
+    usage = ("an --owner file export is also an inventory.toml" if kind is None
+             else f"only {kind}: not a whole inventory.toml")  # fmt: skip
     lines = [f"# vakr inventory export (owner {found.owner}): {len(sites)} site(s), "
              f"{len(devices)} device(s), {len(notes)} annotation(s).",
-             "# Plan it with `vakr inventory import FILE`; an --owner file export is also an "
-             "inventory.toml.", ""]  # fmt: skip
+             f"# Plan it with `vakr inventory import FILE`; {usage}.", ""]  # fmt: skip
     for s in sites:
         lines += _table("sites", str(s.managed_by), _site_pairs(s))
     for d in devices:

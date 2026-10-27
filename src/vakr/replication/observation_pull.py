@@ -106,14 +106,13 @@ class ObservationPuller:
                 if self._register is not None:
                     self._register(source)
                 stored += self._drain(source, status, budget - stored)
-        except (PartnerError, EgressError, ValidationError, StorageError) as exc:
-            status.last_error, status.pulls["failed"] = rec.short_error(str(exc)), \
-                status.pulls["failed"] + 1  # fmt: skip
+            status.last_success_at, status.last_error = status.last_attempt_at, None
+            status.pulls["ok"] += 1
             rec.write_status(self._record, status)
-            raise ObservationPullError(status.last_error) from None
-        status.last_success_at, status.last_error = status.last_attempt_at, None
-        status.pulls["ok"] += 1
-        rec.write_status(self._record, status)
+        except (PartnerError, EgressError, ValidationError, StorageError, OSError) as exc:
+            # OSError: partner.json or this record cannot be written (a full disk, say).
+            raise ObservationPullError(rec.record_failure(self._record, status, str(exc))) \
+                from None  # fmt: skip
         return stored
 
     def _drain(self, source: dict[str, Any], status: rec.ObservationPullStatus, budget: int) -> int:

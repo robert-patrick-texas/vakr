@@ -146,10 +146,7 @@ def _pull(service: Any, pacer: _Pacer) -> int:
     if problem is not None:
         status = rec.read_status(record) or rec.blank()
         status.last_attempt_at = rec.stamp(service.clock.now_utc())
-        status.last_error, status.pulls["failed"] = rec.short_error(problem), \
-            status.pulls["failed"] + 1  # fmt: skip
-        rec.write_status(record, status)
-        raise ObservationPullError(status.last_error)
+        raise ObservationPullError(rec.record_failure(record, status, problem))
     register = None if node.is_peer else partial(register_partner, parts.uow_factory)
     puller = ObservationPuller(client, writer, record, service.clock, parts.collector.id,
                                register)  # fmt: skip
@@ -179,7 +176,8 @@ async def observation_pull_loop(service: Any) -> None:
             if stored:
                 _LOG.info("stored %d observations from the other position", stored,
                           extra={"event_id": "replication.observations"})  # fmt: skip
-        except ObservationPullError as exc:
+        except (ObservationPullError, OSError) as exc:
+            # OSError too: a state file that cannot be written must not end replication.
             _LOG.warning("observation pull from the other position failed: %s", exc,
                          extra={"event_id": "replication.observations_failed"})  # fmt: skip
         with contextlib.suppress(TimeoutError):

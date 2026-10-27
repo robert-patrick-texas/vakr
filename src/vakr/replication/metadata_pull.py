@@ -23,6 +23,7 @@ Example:
     (1000, 1000)
 """
 
+import contextlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -114,18 +115,20 @@ class MetadataPuller:
             _same_schema(schema, local.schema)
             if local.digest == digest:
                 if self._resync is not None:
-                    self._resync.finish(None, remote)
+                    self._resync.report(None, remote)
+                    self._resync.finish()
                 status.record(self._record, "unchanged", self._clock.now_utc(), digest=digest,
                               position=position)  # fmt: skip
                 return "unchanged"
             self._apply(self._snapshot(), digest, remote)
+            status.record(self._record, "applied", self._clock.now_utc(), digest=digest,
+                          position=position)  # fmt: skip
         except (PullError, PartnerError, EgressError, DomainError, OSError) as exc:
             why = str(exc) or type(exc).__name__
-            status.record(self._record, "failed", self._clock.now_utc(), error=why,
-                          position=position)  # fmt: skip
+            with contextlib.suppress(OSError):  # an unwritable record must not end the pulls
+                status.record(self._record, "failed", self._clock.now_utc(), error=why,
+                              position=position)  # fmt: skip
             raise PullError(why) from None
-        status.record(self._record, "applied", self._clock.now_utc(), digest=digest,
-                      position=position)  # fmt: skip
         _LOG.info("applied the primary's metadata (%s)", digest[:12],
                   extra={"event_id": "replication.metadata_applied"})  # fmt: skip
         return "applied"
@@ -207,9 +210,11 @@ class MetadataPuller:
             self._resync.before_apply()
         with self._uow() as uow:
             result = uow.replica.apply(snapshot, digest, replace=self._resync is not None)
+            if self._resync is not None:  # the report is durable before anything is discarded
+                self._resync.report(result, remote)
             uow.commit()
         if self._resync is not None:
-            self._resync.finish(result, remote)
+            self._resync.finish()
 
 
 def _same_schema(primary: int, peer: int) -> None:

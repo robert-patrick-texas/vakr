@@ -66,8 +66,10 @@ def replication_reader(state_dir: Path, node: NodeSettings) -> Callable[[], Read
             return None
         now = datetime.now(UTC)
         parts = [_metadata(state_dir, now)] if node.is_peer else []
-        if conflict_at(state_dir, node):
-            parts.append("TWO PRIMARIES: the partner is a primary too; see vakr node status")
+        if (conflict := conflict_at(state_dir, node, now)) is not None:
+            parts.append("TWO PRIMARIES: the partner is a primary too; see vakr node status"
+                         if conflict.critical else "the partner was last seen as a primary; "
+                         "see vakr node status")  # fmt: skip
         record = obs.read_status(state_dir / obs.FILE)
         lag = None if record is None else record.lag_s(now)
         if record is None or lag is None:

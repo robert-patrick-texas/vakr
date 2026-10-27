@@ -171,6 +171,30 @@ def write_status(path: Path, record: ObservationPullStatus) -> None:
     temp.replace(path)
 
 
+def record_failure(path: Path, record: ObservationPullStatus, why: str) -> str:
+    """Record a failed pull, best effort: a full disk must not stop the next pass (MPOS-006).
+
+    Args:
+        path: The record file.
+        record: The record of this attempt, changed in place.
+        why: The failure, in operator words.
+
+    Returns:
+        str: The bounded message recorded, with the record's own write failure appended
+        when that failed too (the collector log then carries it).
+
+    Raises:
+        None
+    """
+    record.last_error = short_error(why)
+    record.pulls["failed"] = record.pulls.get("failed", 0) + 1
+    try:
+        write_status(path, record)
+    except OSError as exc:
+        return short_error(f"{record.last_error}; the pull record cannot be written either: {exc}")
+    return record.last_error
+
+
 def stamp(moment: datetime) -> str:
     """Format a time for the record.
 

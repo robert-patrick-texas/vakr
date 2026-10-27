@@ -50,12 +50,14 @@ def node_status(paths: InstallPaths, node: NodeSettings, now: datetime) -> tuple
     pull = status.read_status(state / status.FILE) if node.is_peer else None
     partner = role_record.read_json(state / role_record.PARTNER_FILE)
     changes = role_record.read_changes(state / role_record.ROLE_FILE)
-    conflict = conflict_at(state, node)
+    conflict = conflict_at(state, node, now)
+    critical = conflict.text if conflict and conflict.critical else None
+    stale = conflict.text if conflict and not conflict.critical else None
     resync = role_record.read_json(state / role_record.RESYNC_FILE)
     report = role_record.read_json(state / role_record.REPORT_FILE)
     lines = [f"role {node.role}, position {node.position or '(none)'}"]
     lines += _primary_lines(node, pull, partner, now)
-    lines += [f"CRITICAL {conflict}"] if conflict else []
+    lines += [f"CRITICAL {critical}"] if critical else [f"WARNING {stale}"] if stale else []
     if changes:
         newest = changes[-1]
         forced = " (forced)" if newest.get("forced") else ""
@@ -68,7 +70,8 @@ def node_status(paths: InstallPaths, node: NodeSettings, now: datetime) -> tuple
     data = {"role": node.role, "position": node.position, "primary_url": node.primary_url or None,
             "peer_url": node.peer_url or None,
             "metadata_pull": None if pull is None else asdict(pull),
-            "partner": partner, "two_primaries": conflict, "role_changes": changes,
+            "partner": partner, "two_primaries": critical, "stale_primary": stale,
+            "role_changes": changes,
             "resync_pending": resync, "resync_report": report}  # fmt: skip
     return lines, data
 

@@ -159,7 +159,7 @@ When the old primary returns still configured as a primary, the two nodes would 
 - **`vakr status`, the TUI header, and the web UI health panel:** `TWO PRIMARIES`.
 - **`vakr node status`:** the same, as a `CRITICAL` line.
 
-It is node health only: every device keeps the state its evidence gives it (MPOS-006). The old primary sees the conflict only through its own observation pull, so it needs its `peer_url`, as every two-position setup has. The new primary always sees it.
+It is node health only: every device keeps the state its evidence gives it (MPOS-006). The CRITICAL lasts while the partner's newest `primary` answer is at most 5 minutes old. If you switch the old primary off instead of demoting it, its last answer goes stale: after 5 minutes the check says WARNING, "partner east was last seen as a primary at T, and no newer answer has been recorded since", and the health line says "the partner was last seen as a primary". Demote it before it rejoins, or, if it is gone for good, remove `node.peer_url` from this node's configuration. The CRITICAL comes back if it answers as a primary again (Appendix E.39). The old primary sees the conflict only through its own observation pull, so it needs its `peer_url`, as every two-position setup has. The new primary always sees it.
 
 Make the old primary a peer of the new one:
 
@@ -172,11 +172,11 @@ the collector replaces this node's metadata with https://vakr-west.example.net's
 restarted vakr-collector.service and vakr-api.service (if they were running)
 ```
 
-`--primary-url URL` names the new primary when `node.peer_url` is not set. The node needs a `node.position`. At its first successful pull, normally within a minute, the demoted node's collector:
+`--primary-url URL` names the new primary when `node.peer_url` is not set. The node needs a `node.position`. The command writes `/var/lib/vakr/replication/resync.json` before it changes the role; if it cannot, it changes nothing and exits 1. At its first successful pull, normally within a minute, the demoted node's collector:
 
-1. writes a verified backup of `metadata.db` to `/var/lib/vakr/backups/`;
+1. writes a verified backup of `metadata.db` to `/var/lib/vakr/backups/`, once: if the pull fails and is retried, the same copy is reused;
 2. replaces its replicated metadata with the new primary's, exactly. **The new primary wins:** anything changed on the old primary during the partition is removed or overwritten;
-3. writes `/var/lib/vakr/replication/resync-report.json`, which lists the backup, every row it removed or overwrote (table, key, and name, never a value), and this node's own metadata edits from the audit since the new primary's last pull from it, minus one minute.
+3. writes `/var/lib/vakr/replication/resync-report.json` before it commits, so nothing is discarded without it; the report lists the backup, every row it removed or overwrote (table, key, and name, never a value), and this node's own metadata edits from the audit since the new primary's last pull from it, minus one minute.
 
 `vakr node status` summarizes the report, and `vakr node status --json` has all of it:
 
@@ -235,4 +235,5 @@ The lag is the age of the newest partner observation held here. It grows during 
 | `node.primary_url names another peer` | The URL points at a peer. | Point it at the primary. |
 | `does not match the primary's digest` (once) | Metadata changed on the primary during the pull. | Nothing: the next pull copies it whole. |
 | `two primaries: ...` (CRITICAL) | A promoted peer and a returning old primary are both primaries. | `sudo vakr node demote` on the node the message names ([when the old primary comes back](#when-the-old-primary-comes-back)). |
+| `partner ... was last seen as a primary at ...` (WARNING) | The old primary answered as a primary more than 5 minutes ago and has been silent since, for example it was switched off instead of demoted. | Demote it before it rejoins. If it is gone for good, remove `node.peer_url` here. |
 | a unique-name conflict (`name`) | Two records swapped names in one change. | Rename through an intermediate name on the primary. |

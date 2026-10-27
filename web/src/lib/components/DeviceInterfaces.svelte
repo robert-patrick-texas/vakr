@@ -5,7 +5,8 @@ A device's interfaces: primary interfaces in full, other interfaces on demand, o
 
 - Table view: the primary-interest interfaces (META-011) are listed in
   full; the other interfaces load only when asked for, in pages of 25,
-  searchable, sticky and WAN circuits first.
+  searchable, sticky and WAN circuits first, optionally only those not
+  yet classified (META-013).
 - Graph view: one compact traffic card per interface, in priority order
   (sticky, WAN, high priority, then the rest), `CARDS_PER_PAGE` cards per
   page, each loading its graph only when it scrolls into view.
@@ -37,6 +38,7 @@ Example: `<DeviceInterfaces deviceId={id} total={detail.interfaces_total} view="
 	let showOther = $state(false);
 	let search = $state('');
 	let applied = $state('');
+	let unclassified = $state(false);
 	const other = new CursorTrail();
 	const cards = new CursorTrail();
 
@@ -47,6 +49,7 @@ Example: `<DeviceInterfaces deviceId={id} total={detail.interfaces_total} view="
 		...deviceInterfacesQuery(deviceId, {
 			interest: 'secondary',
 			search: applied,
+			unclassified: unclassified || undefined,
 			limit: OTHER_PAGE,
 			cursor: other.cursor
 		}),
@@ -86,6 +89,16 @@ Example: `<DeviceInterfaces deviceId={id} total={detail.interfaces_total} view="
 		>
 			<label>Find an interface <input type="search" maxlength="256" bind:value={search} /></label>
 			<button type="submit">Search</button>
+			<label
+				><input
+					type="checkbox"
+					checked={unclassified}
+					onchange={(e) => {
+						unclassified = e.currentTarget.checked;
+						other.reset();
+					}}
+				/> Only not yet classified</label
+			>
 		</form>
 		<PageStatus
 			state={pageState(rest, { isEmpty })}

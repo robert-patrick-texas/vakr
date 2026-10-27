@@ -109,7 +109,7 @@ async def create(
     Raises:
         ApiError: 422 naming each refused field.
     """
-    made = await edit_call(_editor(context).create, body.model_dump(exclude_none=True),
+    made = await edit_call(_editor(context).create, body.model_dump(mode="json", exclude_none=True),
                            actor=principal_actor(principal),
                            request_id=request_id_of(request))  # fmt: skip
     return JSONResponse(device_json(made), status_code=201)
@@ -137,7 +137,7 @@ async def change(
         ConflictError: A stale version (409).
         ApiError: 409 ``managed_by_file`` or 422, naming each field.
     """
-    changes = body.model_dump(exclude_unset=True, exclude={"version"})
+    changes = body.model_dump(mode="json", exclude_unset=True, exclude={"version"})
     made = await edit_call(_editor(context).update, DeviceId(device_uuid), changes,
                            version=body.version, actor=principal_actor(principal),
                            request_id=request_id_of(request))  # fmt: skip

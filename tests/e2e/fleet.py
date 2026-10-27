@@ -171,6 +171,10 @@ DEVICES = (
 )
 """The whole fleet, inserted in this (deliberately unsorted) order."""
 
+FILE_MANAGED = frozenset({"edge-b", "edge-b/Gi0/0/1"})
+"""Records ``inventory.toml`` manages (a device and one claimed interface), for the manual-entry
+pages' read-only state (META-008); every other record is API-managed."""
+
 EXPECTED_ORDER = ("branch3", "branch9", "branch7", "access2", "access10", "core1", "dist1",
                   "edge-a", "edge-b", "lab-sw")  # fmt: skip
 """Default device-list order (7.7, E.2 severity, natural names); ``old-rtr`` is hidden."""

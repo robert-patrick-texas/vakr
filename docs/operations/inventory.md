@@ -252,3 +252,6 @@ The request answers at once; `vakr-collector` picks it up within about 5 seconds
 | `credential names not checked: …` | The credentials file is missing or unreadable for the user running the command; run it with `sudo`, or see the [credentials guide](credentials.md). |
 | An annotation stays under "waiting" | Read the reason on that line; usually the device has not been discovered yet, or the interface needs `vakr interface claim`. |
 | An interface has no graphs after a reload | Look for an open case with `vakr interface review list`. |
+| The web UI or `vakr device set` says a device is "managed by inventory.toml" | The file owns it: change its `[[devices]]` entry and run `vakr inventory apply` (META-008). |
+| `… is already polled by device …` when adding a device | Another device that is not retired has that address; change or retire that one, or use its record. |
+| `… is already the name of device … (API-managed, retired)` | A retired device keeps its name; restore it (`--admin-state enabled`) or pick another name. |

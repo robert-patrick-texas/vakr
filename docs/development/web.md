@@ -124,6 +124,7 @@ $ make web-e2e                                  # builds, then runs Playwright
 | `a11y.spec.ts` | WEB-T08 (axe, WCAG 2.0 to 2.2 A/AA, light and dark, reduced motion; keyboard path), WEB-T09 (icon and words, no icon for two colours) |
 | `security.spec.ts` | WEB-T10: no request leaves the origin, no CSP violation on any page, CSP and 15.4 headers, cache headers, envelopes |
 | `auth.spec.ts`, `navigation.spec.ts`, `reviews.spec.ts` | Sign-in and an ended session, navigation and search (UI-017), the dashboards, collector health, the admin's review decision with CSRF |
+| `inventory.spec.ts`, `inventory-a11y.spec.ts` | Manual entry (27.4, E.37): add, change, conflict and reload, and retire a device; problems beside their fields; a file-managed device and interface read-only (META-008); a peer's refusal (MPOS-003); an annotation; bulk tagging of the not-yet-classified (META-013); operators see no edit controls; axe on every form and a keyboard-only add. The seeded `edge-b` and `edge-b` `Gi0/0/1` are managed by `inventory.toml`; tests that change shared interfaces put them back |
 
 On a host without Chromium's system libraries (and without root to install them), run the browser in the Playwright container and point the tests at it; the test servers stay on the host:
 

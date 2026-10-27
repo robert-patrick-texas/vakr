@@ -107,6 +107,7 @@ export function readInterfaceFilters(params: Params): InterfaceQuery {
 		interest: oneOf(params.get('interest'), ['primary', 'secondary'] as const),
 		lifecycle: oneOf(params.get('lifecycle'), LIFECYCLES),
 		include_retired: params.get('include_retired') === 'true',
+		unclassified: params.get('unclassified') === 'true' ? true : undefined,
 		collector: uuid(params, 'collector'),
 		limit: pageSize(params)
 	};

@@ -81,12 +81,14 @@ def test_27_4_an_admin_adds_changes_and_retires_a_device() -> None:
     """
     kit, admin, csrf = setup()
     body = {"name": "edge9.example.net", "address": "192.0.2.9", "credential": "network-v2c",
-            "tags": ["wan"], "interval": "2m"}  # fmt: skip
+            "tags": ["wan"], "interval": "2m", "reachability": "snmp_fallback",
+            "address_family": "ipv4"}  # fmt: skip
     made = admin.post(DEVICES, json=body, headers=csrf)
     assert made.status_code == 201, made.text
     out = DeviceRecordOut.model_validate(made.json())
     assert (out.managed_by, out.editable, out.version, out.interval, out.warnings) == (
         "api", True, 1, "120s", [])  # fmt: skip
+    assert (out.reachability, out.address_family) == ("snmp_fallback", "ipv4")
     url = f"{DEVICES}/{out.id}"
     operator = kit.client()
     assert kit.login(operator, "olivia").status_code == 200

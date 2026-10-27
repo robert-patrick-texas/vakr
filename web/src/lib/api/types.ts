@@ -18,6 +18,8 @@ import type { components } from './schema.d.ts';
 
 type Schemas = components['schemas'];
 
+export type AnnotationOut = Schemas['AnnotationOut'];
+export type AnnotationPatch = Schemas['AnnotationPatch'];
 export type BucketCounts = Schemas['BucketCounts'];
 export type CriteriaView = Schemas['CriteriaView'];
 export type DashboardCreate = Schemas['DashboardCreate'];
@@ -34,6 +36,9 @@ export type SelectionWidgetView = Schemas['SelectionWidgetView'];
 export type WidgetIn = NonNullable<DashboardCreate['widgets']>[number];
 export type InterfaceCriteriaIn = Schemas['InterfaceCriteriaIn'];
 export type DeviceCriteriaIn = Schemas['DeviceCriteriaIn'];
+export type DeviceCreate = Schemas['DeviceCreate'];
+export type DevicePatch = Schemas['DevicePatch'];
+export type DeviceRecordOut = Schemas['DeviceRecordOut'];
 export type WidgetView = Schemas['WidgetView'];
 export type CollectorHealth = Schemas['CollectorHealthView'];
 export type CollectorOut = Schemas['CollectorOut'];
@@ -97,6 +102,8 @@ export type StateSegment = Schemas['StateSegment'];
 export type StatusBucket = Schemas['StatusBucket'];
 export type StatusColor = Schemas['StatusColor'];
 export type StatusView = Schemas['StatusView'];
+export type TagChange = Schemas['TagChange'];
+export type TagChangeOut = Schemas['TagChangeOut'];
 export type TimelineView = Schemas['TimelineView'];
 export type Unit = Schemas['UnitView'];
 export type UtilizationRow = Schemas['UtilizationRow'];

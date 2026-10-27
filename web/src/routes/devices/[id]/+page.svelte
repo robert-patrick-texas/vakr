@@ -119,7 +119,10 @@ reviews. Facts from stale evidence say so.
 			{#each d.notes as n (n)}<p class="muted note">{n}</p>{/each}
 		</section>
 
-		{#if isAdmin()}<RediscoverPanel deviceId={id} />{/if}
+		{#if isAdmin()}
+			<p><a href="/devices/{id}/edit">Edit device</a></p>
+			<RediscoverPanel deviceId={id} />
+		{/if}
 
 		<section aria-labelledby="reach-h">
 			<h2 id="reach-h">Reachability</h2>

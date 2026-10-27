@@ -167,6 +167,8 @@ def _import(args: argparse.Namespace) -> int:
                 store.close()
         plan, found = plan_import(imp, snapshot, checks)
         done = f"{imp.source}: dry run; nothing changed (apply with --apply)"
+        if store is None:
+            done = f"note: no metadata database yet; planned against nothing\n{done}"
     note = [OWNER_NOTE] if plan.changes else []
     lines = [*warning_lines(imp.source, found), *note, *plan_lines(plan), done]
     emit(args, lines, plan_dict(plan, found) | {"applied": args.apply and bool(plan.changes)})

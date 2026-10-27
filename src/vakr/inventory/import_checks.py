@@ -212,9 +212,11 @@ def _address(scope: Scope, d: DeviceEntry, stored: StoredDevice | None) -> None:
     if other is not None and (stored is None or other.id != stored.id):
         scope.problem(f"{d.at}.address", f"already polled as {other.managed_by} device "
                                          f"{other.device.name!r} (CONF-008)")  # fmt: skip
-    if stored is not None and d.address and {"address", "address_family"} & d.given:
-        address = d.address if "address" in d.given else stored.device.poll_address
-        family = d.address_family if "address_family" in d.given else stored.device.address_family
+    if stored is None or not {"address", "address_family"} & d.given:
+        return
+    address = d.address if "address" in d.given else stored.device.poll_address
+    family = d.address_family if "address_family" in d.given else stored.device.address_family
+    if address:  # an empty one is reported above
         try:
             require_poll_address(address, family)
         except ValidationError as exc:

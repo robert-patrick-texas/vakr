@@ -15,8 +15,16 @@
 # Copy each entry into the release's CHANGELOG "Held dependencies" list.
 # docs/development/updates.md has the whole procedure.
 
+# Microsoft's 7.0 announcement: "Projects using Vue, MDX, Astro, Svelte, and
+# others will need to continue using TypeScript 6.0 for now"; 7.1 is to ship a
+# new, different API. typescript-eslint tracks TS >= 7.1 support in
+# https://github.com/typescript-eslint/typescript-eslint/issues/10940. So
+# revisit when TypeScript publishes and also when SvelteKit or typescript-eslint
+# support the 7.x API. The @typescript/typescript6 alias passes, but every tool
+# would still run 6.0.3 (7.0.2 only re-checks the .ts files, not the .svelte
+# ones), and check-updates cannot read npm aliases, so it is not used.
 [[exception]]
 item = "typescript"
 version = "7.0.2"
-reason = "typescript-eslint 8.72.1 refuses TS 7.0 (lint); SvelteKit 3.1.0 crashes loading tsconfig (svelte-check, vitest, build); 6.0.3 passes all"
+reason = "TS 7.0 has no JavaScript API until 7.1: typescript-eslint 8.72.1 refuses it (lint) and SvelteKit 3.1.0 crashes in ts.readConfigFile (svelte-check, vitest, build); 6.0.3 passes all"
 recorded = 2026-10-27

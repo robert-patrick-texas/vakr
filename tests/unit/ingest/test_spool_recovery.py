@@ -179,12 +179,13 @@ def test_spool_t08_unclean_stop_records_an_estimated_loss(tmp_path: Path) -> Non
         (incident,) = again.recovery.incidents
         assert incident.kind is LossKind.UNCLEAN_STOP
         assert incident.first_seq == 9
-        # The records of the final interval estimate the rate, capped at fsync_records.
+        # The busiest fsync interval estimates what one interval held, capped at fsync_records.
         assert incident.estimated == 8
         assert not incident.exact
         assert set(incident.classes) == {"device_poll", "icmp", "interface", "snmp_device"}
         assert incident.start_us is not None
-        assert incident.end_us == incident.start_us + 5000000
+        # The stop came after the last durable record and before this recovery (E.36).
+        assert incident.end_us == incident.detected_us
         await again.close()
         assert read_incidents(again.directory) == [incident]
 

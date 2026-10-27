@@ -551,6 +551,19 @@ The web UI is the static SvelteKit app in `web/` (ADR-035): pages in `web/src/ro
 | MPOS-T03 | Pass (full run) | as above | `mpos_t03`: west keeps polling with its last-known inventory while east is cut off | `development/two-position-tests.md` | The peer's refusal naming the primary waits for part A (`configure_roles`). Full run passed 2026-10-22 at `c543b80`: `make mpos-test MPOS_FEATURES=roles,replication`, 1800 s partition, 60 s polls, 45 PASS, 0 SKIP. |
 | MPOS-T04 | Pass (full run) | as above | `mpos_t04`: east under 15 ms and west 45 to 90 ms to the same device, one series per position, and each node shows the other's series beside its own with its own RTT; `make mpos-test MPOS_QUICK=1 MPOS_FEATURES=roles,replication`: 45 PASS, 0 SKIP (2026-10-22) | `development/two-position-tests.md` | 60 ms between positions and on west's device path (decision 3). Full run passed 2026-10-22 at `c543b80`: `make mpos-test MPOS_FEATURES=roles,replication`, 1800 s partition, 60 s polls, 45 PASS, 0 SKIP. |
 
+## Resilience system tests (M6, MVP-ACC-06)
+
+`make resilience-test` ([resilience tests](development/resilience-tests.md), Appendix E.36): one systemd node, set up as the install guide says, and a simulated fleet in containers, through a service restart, a host reboot, the telemetry store unavailable, and an abrupt power loss. `tests/system/resilience/accounting.py` then accounts for every poll the schedule expected; its rules run in `make check` (`tests/system/resilience/test_accounting.py`).
+
+| Requirement | Status | Code/module | Tests | Documentation | ADR/notes |
+|---|---|---|---|---|---|
+| MVP-ACC-06 | RESULT_ACC06 | `tests/system/resilience/{run,lib,scenarios}.sh`, `probe.py`, `faults.py`, `accounting.py` | `make resilience-test`: RESULT_COUNTS; `test_accounting.py` (10 tests) | `development/resilience-tests.md`, E.36 | No silent loss: every expected slot stored, outside a run, or in the E.8 window of an abrupt stop with an `unclean_stop` incident. A container cannot drop the host's page cache, so S4 proves the incident and the bound, not a loss (E.36 decision 2). |
+| STORE-014, SPOOL-T03 | Verified (system) | `ingest/ingester.py`, `health/spool_check.py` | `scenario_storage`: the telemetry database's write lock held 180 s and the collector restarted inside it; polling keeps reaching the spool; `vakr check health` WARNING "not accepting writes", then "ingestion behind"; no device Down | E.36 | |
+| STORE-006, STORE-009, SPOOL-T04 | Verified (system) | `ingest/{reader,cursor,ingester}.py` | `scenario_storage`: the backlog drains after the release; the accounting finds every slot of the outage stored once (no duplicate) | E.36 | |
+| STORE-007, SPOOL-T06, SPOOL-T08 | Verified (system) | `ingest/{recovery,losses,incident_log}.py` | `scenario_power`: SIGKILL and `docker kill` each record an `unclean_stop` incident, shown by `vakr check health` and the overview's telemetry-loss feed; clean restarts and reboots record none | E.36, E.8 | |
+| SVC-T01, SVC-T03, SVC-T04 | Verified (system) | `packaging/systemd/vakr-collector.service`, `app/collector/shutdown.py` | `scenario_restart`, `scenario_reboot`: restart mid-poll, reboot, services back by themselves, `collector.stopped` logged, one record per slot | E.36 | |
+| OPS-001 (storage stages) | Verified (system) | `health/spool_check.py` | every scenario checks `vakr check health`: OK in steady state, WARNING (never CRITICAL) for storage trouble and for a recent incident | E.36 | |
+
 ## Field data
 
 | Requirement | Status | Code/module | Tests | Documentation | ADR/notes |

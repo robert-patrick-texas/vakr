@@ -85,11 +85,16 @@ def bad_header_incident(
 def unclean_incident(
     previous: RunState, last: SegmentScan | None, settings: SpoolSettings, now_us: int
 ) -> LossIncident:
-    """Estimate what an unclean stop may have cost from its final fsync interval.
+    """Describe what an unclean stop may have cost: at most one fsync interval's records.
 
     Observations completed after the last durable record were lost with the
-    process; their number is estimated by the records written in the final
-    ``fsync_interval`` before it, the best evidence of the rate at the time.
+    process, or with the page cache in a power cut. When the stop came is
+    not known, only that it was after that record and before this recovery,
+    so that is the range. Poll results arrive in bursts, so the final
+    interval before the last durable record can be nearly empty while the
+    lost one was full; the count is therefore the most records any one
+    ``fsync_interval`` held among the newest ``fsync_records`` (E.8, E.24),
+    the best evidence of what one interval can hold.
 
     Args:
         previous: The previous run marker (not clean).
@@ -103,20 +108,41 @@ def unclean_incident(
     Raises:
         None
     """
-    window: list[Frame] = []
-    if last is not None and last.tail:
-        end = last.tail[-1].header.append_us
-        window = [f for f in last.tail if f.header.append_us >= end - _us(settings)]
-    start = window[-1].header.append_us if window else None
+    tail = list(last.tail) if last is not None else []
+    window = busiest_interval(tail, _us(settings))
+    start = tail[-1].header.append_us if tail else None
     return LossIncident.new(
-        LossKind.UNCLEAN_STOP, now_us, start_us=start,
-        end_us=None if start is None else start + _us(settings),
+        LossKind.UNCLEAN_STOP, now_us, start_us=start, end_us=None if start is None else now_us,
         first_seq=None if last is None or last.last_seq is None else last.last_seq + 1,
         classes=_classes(window), estimated=len(window), segment=f"run-{previous.updated_us}",
         detail="the previous collector run stopped without closing the spool; observations "
-        "completed after the last durable record were lost (estimate from its final fsync "
-        "interval)",
+        "completed after the last durable record and before the stop were lost (at most one "
+        "fsync interval; estimate from the busiest interval among the newest records)",
     )  # fmt: skip
+
+
+def busiest_interval(frames: Sequence[Frame], width_us: int) -> list[Frame]:
+    """Return the most frames appended within any one interval of ``width_us``.
+
+    Args:
+        frames: Verified frames in append order.
+        width_us: The interval, microseconds.
+
+    Returns:
+        list[Frame]: The fullest run of frames spanning at most ``width_us``;
+        the latest such run on a tie, empty for no frames.
+
+    Raises:
+        None
+    """
+    best: list[Frame] = []
+    low = 0
+    for high, frame in enumerate(frames):
+        while frame.header.append_us - frames[low].header.append_us > width_us:
+            low += 1
+        if high - low + 1 >= len(best):
+            best = list(frames[low : high + 1])
+    return best
 
 
 def _us(settings: SpoolSettings) -> int:

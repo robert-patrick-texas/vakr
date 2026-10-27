@@ -149,3 +149,13 @@ mpos-test:
 	DEB=$(DEB) MPOS_QUICK=$(MPOS_QUICK) MPOS_FEATURES=$(MPOS_FEATURES) MPOS_DEVICES=$(MPOS_DEVICES) \
 	MPOS_PARTITION_SECONDS=$(MPOS_PARTITION_SECONDS) MPOS_HOLD_SECONDS=$(MPOS_HOLD_SECONDS) \
 	MPOS_KEEP=$(MPOS_KEEP) tests/system/mpos/run.sh
+
+# Opt-in resilience system tests, MVP-ACC-06 (blueprint 27.6, Appendix E.36): one
+# systemd node and a simulated fleet survive a service restart, a host reboot, the
+# telemetry store unavailable, and an abrupt power loss, with every expected poll
+# stored or explained. About 17 minutes with DEB given.
+# See docs/development/resilience-tests.md. Not part of `make check`.
+.PHONY: resilience-test
+resilience-test:
+	DEB=$(DEB) RESIL_DEVICES=$(RESIL_DEVICES) RESIL_OUTAGE=$(RESIL_OUTAGE) \
+	RESIL_SCENARIOS=$(RESIL_SCENARIOS) RESIL_KEEP=$(RESIL_KEEP) tests/system/resilience/run.sh

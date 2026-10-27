@@ -36,6 +36,10 @@ from dataclasses import dataclass
 CURRENT = "current"
 UPDATE = "update available"
 UNKNOWN = "unknown"
+# Assigned outside ``status``: HELD by a recorded exception (updates_exceptions),
+# REFERENCE to a row whose item the repository does not pin.
+HELD = "held"
+REFERENCE = "reference"
 
 _VERSION_RE = re.compile(
     r"^\s*(?:v|go|python-?)?(?P<release>\d+(?:\.\d+)*)(?P<suffix>[^+\s]*)(?:\+\S*)?\s*$",

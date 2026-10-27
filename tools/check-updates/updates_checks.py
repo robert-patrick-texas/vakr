@@ -35,7 +35,7 @@ from updates_fetch import Fetcher, FetchError
 from updates_report import Result
 from updates_sources import SOURCES, Latest
 from updates_upstream import Upstream
-from updates_versions import UNKNOWN, parse_version, status
+from updates_versions import REFERENCE, UNKNOWN, parse_version, status
 
 Outcome = tuple[str, str]  # (value, error); at most one is non-empty
 Found = tuple[Latest | None, str]
@@ -148,7 +148,8 @@ def make_row(
 
     Returns:
         Result: The row, with status ``unknown`` and a reason when either
-        side is missing or unparseable.
+        side is missing or unparseable, or ``reference`` when the item pins
+        nothing and only its latest release is shown.
 
     Raises:
         None
@@ -158,9 +159,12 @@ def make_row(
     detail = local_error or fetch_error or note
     if found is None:
         return Result(item, category, version, "", UNKNOWN, "", detail)
+    if not version and not local_error:
+        detail = note or "not pinned in this repository"
+        return Result(item, category, "", found.version.text, REFERENCE, found.notes_url, detail)
     state = status(parse_version(version), found.version, precision)
     if state == UNKNOWN and not detail:
-        detail = f"cannot parse version {version!r}" if version else "not pinned in this repository"
+        detail = f"cannot parse version {version!r}"
     return Result(item, category, version, found.version.text, state, found.notes_url, detail)
 
 

@@ -39,6 +39,11 @@ node_version_file = "web/.node-version"
 # being released and can fail for reasons outside the project (Dependabot does
 # not resolve Python 3.15). Absent or empty: every check run counts.
 ci_ignore_checks = ["Dependabot"]
+# Run when the release starts, not only while it is prepared: vakr ships on the
+# newest release of every dependency, however recently it was published, unless
+# that release failed vakr's tests and is held by a recorded exception
+# (ADR-036, TOOLS-005). Must exit 0. Absent or empty: no check.
+update_check = ["uv", "run", "tools/check-updates/check_updates.py", "--gate"]
 # Artifacts to checksum, sign, and attach. Placeholders: {package}, {version}
 # (as in VERSION), {pep440}, {deb_version}, {tag}. Each required pattern must
 # match at least one file; optional ones may match nothing.

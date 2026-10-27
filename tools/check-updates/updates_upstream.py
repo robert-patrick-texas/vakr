@@ -39,6 +39,7 @@ from updates_sources import (
     github_latest,
     go_latest,
     npm_latest,
+    npm_line_latest,
     pypi_latest,
     python_latest,
 )
@@ -48,6 +49,7 @@ PYTHON_RELEASES_URL = (
 )
 GO_RELEASES_URL = "https://go.dev/dl/?mode=json"
 NODE_RELEASES_URL = "https://nodejs.org/dist/index.json"
+NPM_ABBREVIATED = "application/vnd.npm.install-v1+json"
 # Upstream JSON shapes change without notice; these mean "unexpected document".
 _SHAPE_ERRORS = (KeyError, TypeError, AttributeError, ValueError)
 
@@ -161,6 +163,39 @@ class Upstream:
         """
         index = self._memo("node:index", lambda: self.fetcher.get_json(self.node_url))
         return self._memo(key, lambda: parse(index))
+
+    def npm_line(self, name: str, major: int) -> Latest:
+        """Return the newest release of ``name`` on one major line.
+
+        Args:
+            name: npm package name, scoped names included.
+            major: Major version to stay on.
+
+        Returns:
+            Latest: Release and its npm page.
+
+        Raises:
+            FetchError: If the registry cannot be reached or lists no such release.
+        """
+        url = f"https://registry.npmjs.org/{quote(name, safe='@')}"
+
+        def parse() -> Latest:
+            """Fetch the package's version list and pick the newest on the line.
+
+            Args:
+                None
+
+            Returns:
+                Latest: Release and its npm page.
+
+            Raises:
+                FetchError: If the fetch fails or the line has no stable release.
+            """
+            # The abbreviated packument lists every version in about a fifth of the bytes.
+            document = self.fetcher.get_json(url, accept=NPM_ABBREVIATED)
+            return npm_line_latest(document, name, major)
+
+        return self._memo(f"npm:{name}@{major}", parse)
 
     def lookup(self, source: str, name: str, per_page: int = 10) -> Latest:
         """Return the latest release of ``name`` from ``source``.

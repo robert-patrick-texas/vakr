@@ -16,6 +16,12 @@ assets = []
 timeout_seconds = 20  # per HTTPS request or local command
 max_workers = 8       # concurrent checks; small enough to stay under API rate limits
 
+[exceptions]
+# Items held on their last-known-good version because their newest release
+# failed vakr's tests (TOOLS-004, ADR-036). A held row passes --gate until a
+# newer release is published, then shows "update available" to be retested.
+file = "tools/check-updates/update-exceptions.toml"
+
 [python]
 # Latest stable CPython, compared with the pinned minor series, the
 # requires-python floor, and the interpreter uv actually selects (TOOLS-003).
@@ -28,10 +34,13 @@ uv_interpreter = true
 # Latest stable Go, compared with `go version` and every go.mod directive;
 # with `modules`, each go.mod's direct requirements via `go list -m -u`.
 # There is no go.mod yet; Go components arrive under blueprint section 24.
+# `pins` are other files that name a Go release: the package builder compiles
+# nfpm with the golang image.
 releases_url = "https://go.dev/dl/?mode=json"
 binary = ["go", "version"]
 go_mod = ["**/go.mod"]
 modules = true
+pins = [{ file = "packaging/Dockerfile", regex = 'FROM golang:(\d+\.\d+\.\d+)@' }]
 
 [node]
 # Newest Node.js LTS, compared with the web build's pin (major line, read by
@@ -53,9 +62,12 @@ extra = []
 
 [lockfile]
 # Everything `uv lock --upgrade` would change, including transitive
-# packages. --dry-run leaves uv.lock untouched.
+# packages. --dry-run leaves uv.lock untouched. The far-future
+# --exclude-newer overrides any cutoff a developer's uv.toml or
+# UV_EXCLUDE_NEWER sets, so a release published minutes ago still shows
+# (ADR-036: no minimum release age).
 lockfile = "uv.lock"
-command = ["uv", "lock", "--upgrade", "--dry-run"]
+command = ["uv", "lock", "--upgrade", "--dry-run", "--exclude-newer", "2999-12-31T00:00:00Z"]
 
 [npm]
 # Every direct npm package of the web UI (dependencies, which are bundled into
@@ -65,6 +77,10 @@ package_json = "web/package.json"
 lockfile = "web/package-lock.json"
 direct_dependencies = true
 extra = []
+# Packages compared with the newest release on another pin's major line
+# instead of npm's `latest`. Node's type definitions describe the Node the
+# build runs (24 LTS), not the newest Current release (ADR-036).
+lines = { "@types/node" = "web/.node-version" }
 
 [actions]
 # `uses:` pins in workflows. Tag pins (@v7) compare at the precision written;
@@ -86,18 +102,28 @@ command = ["uv", "--version"]
 pypi = "uv"
 
 [[tools]]
-name = "nfpm"
-command = ["nfpm", "--version"]
-regex = 'GitVersion:\s*v?(\S+)'
+# The uv in the package builder also chooses the bundled CPython patch
+# release (PKG-002), so it moves with the uv above.
+name = "uv (packaging/Dockerfile)"
+file = "packaging/Dockerfile"
+regex = 'astral-sh/uv:(\d+\.\d+\.\d+)@'
+pypi = "uv"
+
+[[tools]]
+# Built in the package builder; no developer host needs it installed.
+name = "nfpm (packaging/Dockerfile)"
+file = "packaging/Dockerfile"
+regex = 'nfpm/v2/cmd/nfpm@v(\S+)'
 github = "goreleaser/nfpm"
 
 [[tools]]
+# CI's gitleaks-action chooses the gitleaks binary; vakr pins none.
 name = "gitleaks"
-command = ["gitleaks", "version"]
 github = "gitleaks/gitleaks"
 
 [[tools]]
-# The relocatable CPython the .deb bundles (PKG-002); pinned once packaging lands.
+# The relocatable CPython the .deb bundles (PKG-002). uv picks the build, so
+# this row is for reference; the uv rows above are what moves it.
 name = "python-build-standalone"
 github = "astral-sh/python-build-standalone"
 per_page = 3  # each release lists about a thousand assets, so keep the page small

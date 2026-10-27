@@ -101,11 +101,13 @@ class Fetcher:
         self.max_bytes = max_bytes
         self.use_gh = use_gh
 
-    def get_json(self, url: str) -> Any:
+    def get_json(self, url: str, accept: str = "") -> Any:
         """GET an HTTPS URL and decode its JSON body.
 
         Args:
             url: Absolute ``https://`` URL.
+            accept: ``Accept`` header value, for registries that serve a
+                smaller document on request; empty sends none.
 
         Returns:
             Any: The decoded JSON document.
@@ -117,7 +119,8 @@ class Fetcher:
         if not url.startswith("https://"):
             raise FetchError(f"refusing non-HTTPS URL {url}")
         # The scheme is checked above, so S310's file:// concern cannot apply.
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310
+        headers = {"User-Agent": USER_AGENT} | ({"Accept": accept} if accept else {})
+        request = urllib.request.Request(url, headers=headers)  # noqa: S310
         try:
             with urllib.request.urlopen(request, timeout=self.timeout) as response:  # noqa: S310
                 body = response.read(self.max_bytes + 1)

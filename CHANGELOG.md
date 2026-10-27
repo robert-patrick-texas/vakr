@@ -4,9 +4,21 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Changed
+
+- Developers: vakr now ships on the newest release of every tool and dependency, however recently it was published. An update is held back only when it fails vakr's tests, as a recorded exception that is retested when the dependency publishes again (ADR-036, TOOLS-002, TOOLS-004; [keeping tools and dependencies current](docs/development/updates.md)).
+  - `tools/release` runs `check-updates --gate` in its preflight, when the release starts. It stops for any available update, any item it could not check, and any stale exception (TOOLS-005).
+  - `make updates` shows a held item as `held` and an item vakr does not pin as `reference`. It also checks the uv, Go, and nfpm pins of the package builder image, and compares `@types/node` with the newest release on the Node 24 line.
+  - Holds are recorded in `tools/check-updates/update-exceptions.toml` and listed under "Held dependencies" in each release's notes. They replace "Deferred updates".
+  - Nothing waits for a release to age. Dependabot's default 3-day cooldown is off for every ecosystem, `web/.npmrc` sets `min-release-age=0`, and the lockfile check overrides any local uv `exclude-newer`.
+
 ### Fixed
 
 - `vakr setup`'s closing checklist no longer says the web UI arrives in a later release. It now ends with starting `vakr-api` behind the HTTPS reverse proxy and signing in, then giving read-only people and monitoring agents the `vakr-view` group, as the [install guide](docs/operations/install.md#first-run) does.
+
+### Held dependencies (TOOLS-004)
+
+- **TypeScript 7.0.2** (staying on 6.0.3): typescript-eslint 8.72.0 refuses TypeScript 7.0, and SvelteKit 3.1.0 crashes loading `tsconfig.json`. Lint, svelte-check, the unit tests, the API-types check, and the build all fail; all pass on 6.0.3. Tested 2026-10-27; revisited with the next TypeScript release.
 
 ## 0.4.0 - 2026-10-22
 

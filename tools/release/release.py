@@ -49,6 +49,7 @@ from pathlib import Path
 
 import release_artifacts as artifacts
 import release_checks as checks
+import release_currency as currency
 from release_config import ConfigError, ReleaseConfig, load_config
 from release_proc import CommandError, Runner
 from release_publish import changelog_notes, publish, publish_commands
@@ -98,6 +99,7 @@ def preflight(
             f"{entries} signer(s)" if entries else "placeholder only; add the release public key",
         ),
         *checks.toolchain(runner, cfg.build_tools, cfg.node_version_file),
+        *([currency.updates_current(runner, cfg.update_check)] if cfg.update_check else []),
     ]
 
 

@@ -102,7 +102,7 @@ The following decisions are part of this baseline:
 |---|---|
 | Product name | `vakr` is the product name and is used for the Python package, CLI, service user/group, paths, and unit names (owner decision 2026-10-19; closes ADR-019). |
 | Initial language | Python, latest stable release (3.15 at this revision), with `asyncio`. Go, latest stable release (1.27 at this revision), may be used for a component where measured performance requires it, under the rules in section 24. At the MVP scale Python is expected to suffice. |
-| Toolchain currency | Use the latest stable Python, Go, `uv`, `ruff`, and `ty`. Check tools and dependencies for updates at least once per release (TOOLS-001). |
+| Toolchain currency | Use the latest stable Python, Go, `uv`, `ruff`, and `ty`, and the newest release of every dependency, however recently it was published. Stay behind only when a release fails vakr's tests, recorded as an exception that is revisited when the dependency publishes again. Each release checks when it is prepared and again when `tools/release` starts (TOOLS-001, TOOLS-002, TOOLS-004, TOOLS-005, ADR-036). |
 | Version source | The project version lives only in the repository-root `VERSION` file. Every other consumer derives it (VER-001). |
 | Compatibility policy | Breaking changes to configuration, API, CLI, and schemas are accepted until the project moves to third-party/enterprise readiness after MVP. Automated config upgrade and data migrations still apply so operators never re-enter settings by hand (ADR-031, CFGM-002). |
 | Packaging | MVP ships as a `.deb` for Ubuntu 26.04 LTS. RHEL-family (AlmaLinux/Rocky/RHEL) `.rpm` packaging comes after MVP (PKG-001, PKG-006). |
@@ -1999,7 +1999,7 @@ Because admins intentionally configure network destinations, polling is a contro
 - `ty` (latest) for static type checking.
 - `pytest` for tests.
 - `nfpm` for `.deb` (and later `.rpm`) packaging from one spec (PKG-001).
-- `tools/check-updates` to report newer Python, Go, tool, dependency, GitHub Action, and vendored-asset versions before each release (TOOLS-001).
+- `tools/check-updates` to report newer Python, Go, tool, dependency, GitHub Action, builder-image, and vendored-asset versions (TOOLS-001), and to gate each release on them (TOOLS-005).
 - Property-based tests for calculation/reconciliation modules where valuable.
 - A pinned front-end dependency lock or vendored artifact manifest.
 - Secret, dependency, license, and SBOM tooling in CI.
@@ -3454,10 +3454,10 @@ Whenever development needs information from production, a collection tool is bui
 
 ### 28.7 Release process
 
-1. Run `tools/check-updates` (TOOLS-001). Apply the updates, or record each deferral in the changelog.
+1. Run `tools/check-updates` (TOOLS-001). Apply every update, whatever its age. Hold one back only when it fails vakr's tests, as a recorded exception listed in the changelog (TOOLS-002, TOOLS-004).
 2. Bump `VERSION`, and update `CHANGELOG.md` with breaking changes, migrations, and new options.
 3. Confirm CI is green on `main`.
-4. Run `tools/release`. It builds the `.deb` in a clean container, writes `SHA256SUMS`, signs it with the release SSH key (`ssh-keygen -Y sign -n vakr-release`), tags `v<version>`, and creates the GitHub release. Releases are marked pre-release until MVP acceptance unless declared stable.
+4. Run `tools/release`. Its preflight runs `tools/check-updates --gate` again, so a dependency released since step 1 stops the release until it is applied or held (TOOLS-005). It builds the `.deb` in a clean container, writes `SHA256SUMS`, signs it with the release SSH key (`ssh-keygen -Y sign -n vakr-release`), tags `v<version>`, and creates the GitHub release. Releases are marked pre-release until MVP acceptance unless declared stable.
 5. Smoke-test a self-update from the previous release in a container (UPD-T01).
 6. Documentation publishes to GitHub Pages automatically.
 
@@ -3474,8 +3474,10 @@ CI may build artifacts for testing but cannot sign releases.
 | ID | Requirement |
 |---|---|
 | TOOLS-001 | `tools/check-updates` shall report newer versions of Python, Go, uv, ruff, ty, nfpm, locked Python dependencies, Go modules, pinned GitHub Actions, and the web UI's npm packages and Node release (ADR-035), with links to release notes. |
-| TOOLS-002 | Each release runs `tools/check-updates`, and each available update is either applied or deferred with a reason in the changelog. Automated update PRs (Dependabot or Renovate) may supplement this but do not replace it. |
+| TOOLS-002 | Each release runs `tools/check-updates` and applies every available update, whatever the release's age: a release published the same day is adopted like any other, and no tool may impose a minimum release age (Dependabot's cooldown is turned off, npm's `min-release-age` is 0, and uv's `exclude-newer` is overridden by the check). The only accepted reason to stay behind is a failed vakr test (TOOLS-004). Automated update PRs (Dependabot or Renovate) may supplement this but do not replace it (ADR-036). |
 | TOOLS-003 | Moving to a new Python minor version is a normal release change. `.python-version`, `requires-python`, the bundled interpreter, and the CI matrix change together, and the release notes say so. |
+| TOOLS-004 | When a new release of a dependency fails vakr's tests, vakr stays on the last-known-good version and records an exception in `tools/check-updates/update-exceptions.toml`: the item, the failing version, what failed, and the date. The release's changelog lists every hold. `tools/check-updates` shows the item as `held` while the failing release is the newest, and as `update available` again once a newer release is published, so the hold is retested with every new release of the dependency. An exception that no longer matches the report is an error. |
+| TOOLS-005 | `tools/release` runs `tools/check-updates --gate` in preflight, when the release starts, and stops unless every item is current or held. An item that could not be checked (`unknown`) also stops it; an item the repository does not pin (`reference`) does not. |
 
 | Test ID | Layer | Scenario | Required pass condition | Primary requirements |
 |---|---|---|---|---|
@@ -3484,6 +3486,11 @@ CI may build artifacts for testing but cannot sign releases.
 | TOOLS-T03 | Unit | Workflow `uses:` lines, including SHA pins with `# vX.Y.Z` comments | Pins are compared with the latest releases correctly | TOOLS-001 |
 | TOOLS-T04 | Integration | End-to-end table and JSON output, exit codes, network outage | An outage yields `unknown` rows and never a crash; `--fail-on-outdated` exits 1 | TOOLS-001, TOOLS-002 |
 | TOOLS-T05 | Unit | Configuration errors and failure containment | Bad config exits 2; `uv.lock` is never modified | TOOLS-001 |
+| TOOLS-T06 | Unit | Recorded exceptions against latest releases equal to, newer than, and older than the failed one; an item with nothing pending or not in the report; a malformed exceptions file | `held` only while the failed release is the newest; `update available` with a retest note once a newer one exists; every stale exception is a problem; a malformed file exits 2 | TOOLS-004 |
+| TOOLS-T07 | Integration | `--gate` with current, held, outdated, unknown, and stale-exception reports | Exits 1 for an update, an unknown row, or an exception problem, and 0 for current, held, and reference rows; the last line names what blocks | TOOLS-005 |
+| TOOLS-T08 | Unit | Release preflight with a passing, failing, and missing `update_check` command | A non-zero exit or a missing command blocks the release with the command's last line; vakr's `release.toml` runs the gate | TOOLS-005 |
+| TOOLS-T09 | Unit | `@types/node` against the Node pin's major line; a builder image's Go tag; an unpinned tool | The newest stable release of the pinned major is the latest; the image tag is compared with go.dev; the unpinned tool is `reference` | TOOLS-001 |
+| TOOLS-T10 | Unit | Repository settings that could delay a release by its age | Every Dependabot entry excludes all dependencies from its cooldown, `web/.npmrc` sets `min-release-age=0`, and the lockfile check overrides `exclude-newer` | TOOLS-002 |
 
 ### 28.9 Documentation publishing
 
@@ -3596,6 +3603,7 @@ Statuses: `Not started`, `In progress`, `Implemented`, `Verified`, `Deferred-app
 | ADR-033 | Interface classification from description keywords, with vakr-side tags for the rest (META-012, META-013) | Accepted 2026-10-20 |
 | ADR-034 | SNMP library (PySNMP v1arch asyncio), adapter guards, and simulators ([ADR-034](docs/adr/ADR-034-snmp-library-and-simulator.md)) | Proposed; implemented in milestone M3, awaiting owner review |
 | ADR-035 | Web presentation layer: static SvelteKit app, uPlot default charts, lazy ECharts for specialty charts, TanStack for server data and tables ([ADR-035](docs/adr/ADR-035-web-presentation-stack.md)) | Accepted 2026-10-21 (owner) |
+| ADR-036 | Dependency currency: the newest release of everything with no minimum age; a recorded exception only after a failed vakr test, revisited at the dependency's next release; the release gate runs when the release starts ([ADR-036](docs/adr/ADR-036-dependency-currency.md)) | Accepted 2026-10-27 (owner's direction); details for owner review |
 
 ## Appendix D. Recommended first implementation milestone
 

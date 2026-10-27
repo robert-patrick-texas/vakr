@@ -1,0 +1,22 @@
+# Dependencies held on their last-known-good version because their newest
+# release failed vakr's tests (TOOLS-004, ADR-036). This is the only accepted
+# reason to stay behind: a release's age never is.
+#
+# One [[exception]] per held item:
+#   item      the ITEM column of `make updates`, exactly as printed
+#   version   the newest release that failed; when a newer one is published,
+#             the row turns "update available" again and must be retested
+#   reason    what failed: the test, command, or error, short enough to read
+#   recorded  the date of the failed test
+#
+# The CURRENT column of `make updates` is the last-known-good version. Keep
+# it there: a held PyPI package also needs a `NAME<VERSION` entry in
+# [tool.uv] constraint-dependencies, so `uv lock --upgrade` leaves it alone.
+# Copy each entry into the release's CHANGELOG "Held dependencies" list.
+# docs/development/updates.md has the whole procedure.
+
+[[exception]]
+item = "typescript"
+version = "7.0.2"
+reason = "typescript-eslint 8.72.0 refuses TS 7.0 (lint); SvelteKit 3.1.0 crashes loading tsconfig (svelte-check, vitest, build); 6.0.3 passes all"
+recorded = 2026-10-27

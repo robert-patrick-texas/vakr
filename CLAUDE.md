@@ -26,6 +26,7 @@
 
 - **Version:** the root `VERSION` file is the only place the version appears (VER-001). Never hard-code it anywhere else.
 - **Toolchain:** use the latest stable Python (3.15), Go (1.27), uv, ruff, and ty. Run Python through `uv`.
+- **Dependencies:** adopt every new release, however recently it was published. Hold one back only after it fails vakr's tests, as an exception in `tools/check-updates/update-exceptions.toml` (ADR-036, TOOLS-004). Never defer for any other reason.
 - **Portable tools** under `tools/` and `src/vakr/lifecycle/` import nothing from vakr and take project values from arguments or config (§29).
 - **Documentation:** every `.md` file is published to GitHub Pages by `tools/md2html`. Keep internal links valid; CI runs `--check`.
 - **Never commit** `_site/`, `inbox/`, field bundles, or anything resembling credentials.

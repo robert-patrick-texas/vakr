@@ -7,6 +7,7 @@ Example:
     $ uv run pytest tests/contract/memory/test_memory_contracts.py
 """
 
+from tests.contract.contract_acceptance import AcceptanceContract
 from tests.contract.contract_auth_sessions import AuthSessionsContract
 from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_dashboards import DashboardsContract
@@ -72,3 +73,7 @@ class TestMemoryTelemetryHistory(TelemetryHistoryContract):
 
 class TestMemoryRankingProjection(RankingProjectionContract):
     """E.28, DASH-T01, DASH-T02, MPOS-008: projected-bucket bookkeeping on the memory store."""
+
+
+class TestMemoryAcceptance(AcceptanceContract):
+    """E.35, MVP-ACC-01/02/10 lean reads on the in-memory telemetry store."""

@@ -23,6 +23,7 @@ Example:
 
 from datetime import datetime
 
+from vakr.adapters.memory.telemetry_acceptance import MemoryAcceptanceQuery
 from vakr.adapters.memory.telemetry_history import MemoryHistoryQuery
 from vakr.adapters.memory.telemetry_projection import MemoryRankingProjection, prune_projection
 from vakr.adapters.memory.telemetry_query import MemoryObservationQuery
@@ -139,6 +140,7 @@ class MemoryTelemetry:
         retention: Retention.
         history: Downsampled series and ranking summaries (M4, ``HistoryBackend``).
         ranking_projection: Projected-bucket bookkeeping (E.28, ``ProjectionBackend``).
+        acceptance: Lean reads for the acceptance reports (E.35, ``AcceptanceBackend``).
     """
 
     def __init__(self, store: MemoryTelemetryStore) -> None:
@@ -163,3 +165,4 @@ class MemoryTelemetry:
         self.retention = MemoryRetentionManager(store)
         self.history = MemoryHistoryQuery(store)
         self.ranking_projection = MemoryRankingProjection(store)
+        self.acceptance = MemoryAcceptanceQuery(store)

@@ -4472,6 +4472,40 @@ Decisions taken with the self-metrics (2026-10-21):
 10. **No `metrics` check in `vakr check health`.** The snapshot is readable by the `vakr` group only, so a monitoring account in `vakr-view` could not run it, and the collector-health and spool checks already report a collector that stopped. Not added.
 11. **OBS-006 in part.** `vakr_collector_interval_seconds` gives the configured default and the shortest and longest effective interval planned. **Gap:** per-device configured versus effective intervals and the reasons for degraded behaviour stay in the health views, not the metrics.
 
+### E.35 Acceptance reports (MVP-ACC-01, MVP-ACC-02, MVP-ACC-10, M6)
+
+`vakr acceptance schedule`, `gaps`, and `coverage` compute MVP acceptance evidence on the production node from its own telemetry and inventory, per collector (MPOS-008). They are read-only, read through the acceptance port (`vakr.ports.telemetry.acceptance`, contract `contract_acceptance`) and the metadata ports, and live in `vakr.query.acceptance*`; the constants are in `vakr.query.acceptance_limits`, and none is an operator option. The operator guide is [acceptance reports](docs/operations/acceptance.md). No migration was needed: the reports use what poll records, health reports, rollups, the spool's incident log, and the audit log already hold.
+
+| Definition, threshold, or bound | Value |
+|---|---|
+| Windows | `schedule` 7 d, `gaps` 14 d, `coverage` events 14 d by default; 1 h to 30 d (native retention); every window ends 5 min before now, so records still in the spool are not gaps (E.24) |
+| On time | Start within ±5 s of the scheduled time; at least 99% of healthy-device slots (27.6) |
+| Healthy-device slot | Not `MAINTENANCE`; neither the poll nor the device's previous poll that started (within 2 intervals) ended `PARTIAL` or `FAILED` without `COLLECTOR_DEGRADED`, or ran longer than its interval. A slot that never started counts against the share (collector capacity is what MVP-ACC-01 tests) |
+| Overlap | A poll started before the same device's previous poll completed, or a slot recorded twice; 0 allowed |
+| Drift | Least-squares slope of the daily (UTC) median start offset, and of the daily median slot phase (each slot against the device's first slot in the window, modulo the interval), each at most ±100 ms/day; judged over at least 7 days with at least 60 healthy-device polls each, else `incomplete` |
+| Workload | Every healthy-device poll at the 60 s reference interval; devices and interfaces (from the newest health report) shown against 100 and 1,600 (27.2) for comparison only |
+| Slot timeline | Poll records plus the record-less slots between consecutive records more than 1.5 intervals apart (E.19), before the first, and after the last; 60 s slots for a device with no record |
+| Collector silent | Health reports more than 150 s apart: max(2.5 × 60 s, 60 s + 30 s), the E.3 rule at the E.27 health cadence |
+| Spool full | A health report within one interval of a not-attempted slot showed `spool_used_pct` at or above 95 (the E.24 exhausted threshold) |
+| Gap causes | `collector_stopped`, `collector_busy`, `collector_fault`, `storage`, `telemetry_loss`, `poll_overrun`, `device_unreachable`, `snmp_timeout`, `snmp_error`, `admin_state`, `not_yet_discovered`, `interface_not_up`, `inventory_change`, `unexplained` (decisions 3 and 4) |
+| Inventory change near a gap | An audit event about the device, or an `inventory.apply`, within 2 intervals of an otherwise unexplained stretch |
+| Monitored interface | Lifecycle `active`, on a device that is enabled or in maintenance and polls SNMP |
+| Coverage ranges | 1 h, 24 h, 7 d, 30 d from native data; 400 d from 15-minute rollups (E.28 `auto`); families traffic, packets, errors (in or out has a value) |
+| Coverage states | `data`, `gap` (the family exists elsewhere), `pending` (400 d: data newer than the rollup frontier, or an interface under 1 h old), `missing` (no value anywhere; fails) |
+| Events | Samples flagged `BASELINE_UPTIME_RESET`, `BASELINE_DISCONTINUITY`, `BASELINE_DECREASE`, or `BASELINE_WIDTH_CHANGE`; a reload is an SNMP result with `RESET_DETECTED`, found through its quarter-hour's ICMP rollup flag (RET-006) |
+| Spike | An event sample with a rate, an over-capacity sample (`RATE_EXCEEDS_CAPACITY`) among the next 2 samples, or a monitored interface whose first sample within 10 min after a reload has a rate or no invalidating flag; 0 allowed |
+| Rows listed | 1,000 per collector by default, 1 to 10,000 (`--limit`); summaries count every row; unexplained gaps and spikes are listed first |
+| Read bounds | 100,000 marks per port call; 5,000 devices, 5,000 interfaces per device, 10,000 audit events, 50,000 health reports, and 3,000 loss incidents per report; 100,000 SNMP results per device for interface gaps. A read cut short makes the report `incomplete`, never `pass` |
+| Verdicts and exit status | `pass` 0, `fail` 1, usage 2, `incomplete` or unreadable data 3; the text ends with `RESULT <criterion>: PASS`, `FAIL`, or `INCOMPLETE` |
+| Field kit | The `vakr` profile runs all three with `--json` (FIELD-002), within its 120 s per command |
+
+Decisions taken with the acceptance reports:
+
+1. **Rollups find the quarter-hours worth reading.** Native samples of 1,600 interfaces for 14 days are too many to read in two minutes (ADR-021: 4 µs per cold sample). A subject's samples are counted per bucket from rollups before the rollup frontier (a bucket every subject has finished, E.10) and natively after it; only buckets holding fewer samples than the device had polls that ran are read natively, and one missing sample whose slot's sample landed just past the boundary is not suspect. Discontinuities are found the same way, from the rollup quality union. Measured on the Compact adapter, warm, scaled to the MVP workload with both positions: about 25 s (`schedule`, 7 d), 60 s (`gaps`, 14 d), and 35 s (`coverage`).
+2. **"Healthy device" is judged from the poll records,** not from ICMP state. A device that answers nothing completes its poll in about 2 s, so leaving it in only makes the measure stricter, and reading every ICMP result would double the cost. Owner review requested.
+3. **Inventory facts explain a record-less slot first.** A device not created yet, or disabled since before the slot, expected no poll, whatever the collector's state; then a loss incident, then collector silence. A peer collector's silence that lasts to the end of the window is `storage` (not replicated yet), never the devices being down (MPOS-006, invariant 2).
+4. **Evidence vakr does not hold.** An interface that is not up/up gets no sample and no stored status (E.27 #7), so a link that went down and came back while its device answered SNMP is `unexplained`; telling it apart needs a status record for unsampled interfaces, a telemetry schema change for the owner to decide. Admin-state history is not kept (only the current state and when the device last changed), so a disable-and-enable inside the window is explained only through its audit entries. A not-attempted poll does not record why; the spool fill level separates a full spool from a busy collector. Lifecycle is written only by discovery (`vakr.discovery.reconcile.persist`), not at each Stage 1 poll as E.6 says, so `interface_not_up` explains a down interface only after the next rediscovery (at most 24 h); this gap between E.6 and the code is left for the owner, not resolved here.
+
 ### E.36 Resilience system tests (MVP-ACC-06, M6)
 
 `make resilience-test` (`tests/system/resilience/`) runs MVP-ACC-06 against the packaged product: one node booted with systemd in a privileged ubuntu:26.04 container, set up as the install guide says (`vakr setup` with a piped password, credentials, `vakr inventory apply`, `systemctl enable --now vakr-collector.service vakr-api.service vakr.target`), polling a simulated IOS XE fleet. It is opt-in and never part of `make check`; the developer guide is [docs/development/resilience-tests.md](docs/development/resilience-tests.md).

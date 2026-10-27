@@ -23,7 +23,7 @@ from typing import Any
 from vakr.discovery.model import DiscoveredInterface
 from vakr.domain.enums import IfAdminStatus, IfOperStatus, InterfaceLifecycle
 from vakr.domain.ids import DeviceId, InterfaceId
-from vakr.domain.interfaces import Interface
+from vakr.domain.interfaces import INACTIVE_STATES, Interface
 from vakr.domain.ownership import API_MANAGED
 
 CORPUS = Path(__file__).parents[3] / "fixtures" / "reconcile" / "corpus-v1.toml"
@@ -86,13 +86,14 @@ def _stored(case: str, table: dict[str, Any]) -> Interface:
     Raises:
         None
     """
+    lifecycle = InterfaceLifecycle(table.get("lifecycle", "active"))
     return Interface(
         id=interface_id(case, table["key"]), device_id=DEVICE, if_index=table.get("if_index"),
         if_name=table.get("if_name", ""), if_descr=table.get("if_descr", ""),
-        if_alias=table.get("if_alias", ""),
-        lifecycle=InterfaceLifecycle(table.get("lifecycle", "active")), managed_by=API_MANAGED,
+        if_alias=table.get("if_alias", ""), lifecycle=lifecycle, managed_by=API_MANAGED,
         created_at=T0, updated_at=T0, if_type=table.get("if_type"), mac=table.get("mac"),
         addresses=tuple(table.get("addresses", ())),
+        inactive_since=T0 if lifecycle in INACTIVE_STATES else None,
     )  # fmt: skip
 
 

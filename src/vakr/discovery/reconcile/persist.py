@@ -22,6 +22,7 @@ whose case no longer appears is superseded, except after an incomplete
 Dependencies:
     vakr.discovery.reconcile.match, records: Decisions and records.
     vakr.inventory.catalog, reads: Tags and bounded lists.
+    vakr.logic.lifecycle_model: The lifecycle record a change stores.
     vakr.policy.classify: Description keyword tags.
 
 Safety:
@@ -46,12 +47,13 @@ from vakr.discovery.reconcile.records import (
     observed,
     sanitized,
 )
-from vakr.domain.enums import InterfaceLifecycle, ReconcileOutcome
+from vakr.domain.enums import ReconcileOutcome
 from vakr.domain.ids import TagId
 from vakr.domain.interfaces import Interface
 from vakr.domain.ownership import API_MANAGED
 from vakr.inventory.catalog import ensure_tags
 from vakr.inventory.reads import device_interfaces
+from vakr.logic.lifecycle_model import LifecycleRecord
 from vakr.policy.classify import classify
 from vakr.policy.keywords import KeywordSet
 from vakr.ports.metadata import MetadataUnitOfWork
@@ -183,14 +185,14 @@ def _write_match(
 
 
 def _set_lifecycle(
-    uow: MetadataUnitOfWork, current: Interface, state: InterfaceLifecycle, now: datetime
+    uow: MetadataUnitOfWork, current: Interface, record: LifecycleRecord, now: datetime
 ) -> Interface:
-    """Change lifecycle when it differs.
+    """Change lifecycle when it differs, with the stale-clock start the rules computed.
 
     Args:
         uow: The open unit of work.
         current: The interface as stored now.
-        state: The lifecycle it should have.
+        record: The lifecycle it should have (``next_lifecycle``).
         now: Change time (UTC).
 
     Returns:
@@ -199,10 +201,11 @@ def _set_lifecycle(
     Raises:
         ConflictError, StorageError: From the repository.
     """
-    if state is current.lifecycle:
+    if record.state is current.lifecycle:
         return current
     at = max(now, current.updated_at)
-    return uow.interfaces.set_lifecycle(current.id, state, expected_version=current.version, at=at)
+    return uow.interfaces.set_lifecycle(current.id, record.state, expected_version=current.version,
+                                        at=at, inactive_since=record.inactive_since)  # fmt: skip
 
 
 def _write_missing(uow: MetadataUnitOfWork, write: DiscoveryWrite, before: Interface) -> bool:
@@ -219,7 +222,7 @@ def _write_missing(uow: MetadataUnitOfWork, write: DiscoveryWrite, before: Inter
     Raises:
         ConflictError, StorageError: From the repository.
     """
-    state = next_lifecycle(before, None, write.now, write.stale_after)
+    record = next_lifecycle(before, None, write.now, write.stale_after)
     current = before
     if before.if_index is not None:
         detached = replace(before, if_index=None, updated_at=max(write.now, before.updated_at))
@@ -227,5 +230,5 @@ def _write_missing(uow: MetadataUnitOfWork, write: DiscoveryWrite, before: Inter
         why = (f"not in the latest complete ifTable; ifIndex {before.if_index} released",)
         entry = history(before, ReconcileOutcome.MISSING, write.now, before.if_index, None, why)
         uow.interfaces.append_identity_history(entry)
-    _set_lifecycle(uow, current, state, write.now)
+    _set_lifecycle(uow, current, record, write.now)
     return before.if_index is not None

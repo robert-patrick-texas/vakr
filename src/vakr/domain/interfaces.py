@@ -11,8 +11,11 @@ different writers:
 - *owned* fields are the operator's (comment, tags, annotation) and change
   only through ``InterfaceRepository.update`` with an ownership check.
 
-``lifecycle`` changes only through ``set_lifecycle``; retiring an interface
-is a soft change that keeps every observation and history entry (META-009).
+``lifecycle`` and ``inactive_since``, the start of the unbroken INACTIVE or
+STALE period that the ten-day stale clock counts from (LIFE-003), change
+together and only through ``set_lifecycle``. An annotation or tag edit
+moves ``updated_at`` but never the stale clock. Retiring an interface is a
+soft change that keeps every observation and history entry (META-009).
 
 Dependencies:
     dataclasses: Frozen, slotted records with ``__post_init__`` invariants.
@@ -43,9 +46,10 @@ from vakr.domain.checks import (
     require_uuid_set,
 )
 from vakr.domain.enums import InterestClass, InterfaceLifecycle
+from vakr.domain.errors import ValidationError
 from vakr.domain.ids import DeviceId, InterfaceId, SiteId, TagId
 from vakr.domain.ownership import ManagedBy, require_record
-from vakr.domain.timestamps import require_utc
+from vakr.domain.timestamps import require_optional_utc, require_utc
 
 MAX_IF_INDEX = 2_147_483_647  # IF-MIB InterfaceIndex is 1..2^31-1
 
@@ -66,8 +70,20 @@ INTERFACE_OBSERVED_FIELDS = (
 INTERFACE_OWNED_FIELDS = ("comment", "tags", "annotation")
 """Fields the owning source writes through ``update``."""
 
-INTERFACE_FIXED_FIELDS = ("id", "device_id", "managed_by", "created_at", "lifecycle")
+INTERFACE_LIFECYCLE_FIELDS = ("lifecycle", "inactive_since")
+"""Fields only ``set_lifecycle`` writes, always together."""
+
+INTERFACE_FIXED_FIELDS = (
+    "id",
+    "device_id",
+    "managed_by",
+    "created_at",
+    *INTERFACE_LIFECYCLE_FIELDS,
+)
 """Fields neither ``update`` nor ``update_observed`` may change."""
+
+INACTIVE_STATES = frozenset({InterfaceLifecycle.INACTIVE, InterfaceLifecycle.STALE})
+"""States with a running or expired stale clock, so with an ``inactive_since``."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +164,8 @@ class Interface:
         tags: Tags added in vakr; never removed by a description change (META-013).
         description_tags: Tags derived from ``ifAlias`` keywords (META-012).
         annotation: Operator circuit and interest metadata.
+        inactive_since: Start of the unbroken INACTIVE/STALE period (UTC); set
+            exactly while ``lifecycle`` is INACTIVE or STALE (LIFE-003).
         version: Optimistic-concurrency version.
     """
 
@@ -170,6 +188,7 @@ class Interface:
     tags: frozenset[TagId] = frozenset()
     description_tags: frozenset[TagId] = frozenset()
     annotation: InterfaceAnnotation = field(default_factory=InterfaceAnnotation)
+    inactive_since: datetime | None = None
     version: int = 1
 
     def __post_init__(self) -> None:
@@ -201,4 +220,10 @@ class Interface:
         require_utc(self.created_at, "created_at")
         require_utc(self.updated_at, "updated_at")
         require_order(self.created_at, self.updated_at, "updated_at")
+        require_optional_utc(self.inactive_since, "inactive_since")
+        if (self.lifecycle in INACTIVE_STATES) != (self.inactive_since is not None):
+            raise ValidationError(
+                "inactive_since is set exactly while an interface is inactive or stale",
+                field="inactive_since",
+            )
         require_record(self.version, self.managed_by)

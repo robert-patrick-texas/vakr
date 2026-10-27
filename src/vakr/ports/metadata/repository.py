@@ -110,7 +110,8 @@ class InterfaceRepository(EntityRepository[Interface, InterfaceId, InterfaceFilt
     only ``INTERFACE_OBSERVED_FIELDS`` (and ``updated_at``) may differ, and
     no ownership check applies because discovered attributes belong to no
     configuration source. ``set_lifecycle`` is the only way to change
-    ``lifecycle``.
+    ``lifecycle`` and ``inactive_since``, so no other write moves the stale
+    clock (LIFE-003).
     """
 
     def update_observed(self, interface: Interface) -> Interface:
@@ -137,6 +138,7 @@ class InterfaceRepository(EntityRepository[Interface, InterfaceId, InterfaceFilt
         *,
         expected_version: int,
         at: datetime,
+        inactive_since: datetime | None,
     ) -> Interface:
         """Change an interface's lifecycle; history is always kept (LIFE-002).
 
@@ -145,6 +147,8 @@ class InterfaceRepository(EntityRepository[Interface, InterfaceId, InterfaceFilt
             lifecycle: New lifecycle state.
             expected_version: Version the caller read.
             at: Change time (UTC), stored as ``updated_at``.
+            inactive_since: Start of the unbroken INACTIVE/STALE period, as
+                ``vakr.logic.lifecycle`` computed it; ``None`` for ACTIVE and RETIRED.
 
         Returns:
             Interface: The stored interface, with ``version`` incremented.
@@ -152,6 +156,7 @@ class InterfaceRepository(EntityRepository[Interface, InterfaceId, InterfaceFilt
         Raises:
             NotFoundError: If the interface does not exist.
             ConflictError: If ``expected_version`` is stale.
+            ValidationError: If ``inactive_since`` does not fit ``lifecycle``.
         """
         ...
 

@@ -157,6 +157,8 @@ Every state keeps its history and stays visible to discovery, so a returning int
 
 Every change is recorded with the prior state, new state, reason, effective time, source (Stage 1, discovery, timer, or administrator), and the administrator's name for admin actions (LIFE-006). The move to Stale is recorded at the moment the 10-day threshold was crossed, not when vakr happened to notice. A stale interface remembers *why* it went inactive.
 
+The 10 days count from when the interface became inactive, which vakr stores with it (`inactive_since`, LIFE-003). Only lifecycle changes move that time: editing a down interface's annotation, tags, or comment does not restart the countdown, and neither does a new cause, such as a down port being shut. Returning to Active clears it, retiring clears it, and restoring a retired interface starts a new countdown at the restore (Appendix E.6).
+
 These inputs are not evidence and change nothing:
 
 - `ifOperStatus` `unknown`;

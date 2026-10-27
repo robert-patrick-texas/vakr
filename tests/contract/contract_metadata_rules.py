@@ -204,7 +204,7 @@ class MetadataRulesContract:
                                             writer=API_MANAGED, at=s.T0)  # fmt: skip
             with pytest.raises(ConflictError):
                 uow.interfaces.set_lifecycle(iface.id, InterfaceLifecycle.STALE, expected_version=9,
-                                             at=s.T0)  # fmt: skip
+                                             at=s.T0, inactive_since=s.T0)  # fmt: skip
             with pytest.raises(ConflictError):
                 uow.interfaces.update_observed(replace(iface, if_index=2, version=5))
             stored = uow.devices.get(dev.id)
@@ -279,7 +279,8 @@ class MetadataRulesContract:
             with pytest.raises(ValidationError):
                 uow.interfaces.update_observed(replace(seen, comment="x"))
             with pytest.raises(ValidationError):
-                uow.interfaces.update_observed(replace(seen, lifecycle=InterfaceLifecycle.STALE))
+                uow.interfaces.update_observed(replace(seen, lifecycle=InterfaceLifecycle.STALE,
+                                                       inactive_since=s.T0))  # fmt: skip
             owned = uow.interfaces.update(replace(seen, comment="uplink", tags=frozenset({wan.id})),
                                           writer=s.FILE_OWNER)  # fmt: skip
             uow.commit()
@@ -310,7 +311,8 @@ class MetadataRulesContract:
             retired = uow.devices.set_admin_state(dev.id, AdminState.RETIRED, expected_version=1,
                                                   writer=API_MANAGED, at=later)  # fmt: skip
             gone = uow.interfaces.set_lifecycle(iface.id, InterfaceLifecycle.RETIRED,
-                                                expected_version=1, at=later)  # fmt: skip
+                                                expected_version=1, at=later,
+                                                inactive_since=None)  # fmt: skip
             uow.commit()
         assert (retired.version, retired.updated_at, gone.version) == (2, later, 2)
         with metadata_uow_factory() as uow:

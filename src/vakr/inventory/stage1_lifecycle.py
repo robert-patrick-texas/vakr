@@ -22,6 +22,9 @@ Rules beyond E.6, chosen to keep identity and evidence honest:
   decision: Stage 1 evidence was read under an older plan. ``retired`` never
   changes here.
 - Missing status (neither value read) is not evidence (the lifecycle rules).
+- The write stores the rules' own record: a move into ``inactive`` starts the
+  stale clock at the Stage 1 time, ``stale`` keeps it, and ``active`` clears
+  it (``inactive_since``, LIFE-003).
 
 Dependencies:
     vakr.logic.lifecycle: The transition rules.
@@ -93,10 +96,11 @@ def apply_stage1_status(
                 continue  # discovery lost it after this Stage 1: its decision stands
             evidence = InterfaceEvidence(item.at, LifecycleSource.STAGE1, True,
                                          item.admin_status, item.oper_status)  # fmt: skip
-            state = apply_evidence(current_record(stored), evidence, stale_after).record.state
-            if state is not stored.lifecycle:
-                uow.interfaces.set_lifecycle(stored.id, state, expected_version=stored.version,
-                                             at=item.at)  # fmt: skip
+            record = apply_evidence(current_record(stored), evidence, stale_after).record
+            if record.state is not stored.lifecycle:
+                uow.interfaces.set_lifecycle(stored.id, record.state,
+                                             expected_version=stored.version, at=item.at,
+                                             inactive_since=record.inactive_since)  # fmt: skip
                 changed += 1
         uow.commit()
     return changed

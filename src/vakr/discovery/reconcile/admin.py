@@ -124,9 +124,10 @@ def _release_index(
             replace(other, if_index=None, updated_at=max(now, other.updated_at))
         )
         if detached.lifecycle is InterfaceLifecycle.ACTIVE:
+            # Its stale clock starts at the decision that took its ifIndex (E.6 NOT_DISCOVERED).
             uow.interfaces.set_lifecycle(detached.id, InterfaceLifecycle.INACTIVE,
                                          expected_version=detached.version,
-                                         at=detached.updated_at)  # fmt: skip
+                                         at=detached.updated_at, inactive_since=now)  # fmt: skip
 
 
 def _close(uow: MetadataUnitOfWork, review: IdentityReview, state: ReviewState,
@@ -197,7 +198,7 @@ def map_review(
         if moved.lifecycle in (InterfaceLifecycle.INACTIVE, InterfaceLifecycle.STALE):
             active = InterfaceLifecycle.ACTIVE
             moved = uow.interfaces.set_lifecycle(moved.id, active, expected_version=moved.version,
-                                                 at=now)  # fmt: skip
+                                                 at=now, inactive_since=None)  # fmt: skip
         _close(uow, review, ReviewState.MAPPED, moved, now, actor)
         uow.commit()
     return moved
@@ -231,7 +232,7 @@ def create_identity(
             if_name=review.if_name, if_descr=review.if_descr, if_alias=review.if_alias,
             lifecycle=InterfaceLifecycle.INACTIVE, managed_by=API_MANAGED, created_at=now,
             updated_at=now, if_type=review.if_type, mac=review.mac, if_speed=review.if_speed,
-            if_high_speed=review.if_high_speed, addresses=review.addresses,
+            if_high_speed=review.if_high_speed, addresses=review.addresses, inactive_since=now,
         ))  # fmt: skip
         why = "an administrator created a new identity for this row"
         entry = _admin_entry(created, review, ReconcileOutcome.NEW, now, actor, why)

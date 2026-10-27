@@ -14,6 +14,7 @@ from tests.contract.contract_dashboards import DashboardsContract
 from tests.contract.contract_interface_status import InterfaceStatusContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
+from tests.contract.contract_metadata_lifecycle import MetadataLifecycleContract
 from tests.contract.contract_metadata_operations import OperationsContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 from tests.contract.contract_ranking_projection import RankingProjectionContract
@@ -46,6 +47,10 @@ class TestMemoryTelemetryState(TelemetryStateContract):
 
 class TestMemoryMetadataIdentity(MetadataIdentityContract):
     """IFID-007, META-008 transfer, and the change counter on the memory adapter."""
+
+
+class TestMemoryMetadataLifecycle(MetadataLifecycleContract):
+    """LIFE-003 and E.6: the stale clock's start on the memory adapter."""
 
 
 class TestMemoryRollupSource(RollupSourceContract):

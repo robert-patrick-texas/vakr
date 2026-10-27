@@ -65,7 +65,7 @@ Interfaces have three writers, so their fields fall into groups (`vakr.domain.in
 |---|---|---|
 | Observed | `if_index`, `if_name`, `if_descr`, `if_alias`, `if_type`, `mac`, `if_speed`, `if_high_speed`, `addresses`, `description_tags` | Discovery, through `update_observed`; no ownership check |
 | Owned | `comment`, `tags`, `annotation` | The owning source, through `update` |
-| Lifecycle | `lifecycle` | `set_lifecycle` only |
+| Lifecycle | `lifecycle`, `inactive_since` (start of the stale clock, LIFE-003) | `set_lifecycle` only, always together |
 | Fixed | `id`, `device_id`, `managed_by`, `created_at` | Never changed |
 
 Operator tags (`tags`) and description-derived tags (`description_tags`) are separate fields, so a description change never removes a tag someone added in vakr (META-013).

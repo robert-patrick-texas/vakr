@@ -2,7 +2,7 @@
 
 On the Compact profile (the MVP), vakr keeps everything in two SQLite files in `/var/lib/vakr`:
 
-- **`metadata.db`** holds the inventory: sites, tags, groups, devices, interfaces and their annotations, collection policies, collectors, interface identity history, and the audit log. Since schema 3 it also holds local accounts, login sessions, kiosk tokens, and failed-login counts ([users](users.md)).
+- **`metadata.db`** holds the inventory: sites, tags, groups, devices, interfaces and their annotations, collection policies, collectors, interface identity history, and the audit log. Since schema 3 it also holds local accounts, login sessions, kiosk tokens, and failed-login counts ([users](users.md)). Since schema 7 (`0007_interface_inactive_since.sql`) each interface also records when its current inactive period began, which the ten-day stale countdown starts from; the upgrade fills it in for interfaces that are already inactive or stale (Appendix E.6).
 - **`telemetry.db`** holds what the collectors measured: 30 days of one-minute observations and 400 days of 15-minute rollups, laid out as [ADR-021](../adr/ADR-021-compact-sqlite-telemetry.md) describes.
 
 This page covers where the files are, how to check, migrate, back up, and restore them, how telemetry is stored and expired, and what to do when vakr refuses to use a database.

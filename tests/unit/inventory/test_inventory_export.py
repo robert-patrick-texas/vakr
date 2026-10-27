@@ -207,9 +207,9 @@ def test_export_states_and_names() -> None:
         gi1, gi2 = [
             i for i in device_interfaces(uow, edge.id) if i.if_name in ("Gi0/0/1", "Gi0/0/2")
         ]
-        uow.interfaces.set_lifecycle(
-            gi1.id, InterfaceLifecycle.RETIRED, expected_version=gi1.version, at=gi1.updated_at
-        )
+        uow.interfaces.set_lifecycle(gi1.id, InterfaceLifecycle.RETIRED,
+                                     expected_version=gi1.version, at=gi1.updated_at,
+                                     inactive_since=None)  # fmt: skip
         uow.interfaces.update_observed(replace(gi2, if_name="bad\tname"))
         uow.commit()
     text = exported(store, "toml", unannotated=True)

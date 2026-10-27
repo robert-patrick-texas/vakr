@@ -4,6 +4,11 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Fixed
+
+- A down interface's 10-day stale countdown no longer restarts when its annotation or tags are edited (LIFE-003, Appendix E.6). vakr now stores when each interface became inactive and counts the ten days from then; only a lifecycle change moves that time, so editing a comment, tags, or the annotation of a down port, or claiming it for `inventory.toml`, leaves its countdown alone. Before, the countdown started again at every edit, and a port edited every few days never went stale. On two positions the peer takes the time from the primary with the rest of the interface.
+- Metadata migration `0007_interface_inactive_since.sql` adds that time to `metadata.db` (schema 7) when the package runs `vakr db migrate`. Interfaces that are already inactive or stale at the upgrade count from their last change, the best evidence the old schema kept, so one edited shortly before the upgrade may take a little longer than ten days to go stale, once. Self-update backs up `metadata.db` before migrating and restores it on rollback, so `sudo vakr self-update --rollback` still works and no manual update is needed.
+
 ### Changed
 
 - Developers: `make secrets` scans every tracked file for secrets with gitleaks 8.30.1 (QG-007), and CI's `secrets` job runs it after the gitleaks action. The action scans only the first-parent commits of a push, so commits that arrived on a merged branch were never scanned. `.gitleaks.toml` keeps the default rules and allows only interface names such as `GigabitEthernet0/0/0`, which read as access keys. The action now installs the same gitleaks release, and `make updates` watches both pins. `make secrets-history` scans every commit on every branch. A full-history scan on 2026-10-27 found no real secret, only a test fixture's made-up key id, which `.gitleaksignore` records.

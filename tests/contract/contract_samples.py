@@ -51,7 +51,7 @@ from vakr.domain.ids import (
     TagId,
     new_id,
 )
-from vakr.domain.interfaces import Interface
+from vakr.domain.interfaces import INACTIVE_STATES, Interface
 from vakr.domain.inventory import API_MANAGED, Device, ManagedBy, Site
 from vakr.domain.observations import (
     CollectorHealthObservation,
@@ -195,12 +195,12 @@ def device(name: str = "core1", **overrides: Any) -> Device:
 
 
 def interface(device_id: DeviceId, if_name: str = "Gi1/0/1", **overrides: Any) -> Interface:
-    """Build an active interface.
+    """Build an active interface; an inactive or stale one's stale clock starts at ``updated_at``.
 
     Args:
         device_id: Owning device.
         if_name: ``ifName``.
-        **overrides: Field values to replace.
+        **overrides: Field values to replace; ``inactive_since`` too.
 
     Returns:
         Interface: The interface.
@@ -220,7 +220,10 @@ def interface(device_id: DeviceId, if_name: str = "Gi1/0/1", **overrides: Any) -
         "created_at": T0,
         "updated_at": T0,
     }
-    return Interface(**base | overrides)
+    merged = base | overrides
+    if merged["lifecycle"] in INACTIVE_STATES:
+        merged.setdefault("inactive_since", merged["updated_at"])
+    return Interface(**merged)
 
 
 def history(iface: Interface, at: datetime, **overrides: Any) -> IdentityHistoryEntry:

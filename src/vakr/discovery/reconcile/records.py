@@ -6,11 +6,14 @@ answer keeps what vakr already knew (DISC-008): a row without ``ifAlias``
 because ``ifXTable`` failed keeps the stored description, and incomplete
 IP-MIB answers keep the stored addresses.
 
-Lifecycle follows ``vakr.logic.lifecycle`` (E.6, E.17 #12). The M2 schema
-stores only the state, so the record it needs is rebuilt from what is
-stored: an interface without an ``ifIndex`` went missing
-(``NOT_DISCOVERED``), and an inactive interface's stale clock starts at its
-last change (``updated_at``); E.26 records this approximation.
+Lifecycle follows ``vakr.logic.lifecycle`` (E.6, E.17 #12). The record it
+needs is rebuilt from what is stored: the state, the start of its unbroken
+inactive period (``inactive_since``, metadata schema 7), and a reason
+inferred from the state and ``ifIndex`` (an interface without one went
+missing, ``NOT_DISCOVERED``). The stale clock never reads ``updated_at``,
+which annotation and tag edits also move (LIFE-003). ``next_lifecycle``
+returns the whole record, so the writer stores the state and
+``inactive_since`` that the rules computed instead of deriving them again.
 
 Dependencies:
     vakr.discovery: Rows and reconciliation results.
@@ -34,7 +37,7 @@ from vakr.discovery.model import DiscoveredInterface
 from vakr.domain.control import IdentityHistoryEntry
 from vakr.domain.enums import IdentityDecisionSource, InterfaceLifecycle, ReconcileOutcome
 from vakr.domain.ids import DeviceId, IdentityHistoryId, InterfaceId, TagId, new_id
-from vakr.domain.interfaces import Interface
+from vakr.domain.interfaces import INACTIVE_STATES, Interface
 from vakr.domain.ownership import API_MANAGED
 from vakr.logic.lifecycle import apply_evidence, tick
 from vakr.logic.lifecycle_model import (
@@ -184,17 +187,20 @@ def new_interface(
         now: Discovery time (UTC).
 
     Returns:
-        Interface: The new interface, version 1.
+        Interface: The new interface, version 1; an inactive one's stale clock
+        starts now.
 
     Raises:
         ValidationError: If the agent reported a value the domain rejects.
     """
+    lifecycle = first_lifecycle(row)
     return Interface(
         id=new_id(InterfaceId), device_id=device_id, if_index=row.if_index,
         if_name=row.if_name or "", if_descr=row.if_descr or "", if_alias=row.if_alias or "",
-        lifecycle=first_lifecycle(row), managed_by=API_MANAGED, created_at=now, updated_at=now,
+        lifecycle=lifecycle, managed_by=API_MANAGED, created_at=now, updated_at=now,
         if_type=row.if_type, mac=row.mac, if_speed=row.if_speed, if_high_speed=row.if_high_speed,
         addresses=row.addresses, description_tags=tags,
+        inactive_since=now if lifecycle in INACTIVE_STATES else None,
     )  # fmt: skip
 
 
@@ -205,7 +211,7 @@ def current_record(stored: Interface) -> LifecycleRecord:
         stored: The interface.
 
     Returns:
-        LifecycleRecord: State, inferred reason, and stale-clock start.
+        LifecycleRecord: State, inferred reason, and the stored stale-clock start.
 
     Raises:
         None
@@ -219,15 +225,12 @@ def current_record(stored: Interface) -> LifecycleRecord:
         reason = LifecycleReason.UP_UP
     else:
         reason = LifecycleReason.OPER_NOT_UP
-    inactive = state in (InterfaceLifecycle.INACTIVE, InterfaceLifecycle.STALE)
-    return LifecycleRecord(
-        state, reason, stored.created_at, stored.updated_at if inactive else None
-    )
+    return LifecycleRecord(state, reason, stored.created_at, stored.inactive_since)
 
 
 def next_lifecycle(
     stored: Interface, row: DiscoveredInterface | None, now: datetime, stale_after: timedelta
-) -> InterfaceLifecycle:
+) -> LifecycleRecord:
     """Lifecycle after this discovery: present with its status, missing, or just older.
 
     Args:
@@ -237,17 +240,18 @@ def next_lifecycle(
         stale_after: ``lifecycle.stale_after`` (LIFE-003).
 
     Returns:
-        InterfaceLifecycle: The new state; unchanged when the evidence proves nothing.
+        LifecycleRecord: The new state and stale-clock start; unchanged when
+        the evidence proves nothing.
 
     Raises:
         None
     """
     record = current_record(stored)
     if row is None and stored.if_index is None:
-        return tick(record, now, stale_after).record.state
+        return tick(record, now, stale_after).record
     admin, oper = (None, None) if row is None else (row.admin_status, row.oper_status)
     evidence = InterfaceEvidence(now, LifecycleSource.DISCOVERY, row is not None, admin, oper)
-    return apply_evidence(record, evidence, stale_after).record.state
+    return apply_evidence(record, evidence, stale_after).record
 
 
 def history(

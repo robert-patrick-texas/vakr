@@ -2,7 +2,8 @@
 
 Interfaces have three write paths with different field sets: operator edits
 (owned fields, ownership-checked), discovery (observed fields, no owner),
-and lifecycle changes. Identity history and audit events are append-only.
+and lifecycle changes (state and stale-clock start together, LIFE-003).
+Identity history and audit events are append-only.
 
 Dependencies:
     vakr.adapters.memory.metadata_repos: The generic table.
@@ -30,6 +31,7 @@ from vakr.domain.errors import DuplicateError, ValidationError
 from vakr.domain.ids import InterfaceId
 from vakr.domain.interfaces import (
     INTERFACE_FIXED_FIELDS,
+    INTERFACE_LIFECYCLE_FIELDS,
     INTERFACE_OBSERVED_FIELDS,
     INTERFACE_OWNED_FIELDS,
     Interface,
@@ -39,7 +41,7 @@ from vakr.domain.paging import Page, PageRequest
 from vakr.domain.timestamps import to_epoch_us
 from vakr.ports.metadata.filters import AuditFilter, InterfaceFilter
 
-_LIFECYCLE_FIXED = tuple(f for f in INTERFACE_FIXED_FIELDS if f != "lifecycle")
+_LIFECYCLE_FIXED = tuple(f for f in INTERFACE_FIXED_FIELDS if f not in INTERFACE_LIFECYCLE_FIELDS)
 _OWNER_FIXED = (
     *(f for f in INTERFACE_FIXED_FIELDS if f != "managed_by"),
     *INTERFACE_OBSERVED_FIELDS,
@@ -89,6 +91,7 @@ class MemoryInterfaceRepository(MemoryTable[Interface, InterfaceId, InterfaceFil
         *,
         expected_version: int,
         at: datetime,
+        inactive_since: datetime | None,
     ) -> Interface:
         """Change lifecycle; see ``InterfaceRepository.set_lifecycle``.
 
@@ -97,15 +100,17 @@ class MemoryInterfaceRepository(MemoryTable[Interface, InterfaceId, InterfaceFil
             lifecycle: New state.
             expected_version: Version the caller read.
             at: Change time (UTC).
+            inactive_since: Start of the unbroken INACTIVE/STALE period, or ``None``.
 
         Returns:
             Interface: The stored interface.
 
         Raises:
-            NotFoundError, ConflictError: As the port documents.
+            NotFoundError, ConflictError, ValidationError: As the port documents.
         """
         stored = self._stored(interface_id)
-        changed = replace(stored, lifecycle=lifecycle, updated_at=at, version=expected_version)
+        changed = replace(stored, lifecycle=lifecycle, inactive_since=inactive_since,
+                          updated_at=at, version=expected_version)  # fmt: skip
         return self._replace(stored, changed, None, _LIFECYCLE_FIXED)
 
     def transfer_owner(

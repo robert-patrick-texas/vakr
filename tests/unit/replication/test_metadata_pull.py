@@ -1,4 +1,4 @@
-"""Metadata pull: exact copies, torn snapshots refused, isolation kept (MPOS-002, MPOS-003).
+"""Metadata pull: exact copies, torn snapshots refused, isolation kept (MPOS-002/003, LIFE-003).
 
 Real SQLite stores on both sides; ``FakePrimary`` serves the replication
 endpoints through a JSON round trip.
@@ -11,7 +11,9 @@ Example:
 """
 
 import dataclasses
+import sqlite3
 from collections.abc import Mapping
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -20,7 +22,9 @@ import pytest
 
 from tests.contract import contract_samples as samples
 from tests.unit.replication.repl_testkit import FakePrimary, open_store, puller, seed
+from vakr.domain.enums import InterfaceLifecycle
 from vakr.domain.errors import ValidationError
+from vakr.domain.timestamps import to_epoch_us
 from vakr.health.model import Status
 from vakr.health.replication_check import judge
 from vakr.lifecycle.egress.errors import EgressError
@@ -321,6 +325,49 @@ def test_the_peer_keeps_its_own_collector_record(pair) -> None:
     with qf() as uow:
         assert uow.collectors.get(west.id) is not None
         assert uow.collectors.get(ids["collector"]) is not None
+
+
+def test_life003_the_stale_clock_start_replicates_and_is_in_the_digest(
+    pair, tmp_path: Path
+) -> None:
+    """LIFE-003, MPOS-003: the peer takes ``inactive_since`` from the primary; the digest covers it.
+
+    A peer never writes lifecycle (ADR-024, E.6 "Peers"), so the start of
+    the stale clock must arrive with the row. A change of that column alone
+    must change the digest, or the peer would keep an older clock.
+
+    Args:
+        pair: The stores.
+        tmp_path: Where the primary's file (``east.db``) lives.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    pf, qf, ids, record = pair
+    went_down = NOW - timedelta(days=3)
+    with pf() as uow:
+        iface = uow.interfaces.get(ids["iface"])
+        uow.interfaces.set_lifecycle(iface.id, InterfaceLifecycle.INACTIVE,
+                                     expected_version=iface.version, at=NOW,
+                                     inactive_since=went_down)  # fmt: skip
+        uow.commit()
+    assert puller(FakePrimary(pf), qf, record).pull_once() == "applied"
+    with pf() as a, qf() as b:
+        assert b.interfaces.get(ids["iface"]) == a.interfaces.get(ids["iface"])
+        assert b.interfaces.get(ids["iface"]).inactive_since == went_down
+    before = _digest(pf)
+    earlier = went_down - timedelta(days=1)
+    with closing(sqlite3.connect(tmp_path / "east.db")) as conn:  # that column and nothing else
+        conn.execute("UPDATE interface SET inactive_since = ?", (to_epoch_us(earlier),))
+        conn.commit()
+    assert _digest(pf) != before
+    assert puller(FakePrimary(pf), qf, record).pull_once() == "applied"
+    with qf() as uow:
+        assert uow.interfaces.get(ids["iface"]).inactive_since == earlier
+    assert _digest(qf) == _digest(pf)
 
 
 def test_the_record_ages_and_survives_garbage(tmp_path: Path) -> None:

@@ -1,11 +1,13 @@
 """Table spec for interfaces, with the interface list filter (DB-001, META-002, META-007..013).
 
 One row per logical interface; its UUID, not ``ifIndex``, is the identity
-(invariant 6). Both tag sets live in ``interface_tag``, told apart by
-``kind``, because a description change may replace description-derived
-tags but must never remove an operator's (META-013). The filter hides
-retired interfaces unless asked (LIFE-002), and a tag filter matches either
-kind, as the reference adapter does.
+(invariant 6). ``inactive_since`` (schema 7) holds the start of the stale
+clock, so no other column's change can restart it (LIFE-003). Both tag
+sets live in ``interface_tag``, told apart by ``kind``, because a
+description change may replace description-derived tags but must never
+remove an operator's (META-013). The filter hides retired interfaces
+unless asked (LIFE-002), and a tag filter matches either kind, as the
+reference adapter does.
 
 Dependencies:
     vakr.adapters.sqlite.encoding, metadata.paging, metadata.specs.
@@ -23,6 +25,7 @@ Example:
 import json
 import sqlite3
 from collections.abc import Iterable
+from datetime import datetime
 from uuid import UUID
 
 from vakr.adapters.sqlite.encoding import blob_to_uuid, decode_time, encode_time, optional_blob
@@ -46,10 +49,10 @@ from vakr.ports.metadata.filters import InterfaceFilter
 
 _INTERFACE_COLUMNS = (
     "id", "device_id", "if_index", "if_name", "if_descr", "if_alias", "if_type", "mac",
-    "if_speed", "if_high_speed", "addresses", "lifecycle", "comment", "interest", "sticky",
-    "is_wan_circuit", "provider", "circuit_id", "contracted_bps", "capacity_override_bps",
-    "site_override", "public_dashboard", "display_rank", *OWNER_COLUMNS, "created_at",
-    "updated_at", "version",
+    "if_speed", "if_high_speed", "addresses", "lifecycle", "inactive_since", "comment",
+    "interest", "sticky", "is_wan_circuit", "provider", "circuit_id", "contracted_bps",
+    "capacity_override_bps", "site_override", "public_dashboard", "display_rank", *OWNER_COLUMNS,
+    "created_at", "updated_at", "version",
 )  # fmt: skip
 
 
@@ -69,9 +72,10 @@ def _encode_interface(i: Interface) -> tuple[object, ...]:
     return (
         i.id.bytes, i.device_id.bytes, i.if_index, i.if_name, i.if_descr, i.if_alias, i.if_type,
         i.mac, i.if_speed, i.if_high_speed, canonical_json(list(i.addresses)).decode(),
-        i.lifecycle.value, i.comment, a.interest.value, a.sticky, a.is_wan_circuit, a.provider,
-        a.circuit_id, a.contracted_bps, a.capacity_override_bps, optional_blob(a.site_override),
-        a.public_dashboard, a.display_rank, *owner_values(i.managed_by),
+        i.lifecycle.value, _optional_time(i.inactive_since), i.comment, a.interest.value,
+        a.sticky, a.is_wan_circuit, a.provider, a.circuit_id, a.contracted_bps,
+        a.capacity_override_bps, optional_blob(a.site_override), a.public_dashboard,
+        a.display_rank, *owner_values(i.managed_by),
         encode_time(i.created_at), encode_time(i.updated_at), i.version,
     )  # fmt: skip
 
@@ -108,7 +112,23 @@ def _decode_interface(r: sqlite3.Row, links: Links) -> Interface:
         addresses=tuple(_strings(r["addresses"])), comment=r["comment"],
         tags=tag_ids(links["tags"]), description_tags=tag_ids(links["description_tags"]),
         annotation=annotation, version=r["version"],
+        inactive_since=None if r["inactive_since"] is None else decode_time(r["inactive_since"]),
     )  # fmt: skip
+
+
+def _optional_time(value: datetime | None) -> int | None:
+    """Encode an optional timestamp; ``None`` stays SQL ``NULL``.
+
+    Args:
+        value: The time, or ``None``.
+
+    Returns:
+        int | None: Microseconds since the epoch, or ``None``.
+
+    Raises:
+        None
+    """
+    return None if value is None else encode_time(value)
 
 
 def _strings(text: str) -> list[str]:

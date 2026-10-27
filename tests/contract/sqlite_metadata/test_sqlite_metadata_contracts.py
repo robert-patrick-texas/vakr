@@ -4,7 +4,8 @@ The suites are used unchanged; the fixture comes from this directory's conftest.
 
 Dependencies:
     tests.contract.contract_metadata_crud, contract_metadata_rules, contract_metadata_identity,
-    contract_auth_users, contract_auth_sessions, contract_metadata_operations.
+    contract_metadata_lifecycle, contract_auth_users, contract_auth_sessions,
+    contract_metadata_operations.
 
 Example:
     $ uv run pytest tests/contract/sqlite_metadata/test_sqlite_metadata_contracts.py
@@ -15,6 +16,7 @@ from tests.contract.contract_auth_users import AuthUsersContract
 from tests.contract.contract_dashboards import DashboardsContract
 from tests.contract.contract_metadata_crud import MetadataCrudContract
 from tests.contract.contract_metadata_identity import MetadataIdentityContract
+from tests.contract.contract_metadata_lifecycle import MetadataLifecycleContract
 from tests.contract.contract_metadata_operations import OperationsContract
 from tests.contract.contract_metadata_rules import MetadataRulesContract
 
@@ -29,6 +31,10 @@ class TestSqliteMetadataRules(MetadataRulesContract):
 
 class TestSqliteMetadataIdentity(MetadataIdentityContract):
     """IFID-007, META-008 transfer, and the change counter on a SQLite metadata file."""
+
+
+class TestSqliteMetadataLifecycle(MetadataLifecycleContract):
+    """LIFE-003 and E.6: the stale clock's start in a SQLite metadata file (schema 7)."""
 
 
 class TestSqliteAuthUsers(AuthUsersContract):

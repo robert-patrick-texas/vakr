@@ -3,7 +3,8 @@
 Interfaces have four write paths, each allowed to change its own fields
 only: operator edits (``update``: owned fields, ownership-checked),
 discovery (``update_observed``: observed fields, no owner),
-``set_lifecycle``, and the audited ownership transfer (``transfer_owner``).
+``set_lifecycle`` (state and stale-clock start, LIFE-003), and the audited
+ownership transfer (``transfer_owner``).
 Identity history is append-only, and the schema's triggers refuse any
 update or delete of it. Retiring an interface keeps the
 row, its history, and its telemetry.
@@ -35,6 +36,7 @@ from vakr.domain.errors import DuplicateError, StorageError, ValidationError
 from vakr.domain.ids import DeviceId, IdentityHistoryId, InterfaceId
 from vakr.domain.interfaces import (
     INTERFACE_FIXED_FIELDS,
+    INTERFACE_LIFECYCLE_FIELDS,
     INTERFACE_OBSERVED_FIELDS,
     INTERFACE_OWNED_FIELDS,
     Interface,
@@ -43,7 +45,7 @@ from vakr.domain.inventory import ManagedBy
 from vakr.domain.paging import Page, PageRequest
 from vakr.ports.metadata.filters import InterfaceFilter
 
-_LIFECYCLE_FIXED = tuple(f for f in INTERFACE_FIXED_FIELDS if f != "lifecycle")
+_LIFECYCLE_FIXED = tuple(f for f in INTERFACE_FIXED_FIELDS if f not in INTERFACE_LIFECYCLE_FIELDS)
 _OWNER_FIXED = (
     *(f for f in INTERFACE_FIXED_FIELDS if f != "managed_by"),
     *INTERFACE_OBSERVED_FIELDS,
@@ -160,6 +162,7 @@ class SqliteInterfaceRepository(SqliteTable[Interface, InterfaceId, InterfaceFil
         *,
         expected_version: int,
         at: datetime,
+        inactive_since: datetime | None,
     ) -> Interface:
         """Change lifecycle; history is always kept (LIFE-002).
 
@@ -168,6 +171,7 @@ class SqliteInterfaceRepository(SqliteTable[Interface, InterfaceId, InterfaceFil
             lifecycle: New state.
             expected_version: Version the caller read.
             at: Change time (UTC), stored as ``updated_at``.
+            inactive_since: Start of the unbroken INACTIVE/STALE period, or ``None``.
 
         Returns:
             Interface: The stored interface.
@@ -175,10 +179,12 @@ class SqliteInterfaceRepository(SqliteTable[Interface, InterfaceId, InterfaceFil
         Raises:
             NotFoundError: If the interface does not exist.
             ConflictError: If ``expected_version`` is stale.
+            ValidationError: If ``inactive_since`` does not fit ``lifecycle``.
         """
         self._tx.begin_write()
         stored = self._stored(interface_id)
-        changed = replace(stored, lifecycle=lifecycle, updated_at=at, version=expected_version)
+        changed = replace(stored, lifecycle=lifecycle, inactive_since=inactive_since,
+                          updated_at=at, version=expected_version)  # fmt: skip
         return self._replace(stored, changed, None, _LIFECYCLE_FIXED)
 
     def transfer_owner(

@@ -17,7 +17,7 @@ You need Docker with privileged containers (systemd as PID 1), uv, curl, and out
 
 ```console
 $ make resilience-test                                         # builds the package first
-$ make resilience-test DEB=dist/vakr_<version>_amd64.deb       # about 17 minutes
+$ make resilience-test DEB=dist/vakr_<version>_amd64.deb       # about 14 minutes
 $ make resilience-test DEB=... RESIL_SCENARIOS=restart,power   # some scenarios only
 ```
 
@@ -52,7 +52,7 @@ Three helpers run inside the node with the package's own interpreter:
 
 ## The scenarios
 
-Before any fault, a baseline: `vakr check health` is OK, nothing waits in the spool, there is no incident, and no device is Down. Each scenario ends in the same steady state (every device Active, none Down, `vakr check health` OK), except that after S4 the check stays WARNING for the 24 hours E.24 gives a telemetry-loss incident.
+Before any fault, a baseline: `vakr check health` is OK, nothing waits in the spool, there is no incident, and no device is Down. Each scenario ends in the same steady state (a poll stored for every device since the collector came back, every device Active, none Down, `vakr check health` OK), except that after S4 the check stays WARNING for the 24 hours E.24 gives a telemetry-loss incident.
 
 | Scenario | What the harness does | What it checks |
 |---|---|---|
@@ -63,7 +63,7 @@ Before any fault, a baseline: `vakr check health` is OK, nothing waits in the sp
 
 ## The accounting
 
-Slot `k` of a device is `k × interval + offset` (E.25 decision 1), so once one stored poll shows a device's offset, every slot it was due in the window is known. The harness logs when each collector run became ready (`READY=1`, systemd's `ActiveEnterTimestampMonotonic`) and when it stopped the run and how, then reads every stored poll record and incident. Each expected slot from the end of the warm-up to 45 s before the end is then exactly one of:
+Slot `k` of a device is `k × interval + offset` (E.25 decision 1), so once one stored poll shows a device's offset, every slot it was due in the window is known. The harness logs when each collector run became ready (`READY=1`, systemd's `ActiveEnterTimestampMonotonic`) and when it stopped the run and how, then reads every stored poll record and incident. The accounting waits two intervals after the last recovery, so its window covers it. Each expected slot from the end of the warm-up to 45 s before the accounting is then exactly one of:
 
 | Outcome | Meaning |
 |---|---|
@@ -86,7 +86,7 @@ The run also fails on:
 
 These were decided with the harness (2026-10-27):
 
-1. **Opt-in.** A booted node, a reboot, and two kills take about 17 minutes, need privileged Docker, and reach the Ubuntu archive and PyPI. `make check` stays hermetic; the accounting's rules run there as unit tests.
+1. **Opt-in.** A booted node, a reboot, a held lock, and three kills take about 14 minutes, need privileged Docker, and reach the Ubuntu archive and PyPI. `make check` stays hermetic; the accounting's rules run there as unit tests.
 2. **"Unavailable" is a held write lock.** The store becomes unavailable to writers while it stays readable, as during a long backup or a stuck maintenance job: every write fails after the adapter's 5 s busy timeout (E.20) with a `StorageError`, exactly the path a full or failing disk takes in the ingester. A full filesystem was not used: in the Compact profile the spool and `telemetry.db` share `/var/lib/vakr` (the collector unit may write only there), so filling it fills the spool too, which is the separate `rejected_full` path (6.4, SPOOL-T07, unit-tested).
 3. **A process kill cannot lose the page cache, so S4c simulates it.** `docker kill` stops every process at once, but the host's kernel keeps whatever reached the page cache, and recovery fsyncs it (E.24 "Unclean stop"). S4a and S4b therefore prove the incident and that nothing beyond the E.8 window goes missing, but lose nothing themselves. S4c removes what a real power cut could take: the records appended in the last fsync interval that ingestion had not acknowledged, cut at a frame boundary, plus a torn half frame. It freezes the collector right after an append, so those records exist; the accounting then requires each poll it removed to be missing inside the E.8 window.
 4. **Real intervals.** The collector's test-only interval override is settable from code only, so the inventory sets every device to 30 s, as the two-position tests do.

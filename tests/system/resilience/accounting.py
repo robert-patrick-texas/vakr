@@ -445,11 +445,12 @@ def _check_evidence(stored: Stored, window: tuple[int, int], report: Report) -> 
                         ", ".join(f"{k} {v}" for k, v in sorted(health.items())))  # fmt: skip
 
 
-def check_dropped(lines: Sequence[str], report: Report) -> None:
-    """Require every poll a simulated power cut removed to be missing inside the E.8 window.
+def check_dropped(lines: Sequence[str], incidents: list[dict[str, Any]], report: Report) -> None:
+    """Require each poll a simulated power cut removed to be missing in the E.8 window and ranged.
 
     Args:
-        lines: ``faults.py powercut`` output: ``dropped N``, then ``poll DEVICE SLOT`` lines.
+        lines: ``faults.py powercut`` output: ``dropped N``, then ``poll DEVICE SLOT APPEND_US``.
+        incidents: Telemetry-loss incidents; an ``unclean_stop`` must range over each append.
         report: Updated in place.
 
     Returns:
@@ -459,12 +460,20 @@ def check_dropped(lines: Sequence[str], report: Report) -> None:
         ValueError: If a line is malformed.
     """
     polls = [line.split("\t") for line in lines if line.startswith("poll\t")]
-    outcomes = Counter(report.missing.get((d, int(at)), "stored") for _, d, at in polls)
+    outcomes = Counter(report.missing.get((p[1], int(p[2])), "stored") for p in polls)
     report.notes.append(f"simulated page-cache loss: {lines[0] if lines else 'nothing'}; its "
                         f"{len(polls)} poll(s): " +
                         ", ".join(f"{k} {v}" for k, v in sorted(outcomes.items())))  # fmt: skip
     if outcomes["unexplained"]:
         report.problems.append("a poll the simulated power cut removed is unexplained")
+    ranges = [(i["start_us"], i["end_us"]) for i in incidents
+              if i["kind"] == "unclean_stop" and i["start_us"] is not None
+              and i["end_us"] is not None]  # fmt: skip
+    for poll in polls:
+        appended = int(poll[3]) if len(poll) > 3 else None
+        if appended is not None and not any(lo <= appended <= hi for lo, hi in ranges):
+            report.problems.append(f"no unclean_stop incident's range holds the lost poll "
+                                   f"appended at {appended} (SPOOL-T08)")  # fmt: skip
 
 
 def render(report: Report) -> list[str]:
@@ -517,7 +526,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     limits = Limits(round(args.interval * US), round(args.fsync * US), round(args.handoff * US))
     report = account(runs, (start, end), stored, incidents, limits)
     if args.dropped is not None:
-        check_dropped(args.dropped.read_text(encoding="utf-8").splitlines(), report)
+        check_dropped(args.dropped.read_text(encoding="utf-8").splitlines(), incidents, report)
     print("\n".join(render(report)))
     return 0 if report.passed else 1
 

@@ -153,7 +153,7 @@ mpos-test:
 # Opt-in resilience system tests, MVP-ACC-06 (blueprint 27.6, Appendix E.36): one
 # systemd node and a simulated fleet survive a service restart, a host reboot, the
 # telemetry store unavailable, and an abrupt power loss, with every expected poll
-# stored or explained. About 17 minutes with DEB given.
+# stored or explained. About 14 minutes with DEB given.
 # See docs/development/resilience-tests.md. Not part of `make check`.
 .PHONY: resilience-test
 resilience-test:

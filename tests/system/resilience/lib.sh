@@ -119,21 +119,28 @@ all_unknown_not_down() {
     lines=$(status_lines) || return 1
     none_down && ! awk -F'\t' '$3 !~ /^Unknown/' <<<"$lines" | grep -q .
 }
-health_line() { on vakr check health 2>/dev/null; }
+# Both commands exit 1 on WARNING, which is an answer, not a failure: their output is
+# captured whatever the status, because run.sh's pipefail would fail any pipe from them.
+health_line() { on vakr check health 2>/dev/null || true; }
 check_part() {
     # check_part NAME: that check's line of `vakr doctor`, "[STATUS  ] name: summary". The
     # single Nagios line of `vakr check health` cannot be split: summaries contain ';'.
-    on vakr doctor 2>/dev/null | grep -E "^\[[A-Z]+ *\] $1: " | head -1
+    local all
+    all=$(on vakr doctor 2>/dev/null || true)
+    grep -m 1 -E "^\[[A-Z]+ *\] $1: " <<<"$all"
 }
 health_status() { on vakr check health >/dev/null 2>&1; echo $?; }
 spool_says() {
     # spool_says TEXT: the Nagios line of `vakr check health` and the spool check say TEXT.
-    health_line | grep -qF -- "$1" && check_part spool | grep -qF -- "$1"
+    local line part
+    line=$(health_line)
+    part=$(check_part spool) || return 1
+    grep -qF -- "$1" <<<"$line" && grep -qF -- "$1" <<<"$part"
 }
 spool_quiet() {
     # spool_quiet: the spool check is at most a recent-incident warning, nothing waits long.
     local part
-    part=$(check_part spool) && [ -n "$part" ] || return 1
+    part=$(check_part spool) || return 1
     ! grep -qE 'not accepting writes|ingestion behind|CRITICAL|exhausted' <<<"$part"
 }
 

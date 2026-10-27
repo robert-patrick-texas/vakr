@@ -189,12 +189,15 @@ def test_polls_a_simulated_cut_removed_must_be_in_the_e8_window() -> None:
     runs = [Run(T0 - I, kill, "abrupt", "install"), Run(kill + 15 * S, None, "", "restart")]
     stored = polls_for([slot(k) for k in range(10) if k != 4])
     report = account(runs, WINDOW, stored, [unclean(kill + 16 * S)], LIMITS)
-    check_dropped(["dropped 7", f"poll\t{DEV}\t{slot(4)}"], report)
+    ranged = {**unclean(kill + 16 * S), "start_us": slot(4) - S, "end_us": kill + 16 * S}
+    lost = ["dropped 7", f"poll\t{DEV}\t{slot(4)}\t{slot(4) + S // 2}"]
+    check_dropped(lost, [ranged], report)
     assert report.passed, report.problems
     assert any("E.8 window 1" in n for n in report.notes)
     late = account([Run(T0 - I, None, "", "install")], WINDOW, stored, [], LIMITS)
-    check_dropped(["dropped 7", f"poll\t{DEV}\t{slot(4)}"], late)
+    check_dropped(lost, [{**ranged, "end_us": slot(4)}], late)
     assert any("simulated power cut" in p for p in late.problems)
+    assert any("range holds the lost poll" in p for p in late.problems)
 
 
 def test_loss_before_the_e8_window_is_silent() -> None:

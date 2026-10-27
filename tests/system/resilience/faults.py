@@ -16,7 +16,7 @@ The harness runs this with the package's own interpreter:
   ``spool.fsync_interval`` (1 s, E.8) of its last one that ingestion has
   not acknowledged, the ones no fsync may have covered yet, and gets half
   a frame appended: a torn final write. It prints ``dropped N`` and one
-  ``poll DEVICE SCHEDULED_US`` line per poll record removed.
+  ``poll DEVICE SCHEDULED_US APPEND_US`` line per poll record removed.
 
 Dependencies:
     json, os, signal, sqlite3: Standard library.
@@ -123,7 +123,8 @@ def power_cut(directory: Path) -> int:
     for frame in dropped:
         envelope = json.loads(frame.payload)
         if envelope.get("observation_type") == "device_poll":
-            print(f"poll\t{envelope['payload']['device_id']}\t{envelope['timestamp_us']}")
+            print(f"poll\t{envelope['payload']['device_id']}\t{envelope['timestamp_us']}\t"
+                  f"{frame.header.append_us}")  # fmt: skip
     return 0
 
 

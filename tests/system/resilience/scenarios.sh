@@ -49,12 +49,15 @@ health_is() { [ "$(health_status)" = "$1" ]; }
 behind() {
     # behind: E.24's "ingestion behind": spool_oldest_s above six ingest intervals (60 s);
     # the summary names only the first problem and counts the rest ("+1 more").
-    health_line | grep -q '(+[1-9] more)' &&
-        health_line | grep -oE 'spool_oldest_s=[0-9.]+' | awk -F= '$2 + 0 > 60 {ok = 1} END {exit !ok}'
+    local line
+    line=$(health_line)
+    grep -q '(+[1-9] more)' <<<"$line" &&
+        grep -oE 'spool_oldest_s=[0-9.]+' <<<"$line" | awk -F= '$2 + 0 > 60 {ok = 1} END {exit !ok}'
 }
 api_mentions() {
     # api_mentions PATH TEXT: GET PATH on the socket answers 2xx with TEXT in the body.
-    probe api "$1" | grep -qF -- "$2"
+    local body
+    body=$(probe api "$1") && grep -qF -- "$2" <<<"$body"
 }
 last_start() { awk -F'\t' '$1 == "run_start" { t = $2 } END { print t }' "$EVENTS"; }
 resumed() {

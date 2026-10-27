@@ -106,6 +106,33 @@ def _add_inputs(parser: argparse.ArgumentParser, info: BuildInfo) -> None:
     group.add_argument("--keep-keyword", action="append", default=[], metavar="WORD")
 
 
+def _add_compare(parser: argparse.ArgumentParser) -> None:
+    """Add the options of the parallel-run profiles (``mrtg``, ``smokeping``, ``acceptance``).
+
+    Args:
+        parser: The ``collect`` parser.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    group = parser.add_argument_group("parallel run with MRTG and SmokePing")
+    add = group.add_argument
+    add("--mrtg-config", action="append", default=[], metavar="FILE",
+        help="MRTG configuration, * allowed (default /etc/mrtg.cfg, /etc/mrtg/*.cfg)")  # fmt: skip
+    add("--smokeping-config", action="append", default=[], metavar="FILE",
+        help="SmokePing configuration; default /etc/smokeping/config")  # fmt: skip
+    add("--compare-hours", type=_bounded(float, 1, 744), default=50.0, metavar="H",
+        help="data window ending now (default 50: MRTG logs keep 5-minute rows ~50 h)")  # fmt: skip
+    add("--max-targets", type=_bounded(int, 1, 20000), default=5000, metavar="N")
+    add("--acceptance-targets", type=Path, metavar="FILE",
+        help="interfaces and hosts to export when MRTG/SmokePing run elsewhere")  # fmt: skip
+    add("--acceptance-max-rows", type=_bounded(int, 1, 20_000_000), default=5_000_000, metavar="N")
+    add("--rrdtool", default="rrdtool", metavar="PATH")
+
+
 def _add_outputs(parser: argparse.ArgumentParser) -> None:
     """Add output, encryption, and egress options.
 
@@ -184,6 +211,7 @@ def build_parser(info: BuildInfo) -> argparse.ArgumentParser:
         description="Collect the chosen profiles into one bundle, encrypted by default.",
     )
     _add_inputs(collect, info)
+    _add_compare(collect)
     _add_outputs(collect)
     _add_limits(collect)
     collect.set_defaults(func=run_collect)

@@ -100,6 +100,7 @@ def build_values(config: dict[str, Any], base: Path, recipient: Path | None) -> 
         "app_name": app.get("name", ""),
         "app_commands": [list(c) for c in app.get("commands", [])],
         "app_units": list(app.get("units", [])),
+        "acceptance_command": list(kit.get("acceptance", {}).get("command", [])),
         "keep_keywords": list(kit.get("keep_keywords", [])),
         "egress_get": list(kit.get("egress_get", [])),
         "egress_head": list(kit.get("egress_head", [])),

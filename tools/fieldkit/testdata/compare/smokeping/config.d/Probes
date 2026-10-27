@@ -1,0 +1,36 @@
+*** Probes ***
+
++ FPing
+
+binary = /usr/bin/fping
+
+++ FPingCore
+pings = 10
+mininterval = 0.1
+
++ FPing6
+
+binary = /usr/bin/fping
+protocol = 6
+
++ TelnetIOSPing
+
+binary = /usr/bin/telnet
+forks = 5
+offset = 50%
+step = 300
+login = fk-test-telnet-login
+password = fk-test-telnet-password
+pings = 5
+
++ RADIUS
+
+binary = /usr/bin/radtest
+secret = fk-test-radius-secret
+username = fk-test-radius-user
+password = fk-test-radius-password
+
++ Curl
+
+binary = /usr/bin/curl
+urlformat = https://fk-test-curl-user:fk-test-curl-pass@%host%/health

@@ -84,8 +84,9 @@ def test_zipapp_embeds_version_and_project_values(tmp_path: Path) -> None:
     assert "BEGIN CERTIFICATE" in embedded
     assert "PRIVATE KEY" not in embedded
     assert "'TRANSIT'" in embedded
+    assert "'acceptance_command': ['acceptance', 'export']" in embedded
     assert (
-        "host,snmp,paths,vakr"
+        "host,snmp,paths,mrtg,smokeping,acceptance,vakr"
         in subprocess.run(  # noqa: S603
             [sys.executable, str(pyz), "collect", "--help"],
             capture_output=True,

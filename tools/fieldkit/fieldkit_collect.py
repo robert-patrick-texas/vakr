@@ -39,16 +39,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from fieldkit_acceptance import collect_acceptance
 from fieldkit_app import collect_app
 from fieldkit_bundle import FORMAT_VERSION, BundleError, BundleWriter, safe_label, utc_stamp
+from fieldkit_compare import compare_hosts, redactable
 from fieldkit_context import Context, make_scrub_hook
 from fieldkit_crypto import CryptoError, encrypt
 from fieldkit_host import collect_host
+from fieldkit_mrtg import collect_mrtg
 from fieldkit_paths import collect_paths, ping_target
 from fieldkit_plan import Plan, PreflightError, make_plan
 from fieldkit_pseudo import Pseudonymizer
 from fieldkit_run import BuildInfo, StepLog, progress
 from fieldkit_scrub import Scrubber
+from fieldkit_smokeping import collect_smokeping
 from fieldkit_snmp import collect_snmp
 from fieldkit_snmpconf import CredentialError
 from fieldkit_tunnel import redact_url
@@ -57,6 +61,9 @@ _PROFILES: dict[str, Callable[[Context], None]] = {
     "host": collect_host,
     "snmp": collect_snmp,
     "paths": collect_paths,
+    "mrtg": collect_mrtg,
+    "smokeping": collect_smokeping,
+    "acceptance": collect_acceptance,
 }
 
 
@@ -80,6 +87,7 @@ def _scrubber(args: argparse.Namespace, info: BuildInfo, plan: Plan, host: str) 
     scrubber = Scrubber(Pseudonymizer(plan.key, [*info.keep_keywords, *args.keep_keyword]))
     names = [host, host.split(".")[0], args.peer or ""]
     names += [n for entry in plan.devices for n in (entry, ping_target(entry))]
+    names += compare_hosts(plan.parsed)
     if args.proxy:
         names.append(redact_url(args.proxy).rsplit("@", 1)[-1].split("//")[-1].split(":")[0])
     for name in names:
@@ -114,6 +122,10 @@ def _parameters(args: argparse.Namespace, plan: Plan) -> dict[str, Any]:
         "egress_test": not args.no_egress,
         "limits": {k: getattr(args, k) for k in ("time_budget", "max_bytes", "max_member_bytes")},
         "snmp": {k: getattr(args, k) for k in ("walk_timeout", "device_pause", "snmp_timeout")},
+        "compare": {
+            k: getattr(args, k) for k in ("compare_hours", "max_targets", "acceptance_max_rows")
+        },
+        "credentials_redacted": len(plan.secrets),
     }
 
 
@@ -181,14 +193,16 @@ def _collect(args: argparse.Namespace, info: BuildInfo, plan: Plan) -> tuple[Pat
     scrubber = _scrubber(args, info, plan, host)
     host_label = safe_label(scrubber.p.hostname(host) if scrubber else host.split(".")[0])
     bundle_id = f"{info.bundle_prefix}-{host_label}-{utc_stamp(when)}"
-    secrets = [plan.community.encode()] if plan.community else []
+    secrets = [s.encode() for s in ([plan.community] if plan.community else [])]
+    secrets += [s.encode() for s in redactable(plan.secrets)]
     limits = (args.max_bytes, args.max_member_bytes)
     target = args.output_dir / f"{bundle_id}.tar.gz"
     if target.exists() or target.with_name(target.name + ".p7m").exists():
         raise FileExistsError(f"{target} already exists; rerun in a second")
     writer = BundleWriter(target, when, limits, secrets, make_scrub_hook(scrubber))
     steps = StepLog(deadline=time.monotonic() + args.time_budget)
-    ctx = Context(args, info, writer, steps, scrubber, plan.devices, plan.community)
+    ctx = Context(args, info, writer, steps, scrubber, plan.devices, plan.community,
+                  dict(plan.parsed))  # fmt: skip
     profiles = {**_PROFILES, **({info.app_name: collect_app} if info.app_name else {})}
     try:
         for name in plan.profiles:

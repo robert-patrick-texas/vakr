@@ -10,7 +10,7 @@ than a new tool.
 Dependencies:
     fieldkit_bundle: The open bundle writer.
     fieldkit_run: Step log, build information, and bounded commands.
-    fieldkit_scrub, fieldkit_mibscrub: Pseudonymization hooks.
+    fieldkit_scrub, fieldkit_mibscrub, fieldkit_tablescrub: Pseudonymization hooks.
 
 Safety:
     ``capture`` runs commands from argument lists with a timeout and stores
@@ -25,11 +25,13 @@ Example:
 import argparse
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from fieldkit_bundle import BundleWriter, safe_label
 from fieldkit_mibscrub import scrub_walk
 from fieldkit_run import BuildInfo, StepLog, run_command
 from fieldkit_scrub import Scrubber
+from fieldkit_tablescrub import scrub_table
 
 
 def make_scrub_hook(scrubber: Scrubber | None) -> Callable[[str, str], str] | None:
@@ -40,7 +42,8 @@ def make_scrub_hook(scrubber: Scrubber | None) -> Callable[[str, str], str] | No
 
     Returns:
         Callable[[str, str], str] | None: Hook applying walk-aware rules to
-        ``"snmpwalk"`` members and generic rules to everything else.
+        ``"snmpwalk"`` members, column rules to ``"table"`` members, and
+        generic rules to everything else.
 
     Raises:
         None
@@ -52,7 +55,7 @@ def make_scrub_hook(scrubber: Scrubber | None) -> Callable[[str, str], str] | No
         """Pseudonymize one member's text.
 
         Args:
-            kind: ``"snmpwalk"`` or ``"text"``.
+            kind: ``"snmpwalk"``, ``"table"`` (CSV with a header), or ``"text"``.
             text: Member content.
 
         Returns:
@@ -61,6 +64,8 @@ def make_scrub_hook(scrubber: Scrubber | None) -> Callable[[str, str], str] | No
         Raises:
             None
         """
+        if kind == "table":
+            return scrub_table(scrubber, text)
         return scrub_walk(scrubber, text) if kind == "snmpwalk" else scrubber.text(text)
 
     return hook
@@ -79,6 +84,8 @@ class Context:
         devices: Validated entries from ``--devices``.
         community: SNMPv2c community; excluded from ``repr`` so it cannot
             leak through a traceback or debug print.
+        parsed: Results profiles hand to later ones: parsed MRTG and
+            SmokePing configuration, host aliases, and comparison targets.
     """
 
     args: argparse.Namespace
@@ -88,6 +95,7 @@ class Context:
     scrubber: Scrubber | None = None
     devices: list[str] = field(default_factory=list)
     community: str = field(default="", repr=False)
+    parsed: dict[str, Any] = field(default_factory=dict)
 
     def label(self, name: str) -> str:
         """Return the safe, pseudonymized-if-enabled path label for a host.

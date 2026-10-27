@@ -6,10 +6,13 @@ An operator should never wait through ten minutes of SNMP walks only to
 learn that the bundle cannot be encrypted. Everything checkable up front is
 checked here, in this order: profile names, the device list, the peer, extra
 OIDs, the output directory, OpenSSL 3.0+ and the recipient certificate
-(FIELD-006), then the SNMP community (prompting last, so nothing else can
-fail after the operator typed it), then the pseudonym key (FIELD-005).
+(FIELD-006), the MRTG and SmokePing configuration (whose credentials the
+bundle writer must know before the first member), then the SNMP community
+(prompting last, so nothing else can fail after the operator typed it),
+then the pseudonym key (FIELD-005).
 
 Dependencies:
+    fieldkit_compare: MRTG and SmokePing configuration.
     fieldkit_crypto: OpenSSL preflight, certificate details, pseudonym key.
     fieldkit_snmpconf: Community, device-list, host, and OID validation.
 
@@ -25,13 +28,15 @@ Example:
 import argparse
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
+from fieldkit_compare import CompareError, preflight_compare
 from fieldkit_crypto import certificate_info, load_or_create_key, preflight
 from fieldkit_run import BuildInfo
 from fieldkit_snmpconf import check_host, check_oid, parse_devices, read_community
 
-BASE_PROFILES = ("host", "snmp", "paths")
-"""Built-in profiles in run order; the application profile runs last."""
+BASE_PROFILES = ("host", "snmp", "paths", "mrtg", "smokeping")
+"""Built-in profiles in run order; ``acceptance`` and the application profile run last."""
 
 
 class PreflightError(Exception):
@@ -50,6 +55,8 @@ class Plan:
         openssl: ``openssl version`` line, or ``""`` with ``--no-encrypt``.
         community: SNMPv2c community, or ``""``; hidden from ``repr``.
         key: Pseudonym key, or ``None``; hidden from ``repr``.
+        parsed: MRTG and SmokePing configuration for those profiles.
+        secrets: Credentials found in that configuration; hidden from ``repr``.
     """
 
     profiles: list[str]
@@ -59,6 +66,8 @@ class Plan:
     openssl: str = ""
     community: str = field(default="", repr=False)
     key: bytes | None = field(default=None, repr=False)
+    parsed: dict[str, Any] = field(default_factory=dict, repr=False)
+    secrets: list[str] = field(default_factory=list, repr=False)
 
 
 def profile_names(info: BuildInfo) -> list[str]:
@@ -68,12 +77,14 @@ def profile_names(info: BuildInfo) -> list[str]:
         info: Build information; adds the application profile if named.
 
     Returns:
-        list[str]: ``host``, ``snmp``, ``paths``, then the application.
+        list[str]: ``host``, ``snmp``, ``paths``, ``mrtg``, ``smokeping``,
+        ``acceptance`` (with an acceptance command), then the application.
 
     Raises:
         None
     """
-    return [*BASE_PROFILES, *([info.app_name] if info.app_name else [])]
+    accept = ["acceptance"] if info.acceptance_command and info.app_name else []
+    return [*BASE_PROFILES, *accept, *([info.app_name] if info.app_name else [])]
 
 
 def ordered_profiles(text: str, info: BuildInfo) -> list[str]:
@@ -152,6 +163,10 @@ def make_plan(args: argparse.Namespace, info: BuildInfo, work: Path) -> Plan:
         plan.openssl = preflight(args.openssl)
         plan.recipient = _recipient(args, info, work)
         plan.recipient_info = certificate_info(args.openssl, plan.recipient)
+    try:
+        plan.parsed, plan.secrets = preflight_compare(args, plan.profiles)
+    except CompareError as exc:
+        raise PreflightError(str(exc)) from None
     if "snmp" in plan.profiles:
         plan.community = read_community(args.community_file)
     if args.pseudonymize:

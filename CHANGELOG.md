@@ -15,7 +15,7 @@ Maintenance release. vakr now ships on the newest release of every tool and depe
   - Nothing waits for a release to age. Dependabot's default 3-day cooldown is off for every ecosystem, `web/.npmrc` sets `min-release-age=0`, and the lockfile check overrides any local uv `exclude-newer`.
 - Toolchain and dependencies (TOOLS-001, TOOLS-002), every update `make updates` listed on 2026-10-27:
   - The package bundles CPython 3.15.2 (3.15.1 before), through uv 0.13.6 in the builder image (0.13.5 before).
-  - Runtime: FastAPI 0.162.0 (0.159.1), Starlette 1.10.0 (1.9.0), pyasn1 0.6.5 (0.6.4; published the day of this release), and certifi 2026.10.23. FastAPI's two breaking changes, in 0.160.0 and 0.162.0, concern parameter models and form fields, which vakr does not use.
+  - Runtime: FastAPI 0.162.0 (0.159.1), Starlette 1.10.0 (1.9.0), pyasn1 0.6.5 (0.6.4) and platformdirs 4.13.6 (4.13.5), both published the day of this release, and certifi 2026.10.23. FastAPI's two breaking changes, in 0.160.0 and 0.162.0, concern parameter models and form fields, which vakr does not use.
   - Web UI: Svelte 5.57.3 and TanStack Svelte Query 6.3.6.
   - Developers: ruff 0.17.3, ty 0.0.92, coverage 7.17.0, hypothesis 6.170.12, eslint-plugin-jsdoc 65.4.2, svelte-eslint-parser 1.10.0, typescript-eslint 8.72.1, and `astral-sh/setup-uv` 10.3.2 in CI.
 

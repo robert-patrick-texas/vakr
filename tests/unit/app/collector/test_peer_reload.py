@@ -3,6 +3,12 @@
 Configuration files stay node-local on both positions, so an operator who
 copies ``policies.toml`` to the peer and reloads must see it applied there
 without a restart, just as on the primary.
+
+Dependencies:
+    vakr.app.collector.inventory_service; vakr.app.collector.replication_loop.
+
+Example:
+    $ uv run pytest tests/unit/app/collector/test_peer_reload.py
 """
 
 from pathlib import Path

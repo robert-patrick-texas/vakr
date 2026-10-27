@@ -78,7 +78,7 @@ telemetry loss (unclean_stop): 1904 observation(s) (estimate), sequence 88231-No
 
 | Kind | What happened | What to do |
 |---|---|---|
-| `unclean_stop` | The collector was killed or the host lost power. Observations completed after the last fsync may be gone. The count is an estimate from the rate in the last second before the stop. | Nothing, beyond finding out why it stopped. This is at most about one second of telemetry (E.8). |
+| `unclean_stop` | The collector was killed or the host lost power. Observations completed after the last fsync may be gone. The count is an estimate: the most records any one second (`spool.fsync_interval`) held among the newest records. The time range runs from the last durable record to the restart, because when the collector died is not known. | Nothing, beyond finding out why it stopped. This is at most about one second of telemetry (E.8). |
 | `torn_tail` | Power was lost during a write. vakr cut off the half-written record at the end of the newest segment. | Nothing. |
 | `damaged_segment` | A record failed its checksum somewhere other than the end, which means the disk or something outside vakr changed bytes. vakr renamed the file `.damaged`, stored the records before the damage, and moves the file to `quarantine/` once those are stored. | Check the disk (`smartctl`, `dmesg`). Keep the quarantined file if you want support to look at it. |
 | `bad_header` | A segment's header was unreadable. The whole file went to `quarantine/`. | As for `damaged_segment`. |

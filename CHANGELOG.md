@@ -2,6 +2,62 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## Unreleased
+
+The first M6 (MVP acceptance) release. It adds the tools that turn the parallel run with MRTG and SmokePing into acceptance evidence, manual device entry, bulk inventory import and export, and node promotion. It adds no options. Telemetry migration `0004_interface_status.sql` is additive (`compat: additive`), and every release that can be rolled back to (0.4.0 and later) reads it, so this release carries no manual-update marker and the update timer installs it (E.14).
+
+### Added
+
+- **Manual device entry** (27.4, META-008, META-009; Appendix E.37; [inventory](docs/operations/inventory.md)).
+  - **Ways to do it:** admins can add, change, and retire devices in the web UI (**Devices → Add a device**, **Edit device**), with `vakr device add|set|remove|show`, or through API v1 (`POST /api/v1/devices`, `PATCH` and `DELETE /api/v1/devices/{uuid}`). The same checks as `vakr inventory apply` apply.
+  - **Effect:** devices added this way are managed in vakr, and collectors discover them within a minute. Retiring a device keeps its history.
+  - **Ownership:** devices that `inventory.toml` manages are shown read-only, naming the file.
+- **Classifying interfaces in vakr** (META-007, META-011, META-013; E.37).
+  - The interface page shows and edits the annotation: interest, sticky, WAN circuit, provider, circuit, rates, vakr tags, and comment.
+  - The interface list can select interfaces and tag them at once, and both interface lists offer **Only not yet classified**.
+  - The same is available as `vakr interface annotate` and `vakr interface tag`, and as `PATCH /api/v1/interfaces/{uuid}/annotation` and `POST /api/v1/interfaces/tags`.
+- **Bulk inventory import and export** (META-010, META-013; E.38; [bulk import and export](docs/operations/inventory.md#bulk-import-and-export)).
+  - **Import:** `vakr inventory import FILE` reads a device CSV, an interface-annotation CSV, or a TOML file in the `inventory.toml` format, and shows what it would change. `--apply` writes it in one transaction, audited per change. Problems are listed by row and column, and any one of them stops the whole import.
+  - **Ownership:** an import writes the same records the web UI writes, and new ones are `api:import`. It never changes what `inventory.toml` manages or claims, never moves a record between owners, and never disables or deletes anything. A column left out keeps what is stored; an empty cell clears it.
+  - **Export:** `vakr inventory export [--format toml|csv]` writes the stored sites, devices, and interface annotations with their UUIDs and owners, byte for byte the same for the same records. Importing an export unchanged plans as no changes, and a TOML `--owner file` export is a valid `inventory.toml`. `--unannotated` lists every interface with its description, for classifying interfaces in a spreadsheet.
+- **Node promotion** (MPOS-003, MPOS-006, ADR-024 decisions 23–30, E.39; [losing the primary](docs/operations/two-positions.md#losing-the-primary)).
+  - **Promote:** `sudo vakr node promote` makes a peer the metadata primary when the primary is lost. It reports the newest metadata pull and its age, and refuses without `--force` while the old primary still answers or when that cannot be told. It rewrites `[node]` for you, with a backup, records the old values, audits the change, and restarts only `vakr-collector` and `vakr-api`. Observations keep replicating both ways.
+  - **Two primaries:** the `replication` check of `vakr check health` is CRITICAL and names the node to demote. `vakr status`, the TUI, and the web UI show `TWO PRIMARIES`. No device's state changes.
+  - **Demote:** `sudo vakr node demote` makes a returning old primary a peer of the new one. At its next pull it backs up `metadata.db`, takes the new primary's metadata exactly, and reports the edits it discarded.
+  - **Status:** `vakr node status [--json]` shows the role, the primary, the newest pull, any conflict, and the newest resync.
+- **Acceptance evidence from the node's own data** (MVP-ACC-01, MVP-ACC-02, MVP-ACC-10; E.35; [acceptance reports](docs/operations/acceptance.md)).
+  - `vakr acceptance schedule` reports on-time poll starts, same-device overlap, and drift.
+  - `vakr acceptance gaps` lists every period without data, with the recorded evidence that explains it.
+  - `vakr acceptance coverage` checks graph coverage from 1 h to 400 d, with resets rather than spikes across reloads.
+  - Each prints text or `--json`, per position, and ends in a `RESULT` line. `vakr field collect --profile vakr` brings all three back.
+- **The parallel run with MRTG and SmokePing** (MVP-ACC-03, MVP-ACC-04, FIELD-002, FIELD-004, FIELD-005; E.34; [field data](docs/operations/field-data.md)).
+  - `vakr acceptance export` writes this node's interface samples and ICMP cycles over a window (50 h by default). It is read-only and bounded.
+  - The field kit gains `mrtg`, `smokeping`, and `acceptance` profiles. They collect MRTG's and SmokePing's targets and recent data without any credential, plus vakr's export. Run `vakr field collect --profile host,mrtg,smokeping,acceptance,vakr --pseudonymize` daily during the parallel run, never more than 48 hours apart. rrdtool is needed for RRD files.
+  - New field kit options: `--mrtg-config`, `--smokeping-config`, `--compare-hours`, `--max-targets`, `--acceptance-targets`, `--acceptance-max-rows`, `--rrdtool`.
+- **Interface status records** (E.35, MPOS-004).
+  - Telemetry migration `0004_interface_status.sql` (additive). Stage 1 records an interface's admin and oper status when it changes, and once per interface after each collector start. They are status records, not samples: down interfaces still get no traffic records.
+  - A link that goes down and comes back while its device answers is now explained as `interface_down` by `vakr acceptance gaps`.
+  - The records replicate to the partner with their poll and expire with native data. They cost about 73 MB per node at a pessimistic rate.
+- `inventory.toml` interface annotations accept an optional `uuid`, so an annotation keeps applying after its interface is renamed. Existing files need no change.
+- Developers:
+  - `make resilience-test` runs the MVP-ACC-06 resilience system tests (restart, reboot, telemetry store unavailable, power loss) against the package (E.36; [resilience tests](docs/development/resilience-tests.md)).
+  - `make acceptance-report` turns the parallel-run field bundles in `inbox/` into the ACC-03 and ACC-04 report ([parallel run](docs/development/parallel-run.md)).
+  - The two-position harness has a promote scenario, MPOS-T05 (`MPOS_FEATURES=promote`).
+
+### Changed
+
+- Interface lifecycle now follows each Stage 1 poll (blueprint E.6). An interface that goes down shows `inactive` and "not up/up" in `vakr status`, the TUI, and the web within seconds, instead of at the next rediscovery.
+
+### Fixed
+
+- After a crash or power cut, the `unclean_stop` telemetry-loss incident now estimates the loss from the busiest second among the newest spool records. Its time range now runs from the last durable record to the restart (SPOOL-T08, E.24). Before, after a quiet spell, it could undercount a lost burst of poll results and give a time range that did not contain them.
+- `vakr replication status --json` no longer fails on a peer that has a pull record.
+
+### Notes for operators
+
+- From 0.5.0, nothing is needed: the update timer installs this release, or run `sudo vakr self-update`. `sudo vakr self-update --rollback` returns to 0.5.0, which reads the new telemetry schema because the migration is additive.
+- During the parallel run, run the field kit daily as described in [field data](docs/operations/field-data.md#the-parallel-run-with-mrtg-and-smokeping), and send the bundles as before.
+
 ## 0.5.0 - 2026-10-27
 
 Maintenance release. vakr now ships on the newest release of every tool and dependency, checked again when the release is cut, and holds one back only after it fails vakr's tests (ADR-036). This release bundles CPython 3.15.2 and updates FastAPI, Starlette, and pyasn1, the SNMP codec. It changes no database schema and adds no options. Upgrades are supported from 0.4.0 on, because no earlier release is in operation (owner, 2026-10-27), so this release carries no manual-update marker and the update timer installs it.

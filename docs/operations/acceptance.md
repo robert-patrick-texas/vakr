@@ -80,10 +80,11 @@ Collector or storage trouble is never reported as the device being down, and a s
 
 ### What vakr does not record
 
-Three things the report cannot see, which an operator may need to explain by hand:
+Four things the report cannot see, which an operator may need to explain by hand:
 
 - **An interface that went down and came back.** Interfaces that are not up/up get no samples and no stored status (E.27 #7), so a link that flapped while its device answered SNMP is `unexplained`. Telling it apart would need a status record for interfaces that are not sampled, which is a telemetry schema change.
 - **Admin-state history.** The inventory keeps a device's current admin state and when it last changed. A device disabled and re-enabled inside the window explains its gap only through the audit entries at either end (`inventory_change`).
+- **An interface that has just gone down.** Its lifecycle changes at the next rediscovery (every 24 h), so until then its gap is `unexplained` rather than `interface_not_up`.
 - **Why a poll was not attempted.** The record says not attempted, and `COLLECTOR_DEGRADED` for a capacity or storage refusal, but not which. The spool fill level in the health reports separates a full spool from a busy collector.
 
 ## Coverage (MVP-ACC-02)

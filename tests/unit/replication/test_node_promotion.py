@@ -332,8 +332,9 @@ def test_mpos006_a_second_primary_is_critical_node_health_and_in_the_health_line
     east = new_id(CollectorId)
     src, dst = k.store_at(tmp_path / "src"), k.store_at(tmp_path / "dst")
     record = installed.state_dir / rec.FILE
+    now = ManualClock(datetime.now(UTC))  # the partner's answer must be fresh (E.39)
     puller = ObservationPuller(k.FakePartner(k.source_for(src, east)), k.backend(dst).writer,
-                               record, ManualClock(k.T0), new_id(CollectorId))  # fmt: skip
+                               record, now, new_id(CollectorId))  # fmt: skip
     puller.pull_once(100)
     partner = role_record.read_json(installed.state_dir / role_record.PARTNER_FILE)
     assert partner is not None

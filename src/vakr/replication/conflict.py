@@ -4,7 +4,11 @@ The observation puller records what the partner's state answered in
 ``partner.json``. A primary whose partner said ``primary`` after this
 node's own newest promotion reports CRITICAL node health, naming the node
 that looks like the old primary (the one promoted earlier, or never) and
-the command to run there. It never touches a target's state.
+the command to run there. The evidence counts as now for ``FRESH_FOR``
+(5 minutes); after that, while no newer answer arrives (the partner is
+switched off, say), it is a WARNING that says when the partner was last
+seen as a primary. An answer as a peer clears it. It never touches a
+target's state.
 
 Dependencies:
     vakr.replication.role_record: The partner and role records.
@@ -19,7 +23,8 @@ Example:
 """
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -27,24 +32,54 @@ from vakr.config.node import PRIMARY, NodeSettings
 from vakr.replication import role_record
 
 DOC = "docs/operations/two-positions.md#when-the-old-primary-comes-back"
+FRESH_FOR = timedelta(minutes=5)
+"""How long a partner's "primary" answer counts as now (E.39): ten observation pulls of 30 s,
+the same age at which the replication check starts to warn (E.13)."""
 
 
-def conflict_at(state_dir: Path, node: NodeSettings) -> str | None:
-    """Read the records and say whether this node and its partner are both primaries.
+@dataclass(frozen=True, slots=True)
+class Conflict:
+    """A second primary, as this node's records show it.
+
+    Attributes:
+        critical: ``True`` while the evidence is fresh (two primaries now); ``False``
+            once it is older than ``FRESH_FOR`` (last seen as a primary, silent since).
+        text: The summary, naming the node to demote.
+    """
+
+    critical: bool
+    text: str
+
+
+def conflict_at(state_dir: Path, node: NodeSettings, now: datetime) -> Conflict | None:
+    """Read the records and say whether this node's partner is, or was lately, a primary too.
 
     Args:
         state_dir: ``/var/lib/vakr``.
         node: This node's settings.
+        now: Current time (UTC).
 
     Returns:
-        str | None: The CRITICAL summary, or ``None``.
+        Conflict | None: CRITICAL while the partner said ``primary`` within
+        ``FRESH_FOR``, WARNING after that until it answers otherwise, else ``None``.
 
     Raises:
         None
     """
     partner = role_record.read_json(state_dir / role_record.PARTNER_FILE)
     own = role_record.promotion(state_dir / role_record.ROLE_FILE)
-    return two_primaries(node, partner, own["at"] if own else None)
+    why = two_primaries(node, partner, own["at"] if own else None)
+    if why is None or partner is None:
+        return None
+    seen = _moment(partner.get("seen_at"))
+    if now - seen <= FRESH_FOR:
+        return Conflict(True, why)
+    where = partner.get("position") or node.peer_url
+    when = partner.get("seen_at") or "an unknown time"
+    return Conflict(False, f"partner {where} was last seen as a primary at {when}, and no "
+                    "newer answer has been recorded since (it may be switched off): before it "
+                    "rejoins, demote it there (`sudo vakr node demote`); if it is gone for good, "
+                    f"remove node.peer_url here ({DOC})")  # fmt: skip
 
 
 def two_primaries(node: NodeSettings, partner: Mapping[str, Any] | None,

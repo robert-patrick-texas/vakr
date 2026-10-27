@@ -14,6 +14,8 @@ node with a partner URL the observation pull is judged too
 (``vakr.health.observation_check``), and the worse of the two answers.
 A primary whose partner reported itself a primary at the newest
 observation pull is CRITICAL: two primaries (``vakr node demote``, E.39).
+Once that answer is older than 5 minutes with nothing newer, it is a
+WARNING naming when the partner was last seen as a primary.
 
 Dependencies:
     vakr.replication.status: The pull record the collector writes.
@@ -78,30 +80,37 @@ def check_replication() -> CheckResult:
     since = _since(found, now)
     observed = observation_check.judge(found, None if found is None else found.lag_s(now), since)
     result = observed if metadata is None else _worse(metadata, observed)
-    return _worse(conflict, result) if (conflict := two_primaries_check(paths, node)) else result
+    conflict = two_primaries_check(paths, node, now)
+    return result if conflict is None else _worse(conflict, result)
 
 
-def two_primaries_check(paths: InstallPaths, node: NodeSettings) -> CheckResult | None:
-    """Report CRITICAL when this primary's partner says it is a primary too (E.39).
+def two_primaries_check(paths: InstallPaths, node: NodeSettings,
+                        now: datetime) -> CheckResult | None:  # fmt: skip
+    """Report two primaries: CRITICAL while fresh, WARNING once stale (E.39).
 
     Two primaries each accept metadata edits that the other never copies, and
     the edits on the one demoted later are discarded; that needs the operator
-    now, so it is CRITICAL, not WARNING. It is node health only (MPOS-006).
+    now, so it is CRITICAL, not WARNING. Evidence older than ``FRESH_FOR``
+    with no newer answer (the old primary switched off) is a WARNING that
+    says when it was last seen. It is node health only (MPOS-006).
 
     Args:
         paths: The installation layout.
         node: This node's settings.
+        now: Current time (UTC).
 
     Returns:
-        CheckResult | None: The CRITICAL result, or ``None`` without a conflict.
+        CheckResult | None: The result, or ``None`` without a conflict.
 
     Raises:
         None
     """
-    why = conflict_at(paths.state_dir, node)
-    if why is None:
+    found = conflict_at(paths.state_dir, node, now)
+    if found is None:
         return None
-    return CheckResult(NAME, Status.CRITICAL, why, (PerfDatum("replication_primaries", 2),))
+    if not found.critical:
+        return CheckResult(NAME, Status.WARNING, found.text)
+    return CheckResult(NAME, Status.CRITICAL, found.text, (PerfDatum("replication_primaries", 2),))
 
 
 def _since(record: obs_status.ObservationPullStatus | None, now: datetime) -> float:

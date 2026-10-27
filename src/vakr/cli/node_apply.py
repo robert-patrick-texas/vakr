@@ -56,6 +56,7 @@ def _refuse(message: str) -> int:
     Raises:
         None
     """
+    sys.stdout.flush()  # the preconditions first, then why, even through a pipe
     print(f"vakr: {message}", file=sys.stderr)
     return EXIT_REFUSED
 

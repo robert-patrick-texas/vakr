@@ -209,7 +209,7 @@ The tests are offline: every request and command is answered from `testdata/` or
 
 ```sh
 uv run --with pytest==9.1.1 pytest tools/check-updates
-uvx ruff@0.17.1 check tools/check-updates && uvx ruff@0.17.1 format --check tools/check-updates
+uvx ruff@0.17.3 check tools/check-updates && uvx ruff@0.17.3 format --check tools/check-updates
 ```
 
 ## Known limitations

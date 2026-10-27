@@ -90,7 +90,7 @@ The directory holds `md2html.py` (the entry point, site assembly, and command li
 ```sh
 uv run --with pytest==9.1.1 --with markdown-it-py==4.2.0 --with mdit-py-plugins==0.6.1 \
     pytest tools/md2html
-uvx ruff@0.17.1 check tools/md2html && uvx ruff@0.17.1 format --check tools/md2html
+uvx ruff@0.17.3 check tools/md2html && uvx ruff@0.17.3 format --check tools/md2html
 ```
 
 When you bump a dependency, change the pin in `md2html.py`'s inline metadata and in the test command together.

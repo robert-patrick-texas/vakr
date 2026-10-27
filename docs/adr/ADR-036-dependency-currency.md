@@ -28,7 +28,7 @@ On 2026-10-27 the report showed 17 updates available, including uv 0.13.6 and CP
 5. **No tool may impose a minimum release age.** Every Dependabot entry sets `cooldown: exclude: ["*"]`. `web/.npmrc` sets `min-release-age=0`, which outranks a developer's `~/.npmrc`. The lockfile check passes a far-future `--exclude-newer`, which overrides any `uv.toml` or `UV_EXCLUDE_NEWER` cutoff. A test keeps all three in place.
 6. **Builder-image pins are checked.** check-updates reads uv, Go, and nfpm from `packaging/Dockerfile`. The Node image is already tied to `web/.node-version` by a packaging test.
 
-The first exception: **TypeScript 7.0.2**, tested on 2026-10-27 in a copy of `web/`. typescript-eslint 8.72.0 refuses TypeScript 7.0, and SvelteKit 3.1.0 crashes loading `tsconfig.json` (`Cannot read properties of undefined (reading 'readFile')`). That breaks lint, svelte-check, the unit tests, the API-types check, and the build. The same copy passes all five on 6.0.3, so vakr stays on 6.0.3.
+The first exception: **TypeScript 7.0.2**, tested on 2026-10-27 in a copy of `web/`. typescript-eslint 8.72.0 refuses TypeScript 7.0 (8.72.1, adopted the same day, still does), and SvelteKit 3.1.0 crashes loading `tsconfig.json` (`Cannot read properties of undefined (reading 'readFile')`). That breaks lint, svelte-check, the unit tests, the API-types check, and the build. The same copy passes all five on 6.0.3, so vakr stays on 6.0.3.
 
 ## Alternatives
 

@@ -18,5 +18,5 @@
 [[exception]]
 item = "typescript"
 version = "7.0.2"
-reason = "typescript-eslint 8.72.0 refuses TS 7.0 (lint); SvelteKit 3.1.0 crashes loading tsconfig (svelte-check, vitest, build); 6.0.3 passes all"
+reason = "typescript-eslint 8.72.1 refuses TS 7.0 (lint); SvelteKit 3.1.0 crashes loading tsconfig (svelte-check, vitest, build); 6.0.3 passes all"
 recorded = 2026-10-27

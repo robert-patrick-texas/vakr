@@ -6,7 +6,7 @@ rows, ``(series_key, collector_key, bucket_offset_s)`` in the month
 partitions for rollups. Native reads select only the columns a mark needs
 and compute metric presence in SQL, so no observation is rebuilt. Bucket
 reads step through each payload's counts and skip its values
-(``payload_summary``), which is the costly part of a rollup read.
+(``rollup_summary``), which is the costly part of a rollup read.
 
 Dependencies:
     sqlite3: Statements on the caller's read transaction.
@@ -18,26 +18,24 @@ Safety:
     the catalog via ``layout.checked``; every value is a bound parameter.
 
 Example:
-    >>> payload_summary(bytes((1, 0, 1, 15, 15, 0, 0)))
-    (15, 1, 0)
+    >>> SqliteAcceptanceQuery.__name__
+    'SqliteAcceptanceQuery'
 """
 
 # Arm SQL interpolates checked partition names and fixed column names only.
-# ruff: noqa: S608
 
-import sqlite3
+from typing import Any
 from uuid import UUID
 
 from vakr.adapters.sqlite.telemetry.keys import find_key
 from vakr.adapters.sqlite.telemetry.layout import FAMILY_OF, METRIC_COLUMN, ROLLUP_FAMILY_OF
 from vakr.adapters.sqlite.telemetry.partitions import ROLLUP_HORIZON, spans, state
-from vakr.adapters.sqlite.telemetry.payload_reader import PayloadReader
 from vakr.adapters.sqlite.telemetry.reads import native_start, sources, subject_key, union
 from vakr.adapters.sqlite.telemetry.rollup_reads import rollup_dictionary
+from vakr.adapters.sqlite.telemetry.rollup_summary import bucket_rows, payload_summary
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.adapters.sqlite.telemetry.vocab import code_of
 from vakr.domain.enums import ObservationType, PollExecution
-from vakr.domain.errors import StorageError
 from vakr.domain.ids import CollectorId, DeviceId
 from vakr.domain.quality import Quality
 from vakr.domain.rollups import ROLLUP_BUCKET_SECONDS
@@ -74,42 +72,6 @@ def _presence(observation_type: ObservationType) -> str:
     """
     metrics = _METRICS[observation_type]
     return " | ".join(f"(({METRIC_COLUMN[m]} IS NOT NULL) << {i})" for i, m in enumerate(metrics))
-
-
-def payload_summary(payload: object) -> tuple[int, int, int]:
-    """Return a rollup payload's largest sample count, presence bits, and quality union.
-
-    Args:
-        payload: The stored blob (see ``rollup_codec``).
-
-    Returns:
-        tuple[int, int, int]: Samples, bit ``slot - 1`` per metric with valid
-        samples, and the union of the metrics' quality flags.
-
-    Raises:
-        StorageError: If the payload is truncated or malformed.
-    """
-    if not isinstance(payload, bytes) or len(payload) < 3:
-        raise StorageError("a stored rollup payload is damaged", retryable=False)
-    present, shared, valid_is_sample = payload[0], payload[1], payload[2]
-    reader = PayloadReader(payload, 3)
-    samples = available = quality = sample = 0
-    for slot in range(8):
-        bit = 1 << slot
-        if not present & bit:
-            continue
-        if not shared & bit:
-            reader.varint()
-            sample = reader.varint()
-            quality |= reader.varint()
-        valid = sample if valid_is_sample & bit else reader.varint()
-        if valid > 0:
-            reader.skip_values()
-            available |= bit
-        samples = max(samples, sample)
-    if not reader.done():
-        raise StorageError("a stored rollup payload has trailing bytes", retryable=False)
-    return samples, available, quality
 
 
 class SqliteAcceptanceQuery:
@@ -218,7 +180,7 @@ class SqliteAcceptanceQuery:
             bounds = (to_epoch_us(window.start), to_epoch_us(window.end))
             parts = spans(conn, family, *bounds)
             for name, month_us in reversed(parts) if newest_first else parts:
-                rows = _bucket_rows(conn, name, month_us, (s, c), bounds, newest_first)
+                rows = bucket_rows(conn, name, month_us, (s, c), bounds, newest_first)
                 for offset, payload in rows:
                     start = month_us + offset * _US
                     if start + ROLLUP_BUCKET_SECONDS * _US <= expired:
@@ -231,7 +193,7 @@ class SqliteAcceptanceQuery:
     def _native(
         self, family: str, columns: str, subject: UUID, collector: UUID, window: TimeWindow,
         limit: int, *, descending: bool,
-    ) -> list[tuple[object, ...]]:  # fmt: skip
+    ) -> list[tuple[Any, ...]]:  # fmt: skip
         """Fetch up to ``limit + 1`` rows of one subject and collector from a native family.
 
         Args:
@@ -244,7 +206,7 @@ class SqliteAcceptanceQuery:
             descending: Newest first.
 
         Returns:
-            list[tuple[object, ...]]: The rows, in the requested order.
+            list[tuple[Any, ...]]: The rows, in the requested order (SQLite values).
 
         Raises:
             sqlite3.Error: If a query fails.
@@ -262,36 +224,6 @@ class SqliteAcceptanceQuery:
             sql += f" ORDER BY ts_us {order}, observation_uuid {order} LIMIT :n"
             params = {"s": key, "c": col, "a": start, "b": end, "n": limit + 1}
             return conn.execute(sql, params).fetchall()
-
-
-def _bucket_rows(
-    conn: sqlite3.Connection, name: str, month_us: int, keys: tuple[int, int],
-    bounds: tuple[int, int], descending: bool,
-) -> list[tuple[int, bytes]]:  # fmt: skip
-    """Fetch one month partition's 15-minute rows of a subject and collector in the window.
-
-    Args:
-        conn: Connection inside the read transaction.
-        name: Checked partition name.
-        month_us: The partition's start.
-        keys: Series and collector keys.
-        bounds: ``(start_us, end_us)`` on the bucket start.
-        descending: Newest first.
-
-    Returns:
-        list[tuple[int, bytes]]: ``(bucket offset in seconds, payload)`` rows.
-
-    Raises:
-        sqlite3.Error: If the query fails.
-    """
-    order = "DESC" if descending else "ASC"
-    return conn.execute(
-        f"SELECT bucket_offset_s, payload FROM {name} WHERE series_key = :s "
-        "AND collector_key = :c AND width_adj_s = 0 AND bucket_offset_s >= :lo "
-        f"AND bucket_offset_s < :hi ORDER BY bucket_offset_s {order}",
-        {"s": keys[0], "c": keys[1],
-         "lo": -(-(bounds[0] - month_us) // _US), "hi": -(-(bounds[1] - month_us) // _US)},
-    ).fetchall()  # fmt: skip
 
 
 def _summary(payload: object) -> tuple[int, int, Quality]:

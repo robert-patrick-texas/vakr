@@ -50,6 +50,8 @@ class BuildInfo:
         app_name: Installed application's command and profile name, or ``""``.
         app_commands: Argument lists run by the application profile.
         app_units: journald unit globs read by the application profile.
+        acceptance_command: Arguments after the application command that
+            write its comparison export (the ``acceptance`` profile), or ``()``.
         keep_keywords: Description keywords kept verbatim when pseudonymizing.
         egress_get: URLs fetched with GET by the reachability test.
         egress_head: URLs requested with HEAD by the reachability test.
@@ -64,6 +66,7 @@ class BuildInfo:
     app_name: str = ""
     app_commands: tuple[tuple[str, ...], ...] = ()
     app_units: tuple[str, ...] = ()
+    acceptance_command: tuple[str, ...] = ()
     keep_keywords: tuple[str, ...] = ()
     egress_get: tuple[str, ...] = ()
     egress_head: tuple[str, ...] = ()

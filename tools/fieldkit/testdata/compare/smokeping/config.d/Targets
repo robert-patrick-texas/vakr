@@ -1,0 +1,57 @@
+*** Targets ***
+
+probe = FPing
+
+## You have to edit and uncomment all what you want below this.
+# Please, refer to smokeping_config man page for more info
+# The given adresses aren't real to avoid DoS.
+
+menu = Top
+title = Network Latency Grapher
+remark = Welcome to the SmokePing website of NetOps.
+
++ Core
+
+menu = Core
+title = Core routers and switches
+
+++ rtr1
+
+menu = rtr1
+title = rtr1.example.net (Dallas DC1)
+host = rtr1.example.net
+
+++ sw2
+
+menu = sw2
+title = sw2 access switch
+host = 192.0.2.20
+slaves = boomer
+
+++ edge3
+
+probe = FPingCore
+menu = edge3
+title = edge3 WAN edge
+host = 192.0.2.30
+
++ Remote
+
+menu = Remote
+title = Measured by telnet from the router
+
+++ far1
+
+probe = TelnetIOSPing
+host = 192.0.2.99
+
++ Pair
+
+menu = Pair
+title = rtr1 and sw2 together
+
+++ both
+
+menu = both
+title = rtr1 and sw2
+host = /Core/rtr1 /Core/sw2

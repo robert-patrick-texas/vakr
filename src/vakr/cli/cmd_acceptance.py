@@ -2,8 +2,7 @@
 
 The group holds one subcommand per report. Each module listed in
 ``SUBCOMMAND_MODULES`` adds its own subcommands with ``register(actions)``,
-so another report (such as the MRTG/SmokePing comparison export) joins the
-group by adding its module name here and nothing else.
+so a report joins the group by adding its module name here and nothing else.
 
 - ``schedule`` (MVP-ACC-01): on-time poll starts, same-device overlap,
   drift, and the 60 s workload, per collector, over 7 days by default.
@@ -12,9 +11,12 @@ group by adding its module name here and nothing else.
 - ``coverage`` (MVP-ACC-02): traffic, packet, and error graphs of every
   monitored interface at 1 h, 24 h, 7 d, 30 d, and 400 d, and no spike
   across reloads or counter discontinuities; events over 14 days.
+- ``export`` (MVP-ACC-03, MVP-ACC-04): this node's interface samples and
+  ICMP cycles for the MRTG/SmokePing comparison (E.34); 50 h by default.
 
 Every report is read-only and bounded, prints text or ``--json``, and ends
-with ``RESULT <criterion>: PASS|FAIL|INCOMPLETE``. Exit status: 0 pass,
+with ``RESULT <criterion>: PASS|FAIL|INCOMPLETE`` (``export`` writes files
+instead). Exit status: 0 pass (``export``: written in full),
 1 fail, 2 usage error, 3 incomplete or the data could not be read.
 
 Dependencies:
@@ -34,7 +36,7 @@ import sys
 
 from vakr.cli.common import SubParsers
 
-SUBCOMMAND_MODULES: tuple[str, ...] = ("vakr.cli.acceptance_reports",)
+SUBCOMMAND_MODULES: tuple[str, ...] = ("vakr.cli.acceptance_reports", "vakr.cli.acceptance_export")
 """Modules whose ``register(actions)`` adds ``vakr acceptance`` subcommands, in help order."""
 
 EXIT_USAGE = 2

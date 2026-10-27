@@ -1,0 +1,20 @@
+# This is the main SmokePing configuration file, as the Debian and Ubuntu
+# smokeping package lays it out: the sections live in config.d/ and are
+# joined with @include. The package uses absolute paths
+# (/etc/smokeping/config.d/General); this fixture uses relative ones so the
+# tests can run it from anywhere. Every password and secret is a fake test
+# value (fk-test-...).
+
+@include config.d/General
+
+@include config.d/Alerts
+
+@include config.d/Database
+
+@include config.d/Presentation
+
+@include config.d/Probes
+
+@include config.d/Slaves
+
+@include config.d/Targets

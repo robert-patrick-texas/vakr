@@ -29,6 +29,12 @@ commands = [
 ]
 units = ["vakr*"]
 
+[fieldkit.acceptance]
+# `--profile acceptance`: the application's export for the MRTG/SmokePing parallel run
+# (MVP-ACC-03, MVP-ACC-04), run as `<app> <command...> --window <hours>h --limit N [--targets FILE]`.
+# It writes a member stream on standard output, which the kit splits into bundle members.
+command = ["acceptance", "export"]
+
 [inbox]
 recipient_key = "~/.config/vakr-field/recipient-key.pem"   # never inside the repository
 recipient_cn = "vakr field recipient"

@@ -159,3 +159,11 @@ mpos-test:
 resilience-test:
 	DEB=$(DEB) RESIL_DEVICES=$(RESIL_DEVICES) RESIL_OUTAGE=$(RESIL_OUTAGE) \
 	RESIL_SCENARIOS=$(RESIL_SCENARIOS) RESIL_KEEP=$(RESIL_KEEP) tests/system/resilience/run.sh
+
+# Parallel-run evidence (MVP-ACC-03, MVP-ACC-04): compare the field bundles in inbox/
+# with MRTG and SmokePing and write the Markdown and JSON reports (tools/acceptance).
+TY_PATHS += --extra-search-path tools/acceptance
+ACCEPTANCE_OUT ?= .
+.PHONY: acceptance-report
+acceptance-report:
+	uv run tools/acceptance/acceptance_report.py --output $(ACCEPTANCE_OUT)

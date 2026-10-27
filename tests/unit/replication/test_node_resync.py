@@ -15,6 +15,7 @@ Example:
 
 import dataclasses
 import sqlite3
+from contextlib import closing
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -188,7 +189,8 @@ def test_e39_guard_triggers_return_after_the_resync(partitioned) -> None:
     ef, wf, _, state = partitioned
     resync = Resync(state, ef, lambda: None, lambda: LATER)
     MetadataPuller(_Promoted(wf), ef, state / "pull.json", ManualClock(LATER), resync).pull_once()
-    with sqlite3.connect(state.parent / "east.db") as db:
+    # The connection's own context manager ends the transaction but leaves it open.
+    with closing(sqlite3.connect(state.parent / "east.db")) as db:
         names = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
         assert {"device_never_deleted", "identity_review_closed_is_final"} <= names
         with pytest.raises(sqlite3.DatabaseError, match="never deleted"):

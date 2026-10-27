@@ -2,7 +2,8 @@
 @component
 The interface page (12.5, UI-002; WEB-T03, WEB-T04, WEB-T06).
 
-Identity and circuit metadata, current values, then traffic, utilization,
+Identity and circuit metadata, its classification (and, for admins, the
+annotation form), current values, then traffic, utilization,
 packets, and errors over the chosen range (presets 1h to 400d or a bounded
 custom range), the admin/oper state timeline, and the identity history
 with prior `ifIndex` values. Every graph names its resolution and zone.
@@ -15,6 +16,7 @@ A link back keeps the list's filters when the user came from a list.
 	import { isAdmin } from '#lib/api/session.svelte.ts';
 	import StatusTimeline from '#lib/charts/StatusTimeline.svelte';
 	import PinToDashboard from '#lib/dashboards/PinToDashboard.svelte';
+	import AnnotationPanel from '#lib/inventory/AnnotationPanel.svelte';
 	import { deviceHref, query as qs } from '#lib/links.ts';
 	import { interfaceQuery } from '#lib/query/reads.ts';
 	import { interfaceGraphQuery, timelineQuery } from '#lib/query/reads-history.ts';
@@ -73,6 +75,7 @@ A link back keeps the list's filters when the user came from a list.
 		</h1>
 		{#if d.interface.if_alias}<p class="muted">{d.interface.if_alias}</p>{/if}
 		<InterfaceFacts detail={d} />
+		<AnnotationPanel interfaceId={id} />
 		{#if isAdmin()}<PinToDashboard interfaceId={id} />{/if}
 
 		<section aria-labelledby="graphs-h">
@@ -101,7 +104,7 @@ A link back keeps the list's filters when the user came from a list.
 			<p class="muted note">
 				Identity reviews and the admin's decision are on the <a href="/identity-reviews"
 					>identity reviews</a
-				> page. Policy explanations and metadata editing are not in API v1 yet.
+				> page. Policy explanations are not in API v1 yet.
 			</p>
 		</section>
 	{/snippet}

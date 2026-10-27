@@ -12,6 +12,7 @@ at the top. The list refreshes every 30 s in place.
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { createQuery } from '@tanstack/svelte-query';
+	import { isAdmin } from '#lib/api/session.svelte.ts';
 	import { devicesQuery, type DeviceQuery } from '#lib/query/reads.ts';
 	import { filterOptions } from '#lib/query/options.svelte.ts';
 	import { readDeviceFilters, toQuery } from '#lib/state/filters.ts';
@@ -79,6 +80,7 @@ at the top. The list refreshes every 30 s in place.
 <svelte:head><title>Devices · vakr</title></svelte:head>
 
 <h1>Devices</h1>
+{#if isAdmin()}<p><a href="/devices/new">Add a device</a></p>{/if}
 {#if browsing.length > 0}
 	<p class="notice notice-gray" data-testid="browsing">
 		Browsing by {browsing.join(', ')}. <a href="/devices">Show all devices</a>

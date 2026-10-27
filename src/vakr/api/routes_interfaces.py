@@ -49,7 +49,7 @@ from vakr.api.params import (
     Search,
     collector_id,
     graph_request,
-    interface_scope,
+    interface_list_scope,
 )
 from vakr.api.principals import Viewer
 from vakr.api.responses import paged, view_response
@@ -84,7 +84,7 @@ def missing(interface_uuid: UUID) -> ApiError:
 async def interfaces(
     _: Viewer,
     context: Context,
-    scope: Annotated[InterfaceScope, Depends(interface_scope)],
+    scope: Annotated[InterfaceScope, Depends(interface_list_scope)],
     search: Search = "",
     sort: InterfaceSort = InterfaceSort.PRIORITY,
     collector: Collector = None,
@@ -96,7 +96,7 @@ async def interfaces(
     Args:
         _: The caller (operator or admin).
         context: The services.
-        scope: Site, tag, group, provider, WAN, interest, lifecycle filters.
+        scope: Site, tag, group, provider, WAN, interest, lifecycle, not yet classified.
         search: Substring of device, interface, alias, description, provider, circuit, or site.
         sort: ``priority``, ``name``, ``traffic``, or ``utilization``.
         collector: Position whose current values to show.

@@ -7,7 +7,8 @@ The rows come in the API's order: sticky, WAN circuits, and high-priority
 interfaces first (UI-006), unless the user sorts by name, traffic, or
 utilization. Every value is the API's `Reading`: a missing rate says why
 ("first sample; a rate needs two"), never 0. Indicators are words, not
-only icons. `showDevice` adds the device column for the global list.
+only icons. `showDevice` adds the device column for the global list; `onSelect` adds a
+labelled checkbox per row for bulk tagging (META-013).
 
 Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} showDevice />`
 -->
@@ -29,6 +30,10 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 		hideCaption?: boolean;
 		/** Extra query parameters kept on links to the detail page (WEB-T03: filters survive). */
 		keep?: Record<string, string>;
+		/** Selected interface UUIDs, with `onSelect`. */
+		selected?: string[];
+		/** Adds the selection column; called when a row's checkbox changes. */
+		onSelect?: (row: InterfaceListRow, on: boolean) => void;
 	}
 
 	const {
@@ -39,7 +44,9 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 		showDevice = false,
 		compact = false,
 		hideCaption = false,
-		keep = {}
+		keep = {},
+		selected = [],
+		onSelect
 	}: Props = $props();
 
 	const MARKER_WORDS: Record<string, string> = {
@@ -49,6 +56,14 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 	};
 </script>
 
+{#snippet pick(r: InterfaceListRow)}
+	<input
+		type="checkbox"
+		aria-label="Select {r.ref.device} {r.ref.name}"
+		checked={selected.includes(r.ref.interface_id)}
+		onchange={(e) => onSelect?.(r, e.currentTarget.checked)}
+	/>
+{/snippet}
 {#snippet indicators(r: InterfaceListRow)}
 	{#each r.ref.markers as m (m)}<span class="tag">{MARKER_WORDS[m] ?? m}</span>{/each}
 {/snippet}
@@ -98,6 +113,7 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 	{hideCaption}
 	rowKey={(r) => r.ref.interface_id}
 	columns={[
+		...(onSelect ? [{ id: 'select', header: 'Select', cell: pick }] : []),
 		{
 			id: 'indicators',
 			header: 'Indicators',

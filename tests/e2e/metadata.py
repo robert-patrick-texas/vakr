@@ -25,12 +25,22 @@ from typing import Any
 
 from tests.contract import contract_samples as samples
 from tests.contract.contract_metadata_identity import review
-from tests.e2e.fleet import COLLECTORS, DEVICES, GROUPS, SITES, TAGS, DeviceSpec, IfaceSpec
+from tests.e2e.fleet import (
+    COLLECTORS,
+    DEVICES,
+    FILE_MANAGED,
+    GROUPS,
+    SITES,
+    TAGS,
+    DeviceSpec,
+    IfaceSpec,
+)
 from vakr.adapters.sqlite.metadata import METADATA_FILE, SqliteMetadataStore, sqlite_uow_factory
 from vakr.domain.catalog import Collector
 from vakr.domain.enums import AdminState, InterestClass
 from vakr.domain.interfaces import Interface, InterfaceAnnotation
-from vakr.domain.inventory import Device
+from vakr.domain.inventory import API_MANAGED, Device
+from vakr.inventory.model import FILE_OWNER
 
 _ADMIN = {"disabled": AdminState.DISABLED, "retired": AdminState.RETIRED}
 ETHERNET = 6
@@ -116,10 +126,11 @@ def _interface(device: Device, spec: IfaceSpec) -> Interface:
     Raises:
         None
     """
+    owner = FILE_OWNER if f"{device.name}/{spec.name}" in FILE_MANAGED else API_MANAGED
     return samples.interface(
         device.id, spec.name, if_index=spec.if_index, if_descr=spec.name, if_alias=spec.alias,
         if_type=ETHERNET, if_high_speed=spec.speed_mbps, if_speed=None, mac=spec.mac,
-        addresses=spec.addresses, annotation=_annotation(spec),
+        addresses=spec.addresses, annotation=_annotation(spec), managed_by=owner,
     )  # fmt: skip
 
 
@@ -172,6 +183,7 @@ def _devices(uow: Any, seeded: Seeded, labels: dict[str, dict[str, Any]]) -> Non
             tags=frozenset(labels["tags"][t].id for t in spec.tags),
             groups=frozenset(labels["groups"][g].id for g in spec.groups),
             comment=f"e2e fixture: {spec.behavior}",
+            managed_by=FILE_OWNER if spec.name in FILE_MANAGED else API_MANAGED,
         ))  # fmt: skip
         seeded.devices[spec.name] = device
         seeded.specs[spec.name] = spec

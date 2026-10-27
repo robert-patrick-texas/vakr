@@ -1,6 +1,6 @@
 # Inventory: devices, sites, annotations, and interface identity
 
-vakr keeps the list of devices it polls in its metadata database. You can manage that list from a file under version control, `/etc/vakr/inventory.toml`, and apply it with a plan you review first. This page covers the file format, `vakr inventory validate|plan|apply|list`, how interface annotations in the file take effect (`vakr interface claim`), CSV and TOML bulk import and export (`vakr inventory import|export`), and what happens to interface identities when devices are rediscovered, including the cases vakr leaves for you to decide (`vakr interface review`).
+vakr keeps the list of devices it polls in its metadata database. You can manage that list from a file under version control, `/etc/vakr/inventory.toml`, and apply it with a plan you review first. This page covers the file format, `vakr inventory validate|plan|apply|list`, how interface annotations in the file take effect (`vakr interface claim`), adding devices and classifying interfaces by hand (the web UI, the API, `vakr device`, and `vakr interface annotate|tag`), CSV and TOML bulk import and export (`vakr inventory import|export`), and what happens to interface identities when devices are rediscovered, including the cases vakr leaves for you to decide (`vakr interface review`).
 
 The rules are in the blueprint, sections [11.1–11.4](../../tool-blueprint.md#11-configuration-model), [8.2](../../tool-blueprint.md#82-metadata-sites-interface-annotations-and-ownership), [8.10](../../tool-blueprint.md#810-persistent-interface-identity-requirements), and Appendices [E.26](../../tool-blueprint.md#e26-inventory-and-reconciliation) and [E.38](../../tool-blueprint.md#e38-inventory-import-and-export-m6).
 
@@ -102,7 +102,7 @@ inventory.toml: devices[4].name: device 0190c2… is api:api; remove the entry, 
 
 ### Who owns a record
 
-Every device and site the file creates is marked `file:inventory.toml`. The web UI and API cannot change those records; edit the file instead. Records created in the UI or by `vakr inventory import` (`api:import`, see [bulk import and export](#bulk-import-and-export)) stay UI-managed, and the file cannot take them over: an entry with the same name, UUID, or address as a UI-managed device is an error, never a silent overwrite (CONF-008). Remove the entry from the file, or remove or retire the UI record first.
+Every device and site the file creates is marked `file:inventory.toml`. The web UI, the API, `vakr device`, and `vakr inventory import` cannot change those records; edit the file instead. Records created in the UI, with `vakr device`, or by `vakr inventory import` (`api:import`, see [bulk import and export](#bulk-import-and-export)) stay UI-managed, and the file cannot take them over: an entry with the same name, UUID, or address as a UI-managed device is an error, never a silent overwrite (CONF-008). Remove the entry from the file, or remove or retire the UI record first.
 
 **Removing a device from the file disables it.** It stops being polled and keeps all of its history; nothing is deleted. Put it back and it is enabled again. `apply` refuses to run when the file does not exist, so a mistyped path cannot disable everything; to disable every file-managed device on purpose, apply an empty file.
 
@@ -136,6 +136,61 @@ The claim moves the interface to `file:inventory.toml`, writes the annotation, a
 - **two interfaces are named …**: vakr is not sure which interface is which (see below); resolve the review first.
 
 If you remove an annotation from the file, the next apply resets that interface's annotation and hands it back to the UI.
+
+## Adding devices by hand: the web UI, the API, and `vakr device`
+
+You do not need the file to add a device. An admin can add, change, and retire devices on the **Devices** page of the web UI, through the API, or with `vakr device` ([27.4](../../tool-blueprint.md#274-scope), [E.37](../../tool-blueprint.md#e37-manual-inventory-entry-m6)). All three use the same fields as a `[[devices]]` table and the same checks as `vakr inventory apply`: the field bounds, the [target guardrails](#target-guardrails), the site, and the credential name (names only; vakr never shows a secret).
+
+```text
+$ sudo vakr device add edge9.example.net 192.0.2.9 --credential network-v2c --tags wan,edge --site dal1
+edge9.example.net (0199…): enabled, API-managed, version 1
+  address: 192.0.2.9
+  …
+changed: created
+$ sudo vakr device set edge9.example.net --interval 120s --comment "Lab router"
+$ sudo vakr device set edge9.example.net --interval ""      # an empty value clears a field
+$ sudo vakr device show edge9.example.net --json
+$ sudo vakr device remove edge9.example.net                 # retire: polling stops, history stays
+$ sudo vakr device set edge9.example.net --admin-state enabled   # and back
+```
+
+| Field | Option | Notes |
+|---|---|---|
+| `name` | `NAME` (add), `--name` (set) | Unique, retired devices included |
+| `address` | `ADDRESS` (add), `--address` (set) | IP literal or DNS name; not one another device already polls |
+| `site` | `--site` | An existing site's name; sites come from the file |
+| `credential` | `--credential` | A name in the credentials file; without one, SNMP fails unless `reachability = "icmp_only"` (a warning, not an error) |
+| `tags`, `groups` | `--tags`, `--groups` | Comma-separated; missing ones are created. Policies select devices by these and by site |
+| `admin_state` | `--admin-state` | `enabled`, `maintenance`, or `disabled`; retiring is `remove` |
+| `interval`, `discovery_interval` | `--interval`, `--discovery-interval` | Per-device overrides, such as `120s` or `6h` (30 s to 1 h; 30 s to 30 d) |
+| `reachability`, `address_family` | `--reachability`, `--address-family` | As in the file |
+| `comment` | `--comment` | Up to 4,096 characters |
+
+**Ownership.** A device added this way is API-managed (`api:api`): `vakr inventory apply` never changes it, and an entry in the file with its name or address is an error (CONF-008). A device the file manages cannot be changed this way; the answer names `inventory.toml` and each field you tried to change, and the web UI shows the form read-only with the same message. Change the file and apply it instead.
+
+**Retiring is a soft delete** (META-009). The device stops being polled within seconds; its graphs, interfaces, and identity history stay, and it keeps its name. Set the admin state back to `enabled` to restore it.
+
+**Collectors pick a change up by themselves.** Every change moves the metadata change counter, which each collector reads every 5 s, exactly as after an apply: a new device is discovered within a minute and then polled, and a retired or disabled one leaves the schedule (E.27).
+
+**Every change is audited** with who made it (`cli:<login>`, the web user, or `local:<account>` on the socket) and what changed (`device.create`, `device.update`, `device.retire`). A change based on an out-of-date copy is refused (DB-003): the web form says someone else changed the device and offers to reload it.
+
+**On a peer** (two positions), every change is refused, naming the primary; make it on the primary, and the peer copies it within a minute (MPOS-003).
+
+## Classifying interfaces in vakr: annotations and tags
+
+Interface descriptions are the first source of classification ([policies](policies.md)). For the interfaces whose descriptions carry no keyword, classify them in vakr itself (META-013). An admin can do this on the interface page and the **Interfaces** list in the web UI, through the API, or from the shell:
+
+```text
+$ sudo vakr interface annotate edge1.example.net Gi0/0/0 --high-priority --wan-circuit \
+    --provider "Example Carrier" --circuit-id CKT-0001 --contracted-bps 100000000
+$ sudo vakr interface annotate edge1.example.net Gi0/0/0 --provider ""     # clear it
+$ sudo vakr interface tag edge1.example.net Gi0/0/4 Gi0/0/5 --add uplink --remove legacy
+tagged 2 interface(s), 0 already so
+```
+
+The annotation fields are the file's: `interest` (`--high-priority` is the same as `--interest primary`, META-011), `sticky`, `wan_circuit`, `provider`, `circuit_id`, `contracted_bps`, `capacity_override_bps`, `comment`, and vakr `tags`. **vakr tags are kept apart from description tags**: a later description change never removes them, and removing a vakr tag never touches a description tag.
+
+An interface is **not yet classified** when it has no primary, sticky, or WAN annotation, no vakr tag, and no description tag. The interface list and each device page filter for these, so you can work through them, select several, and tag them at once (up to 500 per change, all or nothing). An interface `inventory.toml` governs (claimed, above) is refused, naming the file.
 
 ## Interface identity after rediscovery
 
@@ -284,3 +339,6 @@ $ sudo vakr inventory export --format csv --kind annotations --unannotated > int
 | An interface has no graphs after a reload | Look for an open case with `vakr interface review list`. |
 | An import says `... is file:inventory.toml; change it in inventory.toml, not by import` | The row would change a record the file manages. Edit `inventory.toml`, or drop the row (or the column) from the import. |
 | An import says `cannot tell devices from annotations by the header` | Add `--kind devices` or `--kind annotations`; the header has neither `address` nor `ifname`. |
+| The web UI or `vakr device set` says a device is "managed by inventory.toml" | The file owns it: change its `[[devices]]` entry and run `vakr inventory apply` (META-008). |
+| `… is already polled by device …` when adding a device | Another device that is not retired has that address; change or retire that one, or use its record. |
+| `… is already the name of device … (API-managed, retired)` | A retired device keeps its name; restore it (`--admin-state enabled`) or pick another name. |

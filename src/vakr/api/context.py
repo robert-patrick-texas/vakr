@@ -37,6 +37,7 @@ from vakr.api.errors import ApiError
 from vakr.api.settings import ApiSettings
 from vakr.auth import AuthServices
 from vakr.config.node import NodeSettings
+from vakr.inventory.validate import Checks
 from vakr.metrics.service import MetricsService
 from vakr.operations import OperationService
 from vakr.ports.clock import Clock
@@ -66,6 +67,9 @@ def account_name(uid: int) -> str:
 LOGINS_ACTIVE = 8
 LOGINS_WAITING = 32
 """Password logins checked at once, and waiting beyond them; more are refused (E.30)."""
+NO_CHECKS = Checks(None, "this API process was started without the credential provider")
+"""The checks of a context built without configuration: every credential name is refused."""
+
 KIOSK_ACTIVE = 4
 KIOSK_WAITING = 16
 """Kiosk token exchanges checked at once, and waiting beyond them (E.30 #17)."""
@@ -144,6 +148,8 @@ class ApiContext:
             without a collector snapshot or database readers.
         node: This node's role and position (MPOS-003); a primary by default.
         observations: Serves this node's observations to its partner (MPOS-004).
+        inventory_checks: Credential names and target guardrails for manual device
+            edits, read at each edit (``checks_for``); tests and schema builds get none.
     """
 
     auth: AuthServices
@@ -163,6 +169,7 @@ class ApiContext:
     metrics: MetricsService = field(default_factory=MetricsService)
     node: NodeSettings = field(default_factory=NodeSettings)
     observations: ObservationSource | None = None
+    inventory_checks: Callable[[], Checks] = field(default=lambda: NO_CHECKS)
 
 
 def get_context(request: Request) -> ApiContext:

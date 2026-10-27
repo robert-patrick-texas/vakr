@@ -32,6 +32,7 @@ from collections.abc import Callable
 from fastapi import APIRouter, Depends, FastAPI
 
 from vakr.api import (
+    routes_annotations,
     routes_auth,
     routes_catalog,
     routes_dashboards,
@@ -40,6 +41,7 @@ from vakr.api import (
     routes_health,
     routes_identity,
     routes_interfaces,
+    routes_inventory,
     routes_kiosk,
     routes_metrics,
     routes_operations,
@@ -78,8 +80,8 @@ TAGS = [
     {"name": "health", "description": "Liveness, readiness, component health, version, metrics."},
     {"name": "auth", "description": "Sign-in, sign-out, and the current session."},
     {"name": "kiosk", "description": "Kiosk display setup and kiosk tokens (admin)."},
-    {"name": "devices", "description": "Device list, device screen, reachability history."},
-    {"name": "interfaces", "description": "Interface list, detail, and history graphs."},
+    {"name": "devices", "description": "Device list and screen, reachability, manual entry."},
+    {"name": "interfaces", "description": "Interface list, detail, graphs, annotations, tags."},
     {"name": "identity", "description": "Interface identity history and reviews."},
     {"name": "operations", "description": "Manual rediscovery and admin operations."},
     {"name": "catalog", "description": "Sites, tags, groups, and collectors."},
@@ -92,10 +94,10 @@ COMMON_ERRORS: Responses = {
     422: {"model": ErrorEnvelope, "description": "a parameter is out of bounds"},
     503: {"model": ErrorEnvelope, "description": "metadata database unavailable"},
 }
-_ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_interfaces,
-            routes_identity, routes_catalog, routes_views, routes_export,
-            routes_dashboards, routes_operations, routes_metrics, routes_replication,
-            routes_replication_obs)  # fmt: skip
+_ROUTERS = (routes_health, routes_auth, routes_kiosk, routes_devices, routes_inventory,
+            routes_interfaces, routes_annotations, routes_identity, routes_catalog,
+            routes_views, routes_export, routes_dashboards, routes_operations, routes_metrics,
+            routes_replication, routes_replication_obs)  # fmt: skip
 
 
 def create_app(context: ApiContext | None = None, *, web: WebMount | None = None) -> FastAPI:

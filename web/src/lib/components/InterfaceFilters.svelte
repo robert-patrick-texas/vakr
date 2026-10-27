@@ -1,7 +1,8 @@
 <!--
 @component
 The interface list's controls (12.5): search; site, tag, group, provider, WAN, interest, and
-lifecycle filters; retired interfaces; the position whose values are shown; page size.
+lifecycle filters; retired interfaces; "not yet classified" (META-013, with `classify`); the
+position whose values are shown; page size.
 
 Example: `<InterfaceFilters filters={f} options={o} onChange={apply} />`
 -->
@@ -15,9 +16,11 @@ Example: `<InterfaceFilters filters={f} options={o} onChange={apply} />`
 		onChange: (next: InterfaceQuery) => void;
 		/** Rankings have no search text or page size. */
 		ranking?: boolean;
+		/** Offer the "not yet classified" filter (META-013); only the interface list has it. */
+		classify?: boolean;
 	}
 
-	const { filters, options, onChange, ranking = false }: Props = $props();
+	const { filters, options, onChange, ranking = false, classify = false }: Props = $props();
 	// svelte-ignore state_referenced_locally
 	let search = $state(filters.search ?? '');
 
@@ -114,6 +117,15 @@ Example: `<InterfaceFilters filters={f} options={o} onChange={apply} />`
 				onchange={(e) => set({ include_retired: e.currentTarget.checked })}
 			/> Include retired</label
 		>
+		{#if classify}
+			<label
+				><input
+					type="checkbox"
+					checked={filters.unclassified === true}
+					onchange={(e) => set({ unclassified: e.currentTarget.checked || undefined })}
+				/> Only not yet classified</label
+			>
+		{/if}
 		{#if !ranking}
 			<label
 				>Rows per page

@@ -81,7 +81,7 @@ There are two roles ([users](users.md)). Every endpoint checks the caller's role
 | A process on the node | the Unix socket | By account: root and members of `vakr-admin` are admin, members of `vakr-view` and `vakr` are operator, anyone else is refused on every endpoint |
 | The partner node of a two-position pair | `Authorization: Bearer vkr_...`, a replication token this node issued (`sudo vakr replication token create`) | none: only `/api/v1/replication/*`, and 403 `replication_only` everywhere else ([two positions](two-positions.md)) |
 
-Operators read everything the API offers. Admins can also change things; in this release that is the identity-review decision. On a peer node every change but sign-in and kiosk tokens is refused with 409 `peer_read_only`, naming the primary ([two positions](two-positions.md#what-a-peer-refuses)). An anonymous request to a protected endpoint gets 401, and a role that lacks the permission gets 403. Both use the error envelope below.
+Operators read everything the API offers. Admins can also change things: devices and interface annotations, identity-review decisions, rediscovery, dashboards, and kiosk tokens. On a peer node every change but sign-in and kiosk tokens is refused with 409 `peer_read_only`, naming the primary ([two positions](two-positions.md#what-a-peer-refuses)). An anonymous request to a protected endpoint gets 401, and a role that lacks the permission gets 403. Both use the error envelope below.
 
 ## The local socket
 
@@ -178,9 +178,13 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/devices` | operator | The device list in Attention, Active, Offline order, with counts and health; `search`, `bucket` (repeatable), `freshness` (repeatable: `fresh`, `stale`, `never`), `collector` (devices that position has evidence for), `sort` (`status`, `name`, `site`, `age`), `include_retired`, and `site`, `tag`, `group`, `provider`, `admin_state` to browse by grouping; paged |
 | `GET /api/v1/devices/{device_uuid}` | operator | The device screen: facts, every position's verdict, warnings, the interface table |
 | `GET /api/v1/device-lookup?key=` | operator | The same device screen for an exact display name, else a device UUID, as `vakr status DEVICE` takes it; `key` is 1 to 1,024 characters; 404 `not_found` when nothing matches |
-| `GET /api/v1/devices/{device_uuid}/interfaces` | operator | The device's interfaces, sticky, WAN, and high-priority first; `search`, `sort`, `interest` (`primary` or `secondary`), `collector`; paged |
+| `GET /api/v1/devices/{device_uuid}/interfaces` | operator | The device's interfaces, sticky, WAN, and high-priority first; `search`, `sort`, `interest` (`primary` or `secondary`), `unclassified` (not yet classified, META-013), `collector`; paged |
+| `GET /api/v1/devices/{device_uuid}/record` | operator | The device's editable record: the `[[devices]]` fields, `managed_by`, `managed_by_source`, `editable`, `version` |
+| `POST /api/v1/devices` | admin | Add a device (below): 201 with the record and any `warnings`; 422 naming each field |
+| `PATCH /api/v1/devices/{device_uuid}` | admin | `{"version": N, ...}` with the fields that change, `null` to clear one; 409 `managed_by_file` for a device the file manages, 409 `conflict` for a stale version |
+| `DELETE /api/v1/devices/{device_uuid}` | admin | Retire the device (the soft delete): 200 with the retired record; optional `version` |
 | `GET /api/v1/devices/{device_uuid}/history/reachability` | operator | Latency, loss, jitter, and the per-probe smoke, one set per position (graph parameters below) |
-| `GET /api/v1/interfaces` | operator | Every interface; `search`, `site`, `tag`, `group`, `provider`, `wan`, `interest`, `lifecycle`, `include_retired`, `sort` (`priority`, `name`, `traffic`, `utilization`), `collector`; paged |
+| `GET /api/v1/interfaces` | operator | Every interface; `search`, `site`, `tag`, `group`, `provider`, `wan`, `interest`, `lifecycle`, `include_retired`, `unclassified`, `sort` (`priority`, `name`, `traffic`, `utilization`), `collector`; paged |
 | `GET /api/v1/interfaces/{interface_uuid}` | operator | Identity and annotations (names, `ifIndex`, speeds, addresses, lifecycle, provider, circuit, contracted rate) plus current values from one position |
 | `GET /api/v1/interfaces/{interface_uuid}/history/traffic` | operator | Inbound and outbound bit/s per position, with capacity and contracted-rate lines |
 | `GET /api/v1/interfaces/{interface_uuid}/history/packets` | operator | Packets per second |
@@ -189,6 +193,9 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 | `GET /api/v1/interfaces/{interface_uuid}/history/status` | operator | Admin and oper state as segments, last 7 days of the range |
 | `GET /api/v1/interfaces/{interface_uuid}/identity-history` | operator | Every identity decision, oldest first; paged |
 | `POST /api/v1/interfaces/{interface_uuid}/identity-resolution` | admin | Answers an identity review (below) |
+| `GET /api/v1/interfaces/{interface_uuid}/annotation` | operator | The annotation: interest, sticky, WAN, provider, circuit, rates, comment, vakr `tags` apart from `description_tags`, `classified`, owner, `version` |
+| `PATCH /api/v1/interfaces/{interface_uuid}/annotation` | admin | `{"version": N, ...}` with the fields that change; `high_priority` is the alias of `interest` (META-011) |
+| `POST /api/v1/interfaces/tags` | admin | `{"interfaces": [...], "add": [...], "remove": [...]}`: vakr tags on 1 to 500 interfaces, all or nothing; answers `changed` and `unchanged` |
 | `POST /api/v1/devices/{device_uuid}/rediscovery` | admin | A manual rediscovery (below): 202 with the queued operation and `Location`, or 200 with the one already queued or running; 409 `refused` with the reason |
 | `GET /api/v1/operations` | operator | Admin operations newest first; `device`, `state` (repeatable); paged |
 | `GET /api/v1/operations/{operation_uuid}` | operator | One operation: state, requester, times, collector, and the result or the reason |
@@ -221,11 +228,19 @@ Sign-ins, failed sign-ins, and sign-outs are audited with the client address and
 
 **Identity resolution.** When discovery cannot tell which existing interface a row is, it opens a review ([inventory](inventory.md)). An admin answers it with `POST /api/v1/interfaces/{interface_uuid}/identity-resolution` and `{"review_id": "...", "decision": "map"}` (the row is this interface; its history continues) or `"decision": "new"` (the row is a different interface and gets its own identity; the interface in the path must be on the review's device). It is the same decision as `vakr interface review map|new`: one transaction updates identities, closes the review, writes identity history and an audit record that name the admin. A closed review or an interface on another device is 409.
 
+**Adding and changing devices.** `POST /api/v1/devices` takes the keys of a `[[devices]]` table ([inventory](inventory.md#adding-devices-by-hand-the-web-ui-the-api-and-vakr-device)): `name` and `address` (required), `site` (an existing site's name), `credential` (a credential name, never a secret), `tags`, `groups`, `comment`, `admin_state` (`enabled`, `maintenance`, `disabled`), `interval` and `discovery_interval` (durations such as `"120s"`), `reachability`, and `address_family`. The checks are those of `vakr inventory apply`: bounds, target guardrails, the site, the credential name, and no name or polled address another device already has. A refusal is 422 with one entry per field, such as `body.address`; a device without a credential is created with a warning. The device is API-managed, and collectors discover it within a minute. A change to a device `inventory.toml` manages is 409 `managed_by_file`, naming the file in `message` and each field you tried to change in `fields`; a field sent with its current value is no change. `DELETE` retires the device; a `PATCH` with `"admin_state": "enabled"` restores it. Each change is audited with the admin's name and the request ID.
+
+```console
+$ curl -s --unix-socket /run/vakr/api.sock -X POST http://localhost/api/v1/devices \
+    -H 'Content-Type: application/json' \
+    -d '{"name": "edge9.example.net", "address": "192.0.2.9", "credential": "network-v2c", "tags": ["wan"]}'
+```
+
 **Manual rediscovery.** `POST /api/v1/devices/{device_uuid}/rediscovery` (no body) answers at once and never waits for SNMP (DISC-010): 202 with an operation in state `queued` and `Location: /api/v1/operations/{id}`. Follow that address: `running` once a collector claimed it, then `succeeded` with `result` (`interfaces`, `new`, `renumbered`, `missing`, `reviews_opened`, `capability_changes`, `partial`, `duration_ms`), or `failed` or `expired` with `error`. A request for a device that already has one queued or running answers 200 with that operation. A device no collector would discover (disabled, retired, no SNMP credential, `icmp_only`) and a full queue (1,000 active operations) answer 409 `refused` with the reason. Each request is audited with the admin's name; the bounds are in Appendix E.32 of the blueprint. `vakr inventory rediscover` does the same on the node ([inventory](inventory.md#rediscovering-a-device-now)).
 
 ## Not in this release
 
-These parts of the blueprint's API (section 14) come in later releases: creating and editing devices and interfaces (`POST /devices`, `PATCH`), inventory imports, policies, dashboard publication (`POST /dashboards/{uuid}/publish`), events, asynchronous exports (`/exports/{operation_uuid}`), the server-sent event stream, and public dashboards (`/public/v1`). Until then, inventory changes are made in `/etc/vakr/inventory.toml`.
+These parts of the blueprint's API (section 14) come in later releases: sites (`POST /sites`; sites come from `inventory.toml`), inventory imports, policies, dashboard publication (`POST /dashboards/{uuid}/publish`), events, asynchronous exports (`/exports/{operation_uuid}`), the server-sent event stream, and public dashboards (`/public/v1`).
 
 ## OpenAPI document
 

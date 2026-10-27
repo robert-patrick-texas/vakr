@@ -1,6 +1,15 @@
 {
   "components": {
     "schemas": {
+      "AddressFamily": {
+        "description": "IP address family of a poll target or interface address (ICMP-011).",
+        "enum": [
+          "ipv4",
+          "ipv6"
+        ],
+        "title": "AddressFamily",
+        "type": "string"
+      },
       "AdminState": {
         "description": "Operator-set device state (7.5); controls scheduling, not observation.",
         "enum": [
@@ -11,6 +20,311 @@
         ],
         "title": "AdminState",
         "type": "string"
+      },
+      "AnnotationOut": {
+        "description": "An interface's owned fields (META-007, META-011, META-013).",
+        "properties": {
+          "capacity_override_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity Override Bps"
+          },
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "circuit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Circuit Id"
+          },
+          "classified": {
+            "description": "False: not yet classified (META-013).",
+            "title": "Classified",
+            "type": "boolean"
+          },
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "contracted_bps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contracted Bps"
+          },
+          "description_tags": {
+            "description": "Tags from description keywords.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Description Tags",
+            "type": "array"
+          },
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "device_id": {
+            "format": "uuid",
+            "title": "Device Id",
+            "type": "string"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "if_name": {
+            "title": "If Name",
+            "type": "string"
+          },
+          "interest": {
+            "$ref": "#/components/schemas/InterestClass"
+          },
+          "lifecycle": {
+            "title": "Lifecycle",
+            "type": "string"
+          },
+          "managed_by": {
+            "$ref": "#/components/schemas/ManagedByKind"
+          },
+          "managed_by_source": {
+            "title": "Managed By Source",
+            "type": "string"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "sticky": {
+            "title": "Sticky",
+            "type": "boolean"
+          },
+          "tags": {
+            "description": "Tags added in vakr.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "wan_circuit": {
+            "title": "Wan Circuit",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "device_id",
+          "device",
+          "if_name",
+          "lifecycle",
+          "managed_by",
+          "managed_by_source",
+          "editable",
+          "interest",
+          "sticky",
+          "wan_circuit",
+          "provider",
+          "circuit_id",
+          "contracted_bps",
+          "capacity_override_bps",
+          "comment",
+          "tags",
+          "description_tags",
+          "classified",
+          "version",
+          "updated_at",
+          "changes"
+        ],
+        "title": "AnnotationOut",
+        "type": "object"
+      },
+      "AnnotationPatch": {
+        "additionalProperties": false,
+        "description": "Body of ``PATCH /api/v1/interfaces/{uuid}/annotation``.",
+        "properties": {
+          "capacity_override_bps": {
+            "anyOf": [
+              {
+                "description": "Bits per second.",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity Override Bps"
+          },
+          "circuit_id": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Circuit Id"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "contracted_bps": {
+            "anyOf": [
+              {
+                "description": "Bits per second.",
+                "maximum": 9.223372036854776e+18,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contracted Bps"
+          },
+          "high_priority": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Alias: true is primary.",
+            "title": "High Priority"
+          },
+          "interest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InterestClass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "sticky": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sticky"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "vakr tags; replaces the set.",
+            "title": "Tags"
+          },
+          "version": {
+            "description": "The version this change is based on (DB-003).",
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          },
+          "wan_circuit": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wan Circuit"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "AnnotationPatch",
+        "type": "object"
       },
       "BucketCounts": {
         "description": "How many matching devices fall in each bucket.\n\nAttributes:\n    attention: Devices needing attention.\n    active: Healthy devices.\n    offline: Disabled, retired, or in maintenance.",
@@ -700,6 +1014,170 @@
         "title": "DashboardView",
         "type": "object"
       },
+      "DeviceCreate": {
+        "additionalProperties": false,
+        "description": "Body of ``POST /api/v1/devices``.",
+        "properties": {
+          "address": {
+            "description": "IP literal or DNS name to poll.",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Address",
+            "type": "string"
+          },
+          "address_family": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AddressFamily"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "admin_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "enabled",
+                  "maintenance",
+                  "disabled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin State"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SNMP credential name, not secret.",
+            "title": "Credential"
+          },
+          "discovery_interval": {
+            "anyOf": [
+              {
+                "description": "Such as 60s, 5m, 1h.",
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Interval"
+          },
+          "groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groups"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "description": "Such as 60s, 5m, 1h.",
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Poll interval override.",
+            "title": "Interval"
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "reachability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReachabilityStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "site": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An existing site's name.",
+            "title": "Site"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "required": [
+          "name",
+          "address"
+        ],
+        "title": "DeviceCreate",
+        "type": "object"
+      },
       "DeviceCriteriaIn": {
         "additionalProperties": false,
         "description": "Which devices a device selection covers; absent fields do not filter.",
@@ -872,6 +1350,378 @@
           "page"
         ],
         "title": "DeviceListPage",
+        "type": "object"
+      },
+      "DevicePatch": {
+        "additionalProperties": false,
+        "description": "Body of ``PATCH /api/v1/devices/{uuid}``: ``version`` plus what changes.",
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "address_family": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AddressFamily"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "admin_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "enabled",
+                  "maintenance",
+                  "disabled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin State"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SNMP credential name, not secret.",
+            "title": "Credential"
+          },
+          "discovery_interval": {
+            "anyOf": [
+              {
+                "description": "Such as 60s, 5m, 1h.",
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Interval"
+          },
+          "groups": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groups"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "description": "Such as 60s, 5m, 1h.",
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Poll interval override.",
+            "title": "Interval"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "reachability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReachabilityStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "site": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "An existing site's name.",
+            "title": "Site"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 256,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          },
+          "version": {
+            "description": "The version this change is based on (DB-003).",
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "DevicePatch",
+        "type": "object"
+      },
+      "DeviceRecordOut": {
+        "description": "A device's editable record, as the record endpoint and every write answer it.",
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "address_family": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AddressFamily"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "admin_state": {
+            "enum": [
+              "enabled",
+              "maintenance",
+              "disabled",
+              "retired"
+            ],
+            "title": "Admin State",
+            "type": "string"
+          },
+          "changes": {
+            "description": "What this write changed; empty for a read.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "comment": {
+            "title": "Comment",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "credential": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential"
+          },
+          "discovery_interval": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Discovery Interval"
+          },
+          "editable": {
+            "description": "False when a file manages it (META-008).",
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "groups": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "interval": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval"
+          },
+          "managed_by": {
+            "$ref": "#/components/schemas/ManagedByKind"
+          },
+          "managed_by_source": {
+            "description": "The managing file, or `api`.",
+            "title": "Managed By Source",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reachability": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReachabilityStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site"
+          },
+          "site_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Site Id"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/FieldNote"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "address_family",
+          "site",
+          "site_id",
+          "credential",
+          "tags",
+          "groups",
+          "comment",
+          "admin_state",
+          "interval",
+          "discovery_interval",
+          "reachability",
+          "managed_by",
+          "managed_by_source",
+          "editable",
+          "created_at",
+          "updated_at",
+          "version",
+          "changes",
+          "warnings"
+        ],
+        "title": "DeviceRecordOut",
         "type": "object"
       },
       "DeviceRow": {
@@ -1320,6 +2170,25 @@
         ],
         "title": "ExportFormat",
         "type": "string"
+      },
+      "FieldNote": {
+        "description": "Advice about one field that did not block the change.",
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ],
+        "title": "FieldNote",
+        "type": "object"
       },
       "FieldProblem": {
         "description": "One refused input.\n\nAttributes:\n    field: Input name, such as ``limit`` or ``body.password``.\n    message: What rule it broke.",
@@ -2787,6 +3656,15 @@
         "title": "LoginRequest",
         "type": "object"
       },
+      "ManagedByKind": {
+        "description": "Which source owns a configurable record (META-008, blueprint 11.2).",
+        "enum": [
+          "file",
+          "api"
+        ],
+        "title": "ManagedByKind",
+        "type": "string"
+      },
       "MarkerKind": {
         "description": "Why part of a series is missing or needs context (12.6, RATE-004).",
         "enum": [
@@ -3734,6 +4612,17 @@
         "title": "RankingWindow",
         "type": "string"
       },
+      "ReachabilityStrategy": {
+        "description": "How ICMP results gate SNMP collection for a device (ICMP-006..014).",
+        "enum": [
+          "icmp_gated",
+          "snmp_fallback",
+          "icmp_only",
+          "snmp_only"
+        ],
+        "title": "ReachabilityStrategy",
+        "type": "string"
+      },
       "Reading": {
         "description": "One displayed value.\n\nAttributes:\n    text: What to print, such as ``\"12.3 Mb/s\"`` or ``\"—\"``.\n    value: Machine value behind the text; ``None`` when missing.\n    reason: Why the value is missing or unusable, in operator words.\n    stale: True when the value comes from stale evidence (E.3).",
         "properties": {
@@ -4603,6 +5492,74 @@
           "severity"
         ],
         "title": "StatusView",
+        "type": "object"
+      },
+      "TagChange": {
+        "additionalProperties": false,
+        "description": "Body of ``POST /api/v1/interfaces/tags``: add and remove vakr tags on many interfaces.",
+        "properties": {
+          "add": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Add",
+            "type": "array"
+          },
+          "interfaces": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Interfaces",
+            "type": "array"
+          },
+          "remove": {
+            "items": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 256,
+            "title": "Remove",
+            "type": "array"
+          }
+        },
+        "required": [
+          "interfaces"
+        ],
+        "title": "TagChange",
+        "type": "object"
+      },
+      "TagChangeOut": {
+        "description": "What a tag change did.",
+        "properties": {
+          "changed": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Changed",
+            "type": "array"
+          },
+          "unchanged": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Unchanged",
+            "type": "array"
+          }
+        },
+        "required": [
+          "changed",
+          "unchanged"
+        ],
+        "title": "TagChangeOut",
         "type": "object"
       },
       "TimelineView": {
@@ -6354,9 +7311,210 @@
         "tags": [
           "devices"
         ]
+      },
+      "post": {
+        "description": "Create an API-managed device (SEC-018: audited with the administrator).",
+        "operationId": "create_api_v1_devices_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such device"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "managed by a file, a stale version, or a peer"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Add a device (admin)",
+        "tags": [
+          "devices"
+        ]
       }
     },
     "/api/v1/devices/{device_uuid}": {
+      "delete": {
+        "description": "Retire a device (META-009); its history and interface identities stay.",
+        "operationId": "retire_api_v1_devices__device_uuid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Refuse if changed since.",
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Refuse if changed since.",
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such device"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "managed by a file, a stale version, or a peer"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Retire a device (admin; soft delete)",
+        "tags": [
+          "devices"
+        ]
+      },
       "get": {
         "description": "Return the device screen.",
         "operationId": "device_api_v1_devices__device_uuid__get",
@@ -6435,6 +7593,108 @@
           }
         },
         "summary": "Device screen",
+        "tags": [
+          "devices"
+        ]
+      },
+      "patch": {
+        "description": "Change a device, if a file does not manage it and nobody changed it since ``version``.",
+        "operationId": "change_api_v1_devices__device_uuid__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevicePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such device"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "managed by a file, a stale version, or a peer"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Change a device (admin; carries its version)",
         "tags": [
           "devices"
         ]
@@ -6738,6 +7998,18 @@
               "description": "primary = high priority.",
               "title": "Interest"
             }
+          },
+          {
+            "description": "Only not yet classified (META-013).",
+            "in": "query",
+            "name": "unclassified",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only not yet classified (META-013).",
+              "title": "Unclassified",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -6803,6 +8075,90 @@
           }
         },
         "summary": "A device's interfaces, primary interest first",
+        "tags": [
+          "devices"
+        ]
+      }
+    },
+    "/api/v1/devices/{device_uuid}/record": {
+      "get": {
+        "description": "Return the fields an edit sets, the owner, and the version.",
+        "operationId": "record_api_v1_devices__device_uuid__record_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Device Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRecordOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such device"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "A device's editable record",
         "tags": [
           "devices"
         ]
@@ -8162,6 +9518,18 @@
             }
           },
           {
+            "description": "Only not yet classified (META-013).",
+            "in": "query",
+            "name": "unclassified",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Only not yet classified (META-013).",
+              "title": "Unclassified",
+              "type": "boolean"
+            }
+          },
+          {
             "description": "Site UUID.",
             "in": "query",
             "name": "site",
@@ -8350,6 +9718,98 @@
         ]
       }
     },
+    "/api/v1/interfaces/tags": {
+      "post": {
+        "description": "Add and remove vakr tags on up to 500 interfaces, all or nothing (META-013).",
+        "operationId": "tag_api_v1_interfaces_tags_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TagChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagChangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such interface"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "managed by a file, a stale version, or a peer"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Add and remove vakr tags on many interfaces (admin)",
+        "tags": [
+          "interfaces"
+        ]
+      }
+    },
     "/api/v1/interfaces/{interface_uuid}": {
       "get": {
         "description": "Return one interface.",
@@ -8448,6 +9908,192 @@
           }
         },
         "summary": "Interface identity, annotations, and current values",
+        "tags": [
+          "interfaces"
+        ]
+      }
+    },
+    "/api/v1/interfaces/{interface_uuid}/annotation": {
+      "get": {
+        "description": "Return an interface's owned fields.",
+        "operationId": "annotation_api_v1_interfaces__interface_uuid__annotation_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "interface_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Interface Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such interface"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "An interface's annotation and vakr tags",
+        "tags": [
+          "interfaces"
+        ]
+      },
+      "patch": {
+        "description": "Change an interface's annotation, if nobody changed it since ``version`` (DB-003).",
+        "operationId": "annotate_api_v1_interfaces__interface_uuid__annotation_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "interface_uuid",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Interface Uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "not signed in"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "role, CSRF, or socket peer refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "no such interface"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "managed by a file, a stale version, or a peer"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "a parameter is out of bounds"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "metadata database unavailable"
+          }
+        },
+        "summary": "Annotate an interface (admin; carries its version)",
         "tags": [
           "interfaces"
         ]
@@ -11625,11 +13271,11 @@
       "name": "kiosk"
     },
     {
-      "description": "Device list, device screen, reachability history.",
+      "description": "Device list and screen, reachability, manual entry.",
       "name": "devices"
     },
     {
-      "description": "Interface list, detail, and history graphs.",
+      "description": "Interface list, detail, graphs, annotations, tags.",
       "name": "interfaces"
     },
     {

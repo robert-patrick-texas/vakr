@@ -31,6 +31,7 @@ Example:
 import socket
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import cast
 
@@ -64,6 +65,7 @@ from vakr.config.node import node_settings
 from vakr.domain.errors import StorageError, ValidationError
 from vakr.ingest.incidents import LossIncident, read_incidents
 from vakr.ingest.settings import SpoolSettings
+from vakr.inventory.settings import checks_for
 from vakr.operations import operation_service
 from vakr.paths import InstallPaths
 from vakr.ports.clock import Clock, SystemClock
@@ -284,6 +286,7 @@ def build_parts(
         context.operations = operation_service(uow, clock, config)
         context.metrics = api_metrics(paths, uow, overview)
         context.node = node_settings(config)
+        context.inventory_checks = partial(checks_for, config, paths.secrets_dir, development=False)
         context.observations, feed = observation_source(paths, uow)
         return ApiParts(context, config, local_groups(), [*closers, feed.close, metadata.close])
     except BaseException:

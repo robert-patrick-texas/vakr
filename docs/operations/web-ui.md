@@ -32,9 +32,11 @@ The bar at the top has every section, a search box, your name and role, the rele
 |---|---|---|
 | Overview | `/` | Device counts by state and evidence freshness, collector and database health, high-priority interfaces, WAN circuits, top utilization and top errors for 15 minutes to 24 hours, recent events, and quick filters by provider, site, tag, and group. |
 | Devices | `/devices` | Every device in Attention, Active, Offline/Retired order (blueprint 7.7), with state, address, site, ICMP and loss, SNMP, agent uptime, interfaces, last poll, evidence age, collector, tags, and interval. Filter by status, freshness, site, tag, group, collector, provider, and admin state; sort by state, name, site, or age; choose the page size and compact rows. The filters stay in the address, so you can bookmark or share a view. |
-| A device | `/devices/<uuid>` | The header (state, address, site, tags, admin state, collector and last poll, each position's own verdict), every fact vakr has (ICMP, latency, jitter, SNMP, `sysUpTime` with its disclaimer, intervals, comment), the reachability graph, the interfaces, and open identity reviews. **Table** lists the high-priority interfaces in full and the others on request (searchable, 25 per page, sticky and WAN circuits first); **Graphs** shows a small traffic graph per interface, 12 per page. |
-| Interfaces | `/interfaces` | Every interface, sticky, WAN, and high-priority first, with state, lifecycle, rates, utilization, packets, errors, capacity, addresses, and age. Filter by site, tag, group, provider, WAN, interest, lifecycle, and the collector whose values are shown. |
-| An interface | `/interfaces/<uuid>` | Identity and circuit metadata, current values, traffic, utilization, packets, and errors over a chosen range, the admin/oper state timeline, and the identity history with earlier `ifIndex` values. |
+| A device | `/devices/<uuid>` | The header (state, address, site, tags, admin state, collector and last poll, each position's own verdict), every fact vakr has (ICMP, latency, jitter, SNMP, `sysUpTime` with its disclaimer, intervals, comment), the reachability graph, the interfaces, and open identity reviews. **Table** lists the high-priority interfaces in full and the others on request (searchable, 25 per page, sticky and WAN circuits first, optionally **Only not yet classified**); **Graphs** shows a small traffic graph per interface, 12 per page. |
+| Add a device | `/devices/new` | The device form (admins): name, poll address, site, SNMP credential name, tags, groups, admin state, intervals, reachability, address family, and comment. See [adding and changing devices](#adding-and-changing-devices). |
+| Edit a device | `/devices/<uuid>/edit` | The same form on a stored device, and **Retire device** (admins). |
+| Interfaces | `/interfaces` | Every interface, sticky, WAN, and high-priority first, with state, lifecycle, rates, utilization, packets, errors, capacity, addresses, and age. Filter by site, tag, group, provider, WAN, interest, lifecycle, **Only not yet classified**, and the collector whose values are shown. Admins can select interfaces and tag them at once. |
+| An interface | `/interfaces/<uuid>` | Identity and circuit metadata, its classification (interest, flags, vakr tags and description tags, and whether it is still not yet classified), current values, traffic, utilization, packets, and errors over a chosen range, the admin/oper state timeline, and the identity history with earlier `ifIndex` values. Admins can change the annotation there. |
 | Sites | `/sites` | Sites, tags, groups, providers, and admin states, each leading to the matching devices or interfaces. |
 | Dashboards | `/dashboards` | The built-in dashboards (overview, rankings, high priority, WAN circuits) and the custom dashboards admins define ([dashboards](dashboards.md)). |
 | Rankings | `/rankings` | Top utilization (p95 of the window against capacity) and top errors, 10 to 100 rows, with coverage per row, interfaces left out and why, and CSV/JSON downloads. |
@@ -100,9 +102,24 @@ A refresh replaces values in place: the page does not flash, the keyboard focus 
 
 ## Who sees what
 
-Operators see every page. Admins also see **Admin**, the decision buttons on identity reviews, and **Rediscover now** on each device's page, which walks the device at once and shows the result there when the collector has finished ([inventory](inventory.md#rediscovering-a-device-now)). vakr-api checks every request itself; hiding a button is not the control ([API: who may do what](api.md#who-may-do-what)).
+Operators see every page. Admins also see **Admin**, **Add a device** and **Edit device**, the annotation form on each interface's page, the selection boxes and **Tag selected interfaces** on the interface list, the decision buttons on identity reviews, and **Rediscover now** on each device's page, which walks the device at once and shows the result there when the collector has finished ([inventory](inventory.md#rediscovering-a-device-now)). vakr-api checks every request itself; hiding a button is not the control ([API: who may do what](api.md#who-may-do-what)).
 
 To answer an identity review, an admin chooses **It is \<interface\>** (the row is that interface, and its history continues) or **It is a new interface**, then confirms. The decision is recorded with the admin's name in the identity history and the audit log.
+
+## Adding and changing devices
+
+An admin adds a device with **Devices** → **Add a device**, and changes or retires one with **Edit device** on its page. The fields are those of a `[[devices]]` entry in `inventory.toml`, and vakr applies the same checks ([inventory](inventory.md#adding-devices-by-hand-the-web-ui-the-api-and-vakr-device)). A problem is shown beside its field, with the word "Problem" and the field marked invalid, and the summary above the buttons takes the keyboard focus so a screen reader reads it first. After a save the page says what changed and repeats any warning, such as a device without an SNMP credential. Collectors discover a new device within a minute.
+
+- **A device `inventory.toml` manages** opens read-only: the page names the file, every field says "Managed by inventory.toml", and there is no Save button. Change the file and run `vakr inventory apply`.
+- **Someone else saved first.** The page says so and offers **Reload the device**; your change is not applied over theirs (DB-003).
+- **On a peer node** the save is refused and the message names the primary, where the change belongs ([two positions](two-positions.md#what-a-peer-refuses)).
+- **Retire device** asks once more, naming the device. A retired device stops being polled and keeps its history; set its admin state back to **Enabled** to restore it.
+
+## Classifying interfaces
+
+On an interface's page, **Classification** shows the interest class, the sticky and WAN flags, the vakr tags and the tags its description gives it, and whether it is still **not yet classified**. Admins change the annotation in the form below it: interest (high priority is the primary class), sticky, WAN circuit, provider, circuit ID, contracted rate and capacity override (whole bits per second), vakr tags, and comment. Description tags are not edited here; they follow the description.
+
+To work through the interfaces nobody has classified, open **Interfaces**, tick **Only not yet classified**, select the rows (or **Select all on this page**), name the vakr tags to add or remove, and choose **Apply**. One change covers up to 500 interfaces and is all or nothing: if `inventory.toml` governs any of them, nothing changes and the page names them. Tagged interfaces leave the "not yet classified" list. The same filter is under **Show other interfaces** on each device's page.
 
 ## Kiosk displays
 
@@ -110,7 +127,7 @@ The overview, high-priority interfaces, WAN circuits, and rankings also run on a
 
 ## Not in this release
 
-Public dashboards, editing devices and interfaces, policy explanations, and live updates (server-sent events) come later. Inventory changes are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
+Public dashboards, editing sites, policy explanations, and live updates (server-sent events) come later. Sites are made in `/etc/vakr/inventory.toml` ([inventory](inventory.md)).
 
 ## Troubleshooting
 

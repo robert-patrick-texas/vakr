@@ -45,6 +45,12 @@ describe('12.3: device and interface filters from the URL', () => {
 		const f = readInterfaceFilters(new URLSearchParams('wan=true&interest=primary&sort=traffic'));
 		expect(f).toMatchObject({ wan: true, interest: 'primary', sort: 'traffic' });
 		expect(readInterfaceFilters(new URLSearchParams('wan=maybe')).wan).toBeUndefined();
+		const open = readInterfaceFilters(new URLSearchParams('unclassified=true'));
+		expect(open.unclassified).toBe(true); // META-013
+		expect(toQuery(open, 'priority')).toBe('unclassified=true');
+		expect(
+			readInterfaceFilters(new URLSearchParams('unclassified=1')).unclassified
+		).toBeUndefined();
 	});
 });
 

@@ -84,21 +84,25 @@ class DeviceInterfaceFilter:
     Attributes:
         include_retired: Also list retired interfaces.
         interest: Only this interest class; ``None`` lists every class.
+        unclassified: Only interfaces not yet classified (META-013).
     """
 
     include_retired: bool
     interest: InterestClass | None
+    unclassified: bool = False
 
 
 def device_interface_filter(
     include_retired: bool = False,
     interest: Annotated[InterestClass | None, Query(description="primary = high priority.")] = None,
+    unclassified: Annotated[bool, Query(description="Only not yet classified (META-013).")] = False,
 ) -> DeviceInterfaceFilter:
     """Read the filters of a device's interface list.
 
     Args:
         include_retired: Also list retired interfaces.
         interest: Only ``primary`` or only ``secondary`` interfaces.
+        unclassified: Only interfaces nobody classified yet.
 
     Returns:
         DeviceInterfaceFilter: The filters.
@@ -106,4 +110,4 @@ def device_interface_filter(
     Raises:
         None
     """
-    return DeviceInterfaceFilter(include_retired, interest)
+    return DeviceInterfaceFilter(include_retired, interest, unclassified)

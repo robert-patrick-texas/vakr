@@ -194,6 +194,19 @@ These checks need sight but no screen reader. Do them in the same session.
 | 12.2 | Zoom the browser to 200 %, then 400 %. | Nothing is cut off. Wide tables scroll inside their own region, and the page itself does not scroll sideways. |
 | 12.3 | Use the Windows high-contrast or contrast theme. | Focus outlines, status icons, and button edges stay visible. |
 
+### 13. Manual inventory entry as an admin (27.4, META-008, META-013)
+
+| # | Do | Expected |
+|---|---|---|
+| 13.1 | Open **Devices** → **Add a device**. | Every field has a label and a note that says what it takes, read after the label. The admin state, reachability, site, and address family are selects with their choices read. |
+| 13.2 | Submit with the name `core1` and the address `169.254.169.254`. | Focus moves to the "Not saved" summary, which is read as an alert. Each refused field is read as invalid, and its note starts with "Problem:". |
+| 13.3 | Add a device with a new name and address and no credential. | "Added <name>" is announced, with the warning about the missing credential in words. "Open the device page" is a link. |
+| 13.4 | On that device's page choose **Edit device**, change the comment, and save. | "Saved <name>" is announced; the page says what changed. |
+| 13.5 | Open the edit page of a device `inventory.toml` manages. | The notice names the file and `vakr inventory apply`. Every field is read as dimmed or unavailable, and its note says "Managed by inventory.toml". There is no Save button. |
+| 13.6 | Retire the device you added. | **Retire device** is replaced by "Yes, retire <name>" and "Keep it", and focus does not get lost. "Retired <name>" is announced. |
+| 13.7 | On an interface page, read **Classification**, then change the annotation and save. | The interest, flags, vakr tags, description tags, and "Not yet classified" are read as words. The checkboxes "Sticky" and "WAN circuit" have labels. A rate such as `10 Mb` is refused beside its field before anything is sent. |
+| 13.8 | On **Interfaces**, tick **Only not yet classified**, select two rows, add a tag, and apply. | Each row's checkbox is read as "Select <device> <interface>". The count of selected rows is read as it changes. "Tagged 2 interface(s)" is announced. |
+
 ## Recording the results
 
 Copy this table once for each screen-reader and browser combination, into a new file `docs/development/screen-reader-results-YYYY-MM-DD.md`, and link it from here.

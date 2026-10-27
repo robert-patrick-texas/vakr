@@ -11,6 +11,9 @@ rediscovery (IFID-004): ``list`` shows each open case with its candidates,
 history continues), and ``new REVIEW`` gives the row a new identity. Each
 decision is recorded in identity history and audited.
 
+``annotate`` and ``tag`` (classifying interfaces in vakr, META-013) are
+registered here from ``vakr.cli.cmd_interface_edit``.
+
 Exit status: 0 success; 1 refused (the message says why); 2 usage error;
 4 the metadata database is unavailable.
 
@@ -32,6 +35,7 @@ import sys
 from pathlib import Path
 
 from vakr.adapters.sqlite.metadata import sqlite_uow_factory
+from vakr.cli.cmd_interface_edit import register_edits
 from vakr.cli.common import SubParsers
 from vakr.cli.inventory_support import (
     EXIT_INVALID,
@@ -65,7 +69,7 @@ def register(subparsers: SubParsers) -> None:
     Raises:
         None
     """
-    parser = subparsers.add_parser("interface", help="claim interfaces; resolve identity reviews")
+    parser = subparsers.add_parser("interface", help="annotate, tag, claim; identity reviews")
     parser.set_defaults(func=lambda _args: _usage(parser))
     actions = parser.add_subparsers(title="subcommands", metavar="SUBCOMMAND")
     claim = actions.add_parser("claim", help="let inventory.toml govern a discovered interface")
@@ -88,6 +92,7 @@ def register(subparsers: SubParsers) -> None:
     fresh = steps.add_parser("new", help="the row is a new interface")
     fresh.add_argument("review", metavar="REVIEW", help="review UUID")
     fresh.set_defaults(func=run_review_new)
+    register_edits(actions)
 
 
 def _usage(parser: argparse.ArgumentParser) -> int:

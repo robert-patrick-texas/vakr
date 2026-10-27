@@ -4,8 +4,10 @@
 device, site (the interface's override, else its device's), tag (the
 interface's operator or description tags, or its device's tags), device
 group, provider (case-insensitive exact name), WAN circuits only, interest
-class (``primary`` is the high-priority annotation, META-011), and
-lifecycle. Retired interfaces and interfaces of retired devices are left
+class (``primary`` is the high-priority annotation, META-011),
+lifecycle, and "not yet classified" (META-013: no interest, sticky, or WAN
+annotation, no vakr tag, and no description-keyword tag). Retired
+interfaces and interfaces of retired devices are left
 out unless asked for (7.5, LIFE-002). ``interface_ref`` names an interface
 the way every view shows it.
 
@@ -47,6 +49,7 @@ class InterfaceScope:
         interest: Only this interest class.
         lifecycle: Only this lifecycle state; overrides ``include_retired``.
         include_retired: Include retired interfaces and retired devices.
+        unclassified: Only interfaces not yet classified (META-013).
     """
 
     device_id: DeviceId | None = None
@@ -58,6 +61,7 @@ class InterfaceScope:
     interest: InterestClass | None = None
     lifecycle: InterfaceLifecycle | None = None
     include_retired: bool = False
+    unclassified: bool = False
 
     def _inventory_ok(self, index: CatalogIndex, iface: Interface) -> bool:
         """Apply the device, site, tag, and group filters.
@@ -104,14 +108,45 @@ class InterfaceScope:
                 return False
         elif not self.include_retired and iface.lifecycle is InterfaceLifecycle.RETIRED:
             return False
-        if self.wan_only and not a.is_wan_circuit:
-            return False
         if self.interest is not None and a.interest is not self.interest:
             return False
-        wanted = self.provider.casefold() if self.provider else None
-        if wanted is not None and (a.provider or "").casefold() != wanted:
+        return self._annotation_ok(iface) and self._inventory_ok(index, iface)
+
+    def _annotation_ok(self, iface: Interface) -> bool:
+        """Apply the WAN, provider, and "not yet classified" filters.
+
+        Args:
+            iface: The interface.
+
+        Returns:
+            bool: True when every set filter matches.
+
+        Raises:
+            None
+        """
+        a = iface.annotation
+        if (self.wan_only and not a.is_wan_circuit) or (self.unclassified and classified(iface)):
             return False
-        return self._inventory_ok(index, iface)
+        wanted = self.provider.casefold() if self.provider else None
+        return wanted is None or (a.provider or "").casefold() == wanted
+
+
+def classified(iface: Interface) -> bool:
+    """Tell whether an interface is classified in vakr or by its description (META-013).
+
+    Args:
+        iface: The interface.
+
+    Returns:
+        bool: True with a primary, sticky, or WAN annotation, a vakr tag, or a
+        tag from a description keyword (as of the latest discovery).
+
+    Raises:
+        None
+    """
+    a = iface.annotation
+    flags = (a.interest is InterestClass.PRIMARY, a.sticky, a.is_wan_circuit)
+    return any(flags) or bool(iface.tags) or bool(iface.description_tags)
 
 
 def markers_of(iface: Interface) -> tuple[str, ...]:

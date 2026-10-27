@@ -125,12 +125,20 @@ audit:
 # docker; CI runs it too. Rules and the reasoned allowlist: .gitleaks.toml.
 GITLEAKS_IMAGE := ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
 
-.PHONY: secrets
+.PHONY: secrets secrets-history
 secrets:
 	@set -e; tree=$$(mktemp -d); trap 'rm -rf "$$tree"' EXIT; \
 	git ls-files -z | tar --null --ignore-failed-read -T - -cf - | tar -xf - -C "$$tree"; \
 	docker run --rm -v "$$tree:/scan:ro" $(GITLEAKS_IMAGE) dir /scan \
 		--config /scan/.gitleaks.toml --redact --no-banner --exit-code 1
+
+# Every commit reachable from any ref, merged branches' commits included (the
+# history half of QG-007; run it by hand, for example before an acceptance
+# review). Known findings that are not secrets are fingerprinted in .gitleaksignore.
+secrets-history:
+	docker run --rm -v "$(CURDIR):/repo:ro" $(GITLEAKS_IMAGE) git /repo --log-opts="--all" \
+		--config /repo/.gitleaks.toml --gitleaks-ignore-path /repo/.gitleaksignore \
+		--redact --no-banner --exit-code 1
 
 # Packaging and release (blueprint 28.6, 28.7). These need docker and git.
 .PHONY: deb package-test release-dry-run github-update-test

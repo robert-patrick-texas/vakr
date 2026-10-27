@@ -1,0 +1,7 @@
+# Known gitleaks findings that are not secrets (QG-007). Each line is a fingerprint
+# (commit:file:rule:line), so it covers that one historical finding and nothing new.
+# The fixture pseudonym key id "0123456789abcdef" (sequential hex digits, not a
+# credential), replaced by KEY_ID in 4ebf9ec:
+b240cea6e8f878bb7fccad1d8abb2e81af657f37:tools/acceptance/test_acc_report.py:generic-api-key:205
+b240cea6e8f878bb7fccad1d8abb2e81af657f37:tools/acceptance/test_acc_report.py:generic-api-key:209
+d4ffd38f859ed3c5f633fb254f956b7b1d604ac9:tools/acceptance/test_acc_report.py:generic-api-key:174

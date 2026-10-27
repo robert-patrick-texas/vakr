@@ -46,6 +46,7 @@ CAUSE_TEXT = {
     GapCause.ADMIN_STATE: "device disabled, retired, or in maintenance",
     GapCause.NOT_YET_DISCOVERED: "interface not yet discovered, or identity unresolved",
     GapCause.INTERFACE_NOT_UP: "interface not up/up (lifecycle not active)",
+    GapCause.INTERFACE_DOWN: "interface not up/up at Stage 1 (status record)",
     GapCause.INVENTORY_CHANGE: "inventory change (device added, removed, or edited)",
     GapCause.UNEXPLAINED: "no recorded evidence explains the gap",
 }
@@ -111,12 +112,13 @@ def icmp_cause(slot: Slot) -> GapCause:
     return GapCause.COLLECTOR_FAULT if flags & Quality.COLLECTOR_DEGRADED else GapCause.UNEXPLAINED
 
 
-def _sampled_cause(slot: Slot, iface: InterfaceEvidence) -> GapCause:
+def _sampled_cause(slot: Slot, iface: InterfaceEvidence, down: bool) -> GapCause:
     """Explain an interface left out of a poll whose SNMP device read answered.
 
     Args:
         slot: The slot.
         iface: The interface's inventory evidence.
+        down: A status record says the interface was not up/up at this poll.
 
     Returns:
         GapCause: The cause.
@@ -130,6 +132,8 @@ def _sampled_cause(slot: Slot, iface: InterfaceEvidence) -> GapCause:
         cause = GapCause.SNMP_ERROR  # Stage 2 did not finish
     elif flags & Quality.BASELINE_IDENTITY_UNRESOLVED or iface.created_us > slot.at_us:
         cause = GapCause.NOT_YET_DISCOVERED
+    elif down:
+        cause = GapCause.INTERFACE_DOWN
     elif flags & Quality.MAINTENANCE:
         cause = GapCause.ADMIN_STATE
     elif iface.lifecycle is not InterfaceLifecycle.ACTIVE and iface.updated_us <= slot.at_us:
@@ -140,7 +144,7 @@ def _sampled_cause(slot: Slot, iface: InterfaceEvidence) -> GapCause:
 
 
 def interface_cause(
-    slot: Slot, snmp: SnmpDeviceObservation | None, iface: InterfaceEvidence
+    slot: Slot, snmp: SnmpDeviceObservation | None, iface: InterfaceEvidence, down: bool = False
 ) -> GapCause:
     """Explain a poll that ran without sampling an interface.
 
@@ -148,6 +152,7 @@ def interface_cause(
         slot: The slot (its poll ran).
         snmp: The poll's SNMP device observation, if stored.
         iface: The interface's inventory evidence.
+        down: A status record says it was not up/up at this poll (E.35).
 
     Returns:
         GapCause: The cause.
@@ -167,7 +172,7 @@ def interface_cause(
     if snmp.state is SnmpState.UNKNOWN:
         degraded = snmp.quality & Quality.COLLECTOR_DEGRADED
         return GapCause.COLLECTOR_FAULT if degraded else GapCause.UNEXPLAINED
-    return _sampled_cause(slot, iface)
+    return _sampled_cause(slot, iface, down)
 
 
 def runs(indices: Sequence[int], cause_of: Callable[[int], GapCause]) -> list[Run]:

@@ -43,6 +43,9 @@ from vakr.query.snapshot import pages
 RAN_KINDS = frozenset({SlotKind.RAN, SlotKind.CANCELLED})
 """Slots whose poll ran, so its subjects should have a sample."""
 
+LOOKBACK_US = 30 * 86_400 * US
+"""How far before the window a status record still says what state an interface was in."""
+
 MAX_SNMP_READ = 100_000
 """Most SNMP device observations read to classify one device's interface gaps."""
 
@@ -225,3 +228,53 @@ def snmp_by_slot(
             if j >= 0:
                 out.setdefault(ran[j], o)
     return out, cut
+
+
+def down_slots(
+    query: AcceptanceQuery, iface: UUID, collector: CollectorId, slots: Sequence[Slot],
+    indices: Sequence[int], window: tuple[int, int],
+) -> set[int]:  # fmt: skip
+    """Return the missing slots at which a status record says the interface was not up/up.
+
+    A status holds from its record until the interface's next record from the
+    same collector (E.35), so the state at the window start is the newest
+    record before it, read back as far as native data goes (30 days).
+
+    Args:
+        query: The acceptance port.
+        iface: The interface.
+        collector: The collector.
+        slots: The device's timeline.
+        indices: Missing slot indices, ascending.
+        window: ``(start_us, end_us)`` of the report.
+
+    Returns:
+        set[int]: The slot indices explained as down.
+
+    Raises:
+        StorageError: If the store is unavailable.
+    """
+    if not indices:
+        return set()
+    last = slots[indices[-1]]
+    end = last.at_us + last.interval_s * US
+    before = query.status_marks
+    lead = before(
+        iface,
+        collector,
+        TimeWindow(as_time(window[0] - LOOKBACK_US), as_time(window[0])),
+        limit=1,
+        newest_first=True,
+    )
+    marks = [
+        *lead.items,
+        *before(iface, collector, TimeWindow(as_time(window[0]), as_time(end))).items,
+    ]
+    times = [m.ts_us for m in marks]
+    down: set[int] = set()
+    for i in indices:
+        slot = slots[i]
+        j = slot_index(times, slot.at_us + slot.interval_s * US - 1)
+        if j >= 0 and not marks[j].up_up:
+            down.add(i)
+    return down

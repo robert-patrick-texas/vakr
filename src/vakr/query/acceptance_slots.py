@@ -48,6 +48,7 @@ class GapCause(StrEnum):
     ADMIN_STATE = "admin_state"
     NOT_YET_DISCOVERED = "not_yet_discovered"
     INTERFACE_NOT_UP = "interface_not_up"
+    INTERFACE_DOWN = "interface_down"
     INVENTORY_CHANGE = "inventory_change"
     UNEXPLAINED = "unexplained"
 

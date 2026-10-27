@@ -104,6 +104,31 @@ def _cell(scrubber: Scrubber, column: str, value: str) -> str:
     return scrubber.text(value)
 
 
+def table_hosts(text: str) -> list[str]:
+    """List the host names a table holds, to register them before later members.
+
+    Args:
+        text: CSV text with a header.
+
+    Returns:
+        list[str]: Values of the host and alias columns.
+
+    Raises:
+        None
+    """
+    try:
+        rows = list(csv.DictReader(io.StringIO(text)))
+    except csv.Error:
+        return []
+    found: list[str] = []
+    for row in rows:
+        for column, value in row.items():
+            name = (column or "").strip().lower()
+            if name in HOST_COLUMNS or name in HOST_LIST_COLUMNS:
+                found += (value or "").split()
+    return found
+
+
 def scrub_table(scrubber: Scrubber, text: str) -> str:
     """Pseudonymize a CSV member whose first row is its header.
 

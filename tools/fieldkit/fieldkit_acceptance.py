@@ -44,6 +44,7 @@ from pathlib import Path
 from fieldkit_app import find_app
 from fieldkit_bundle import BundleError
 from fieldkit_context import Context
+from fieldkit_tablescrub import table_hosts
 
 STREAM_HEADER = "#member-stream 1"
 KINDS = frozenset({"table", "text"})
@@ -137,7 +138,11 @@ def _split(ctx: Context, out: Path) -> None:
         added = 0
         try:
             for name, kind, body in members(line.rstrip("\n") for line in handle):
-                ctx.bundle.add_text(f"acceptance/{name}", "".join(f"{b}\n" for b in body), kind)
+                text = "".join(f"{b}\n" for b in body)
+                if ctx.scrubber is not None and kind == "table":
+                    for host in table_hosts(text):  # later members may name these hosts
+                        ctx.scrubber.add_host(host)
+                ctx.bundle.add_text(f"acceptance/{name}", text, kind)
                 added += 1
         except (ValueError, BundleError) as exc:
             record["error"] = str(exc)

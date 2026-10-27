@@ -1,0 +1,27 @@
+# Acceptance criteria and alignment rules for the MRTG/SmokePing parallel run.
+# These are vakr's MVP-ACC-03 and MVP-ACC-04 values, documented in blueprint
+# Appendix E.34; another project changes them here, not in Python.
+
+[report]
+title = "vakr parallel run: comparison with MRTG and SmokePing"
+inbox = "../../inbox"              # field_inbox.py extracts bundles here (relative to this file)
+max_bundles = 1000
+max_listed = 40                    # out-of-tolerance windows listed per subject in Markdown (JSON has all)
+
+[traffic]                          # MVP-ACC-03
+tolerance = 0.02                   # +-2 % of MRTG's 5-minute average
+step_s = 300                       # MRTG's 5-minute windows; other rows are not compared
+min_coverage = 0.9                 # share of a window vakr's samples must cover
+phase_search_s = 60                # MRTG poll phase searched around the last run's phase
+phase_step_s = 5
+jitter_s = 30                      # a run starting this much early or late explains a window
+quantum_bps = 8                    # MRTG .log files store whole bytes per second
+min_windows = 288                  # one day of compared windows per interface
+
+[latency]                          # MVP-ACC-04
+tolerance_ms = 1.0                 # +-1 ms or +-5 %, whichever is larger
+tolerance_rel = 0.05
+loss_abs = 0.005                   # loss rates agree within 0.5 percentage points ...
+loss_z = 3.0                       # ... or within 3 standard errors of the difference
+high_loss = 0.5                    # a window losing this share of probes has a weak median
+min_windows = 288

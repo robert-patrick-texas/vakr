@@ -83,7 +83,7 @@ Collector or storage trouble is never reported as the device being down, and a s
 
 Interfaces that are not up/up get no traffic samples (E.27 #7). So that their gaps are still explained, Stage 1 records an interface's admin and oper status whenever it changes, and every interface's status at its device's first Stage 1 after the collector starts. A link that went down and came back while its device answered SNMP is therefore `interface_down`, not `unexplained`. The records are small and few (about 73 MB per node at a pessimistic rate, blueprint E.35), replicate to the partner with their poll, and expire with native data.
 
-The same changes drive interface lifecycle (E.6): an interface that goes down is `inactive` in `vakr status`, the TUI, and the web UI within seconds, and `active` again when it comes back, without waiting for rediscovery.
+The same changes drive interface lifecycle on the primary (E.6): an interface that goes down is `inactive` in `vakr status`, the TUI, and the web UI within seconds, with the status Stage 1 read, and `active` again when it comes back, without waiting for rediscovery. A peer records its own status records but takes lifecycle from the primary.
 
 ### What vakr does not record
 

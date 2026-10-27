@@ -239,7 +239,7 @@ def open_inventory(context: InventoryContext) -> InventorySource:
     source = INVENTORY_FACTORY(context)
     # On a peer identity belongs to the primary: discovery must not write (ADR-024).
     if node_settings(context.config).is_peer:
-        wrapped: InventorySource = PeerInventory(source)  # ty: ignore[invalid-assignment]
+        wrapped: InventorySource = PeerInventory(source)
         return wrapped
     return source
 

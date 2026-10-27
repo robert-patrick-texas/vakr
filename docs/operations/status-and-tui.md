@@ -4,7 +4,7 @@ Two read-only views show what vakr knows right now about every device. `vakr sta
 
 Run them on the monitoring node. Neither command ever creates a database: on a node where `metadata.db` does not exist yet, both say **no data yet** and exit with status 3.
 
-An interface's lifecycle follows each Stage 1 poll (blueprint E.6). When a link goes down, its row shows `inactive` and the state "not up/up (inactive)" within seconds, even though its last traffic sample still says up; it shows `active` again at the first Stage 1 that finds it up/up.
+An interface's lifecycle follows each Stage 1 poll (blueprint E.6). When a link goes down, its row shows `inactive` within seconds and the state Stage 1 read, such as "not up/up (up/down)", even though its last traffic sample still says up; it shows `active` again at the first Stage 1 that finds it up/up. "Not up/up" appears only when a Stage 1 status record says so: a `stale` interface, or one without any sample, keeps "no sample" or its last sampled state. On a peer, lifecycle comes from the primary.
 
 ## Where the data comes from
 

@@ -136,10 +136,18 @@ async def metadata_pull_loop(service: Any) -> None:
 
 
 class PeerInventory:
-    """An inventory source that never writes discovery results to metadata (ADR-024).
+    """An inventory source that never writes replicated metadata (ADR-024).
 
-    Every other call goes to the wrapped source; ``record_discovery`` answers
-    the plan from the replicated interfaces instead of reconciling.
+    A peer takes inventory, identities, and interface lifecycle from the
+    primary, so this wrapper offers an allow-list: the reads the collector
+    plans from (``devices``, ``change_counter``, ``poll_plan``), the in-memory
+    policy swap of a reload (``replace_policy``), and ``record_discovery``,
+    which answers the replicated plan instead of reconciling. Anything else,
+    such as ``record_discovery_report`` or the Stage 1 lifecycle writer
+    ``record_stage1_status`` (E.6), does not exist here, so a new write method
+    of the inventory service cannot reach a peer's metadata by accident. The
+    peer still records its own interface status observations: they are
+    telemetry, owned by its collector.
     """
 
     def __init__(self, inner: Any) -> None:
@@ -156,22 +164,62 @@ class PeerInventory:
         """
         self._inner = inner
 
-    def __getattr__(self, name: str) -> Any:
-        """Delegate everything else.
+    def devices(self) -> Any:
+        """Return the devices to poll (read).
 
         Args:
-            name: The attribute.
+            None
 
         Returns:
-            Any: The wrapped source's attribute.
+            Any: The wrapped source's devices.
 
         Raises:
-            AttributeError: If it has none; ``record_discovery_report`` is
-                hidden, so manual operations never write on a peer.
+            StorageError: If metadata cannot be read.
         """
-        if name == "record_discovery_report":
-            raise AttributeError(name)
-        return getattr(self._inner, name)
+        return self._inner.devices()
+
+    def change_counter(self) -> int:
+        """Return the inventory change counter (read).
+
+        Args:
+            None
+
+        Returns:
+            int: The counter.
+
+        Raises:
+            StorageError: If metadata cannot be read.
+        """
+        return self._inner.change_counter()
+
+    def poll_plan(self, device_id: DeviceId) -> PollPlan | None:
+        """Return a device's plan from replicated metadata (read).
+
+        Args:
+            device_id: The device.
+
+        Returns:
+            PollPlan | None: The plan.
+
+        Raises:
+            NotFoundError: If inventory no longer knows the device.
+        """
+        return self._inner.poll_plan(device_id)
+
+    def replace_policy(self, *args: Any, **kwargs: Any) -> None:
+        """Swap the in-memory collection policy on reload; nothing is written.
+
+        Args:
+            *args: As the wrapped source's ``replace_policy``.
+            **kwargs: As the wrapped source's ``replace_policy``.
+
+        Returns:
+            None
+
+        Raises:
+            AttributeError: If the wrapped source has no such method.
+        """
+        self._inner.replace_policy(*args, **kwargs)
 
     def record_discovery(self, device_id: DeviceId, result: DiscoveryResult,
                          now: datetime) -> PollPlan:  # noqa: ARG002 - contract  # fmt: skip

@@ -109,11 +109,8 @@ def test_e6_lifecycle_follows_stage1_without_rediscovery() -> None:
     detail = queries.device_detail(str(device.id))
     assert detail is not None
     (row,) = detail.interfaces
-    assert row.lifecycle is InterfaceLifecycle.INACTIVE
-    assert row.state.text == "not up/up (inactive)"
+    assert row.lifecycle is InterfaceLifecycle.INACTIVE  # the state text needs a status record
     assert apply_stage1_status(uow, [down], stale) == 0  # nothing changes twice
-    old = StatusEvidence(iface.id, s.T0, IfAdminStatus.UP, UP)
-    assert apply_stage1_status(uow, [old], stale) == 0  # older than the record: ignored
     up = StatusEvidence(iface.id, s.T0 + 2 * s.MINUTE, IfAdminStatus.UP, UP)
     assert apply_stage1_status(uow, [up], stale) == 1
     with uow() as u:

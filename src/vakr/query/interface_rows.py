@@ -28,14 +28,16 @@ Example:
 from dataclasses import replace
 from typing import NamedTuple
 
-from vakr.domain.enums import Freshness, InterestClass, InterfaceLifecycle
+from vakr.domain.enums import Freshness, IfAdminStatus, IfOperStatus, InterestClass
 from vakr.domain.interfaces import Interface
 from vakr.domain.quality import Quality
 from vakr.domain.state import CurrentInterfaceState
 from vakr.logic.capacity import Capacity
 from vakr.logic.natural import natural_key
+from vakr.ports.telemetry.acceptance import StatusMark
 from vakr.query.detail_views import InterfaceRow
 from vakr.query.interface_capacity import capacity_of, no_capacity_reason, utilization
+from vakr.query.interface_status import int_status
 from vakr.query.labels import if_state_text, mark_stale, rate_gap_reason
 from vakr.query.text import age_text, bits_per_second, packets_per_second
 from vakr.query.views import DASH, Reading, missing
@@ -197,14 +199,17 @@ def _over(reading: Reading, over: bool) -> Reading:
 
 
 def interface_row(
-    interface: Interface, state: CurrentInterfaceState | None, position: str
-) -> InterfaceRow:
+    interface: Interface, state: CurrentInterfaceState | None, position: str,
+    status: StatusMark | None = None,
+) -> InterfaceRow:  # fmt: skip
     """Assemble one interface-table row.
 
     Args:
         interface: Inventory record.
         state: Its current sample from the shown position, if any.
         position: That position's label, for the "no sample" reason.
+        status: Its newest Stage 1 status record, when that is newer than the sample
+            and not up/up (``interface_status.down_statuses``).
 
     Returns:
         InterfaceRow: The row.
@@ -220,12 +225,11 @@ def interface_row(
         m = _Measured(*([missing(f"no sample from {position}")] * len(_Measured._fields)))
     else:
         m = _measured(state, cap, interface)
-    if interface.lifecycle is not InterfaceLifecycle.ACTIVE and (
-        state is None or state.observed_at < interface.updated_at
-    ):
-        # Stage 1 found it not up/up after its last sample (E.6); that sample's "up" is history.
-        word = interface.lifecycle.value
-        m = m._replace(state=Reading(f"not up/up ({word})", None, f"{word} since Stage 1"))
+    if status is not None:
+        # Stage 1 read it not up/up after its last sample (E.6, E.35): that is the state now.
+        text = if_state_text(int_status(IfAdminStatus, status.admin_status),
+                             int_status(IfOperStatus, status.oper_status))  # fmt: skip
+        m = m._replace(state=Reading(f"not up/up ({text})", text, "from a Stage 1 status record"))
     return InterfaceRow(
         interface_id=interface.id,
         name=display_name(interface),

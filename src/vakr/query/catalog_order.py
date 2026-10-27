@@ -42,6 +42,7 @@ from vakr.query.catalog_views import InterfaceListRow
 from vakr.query.detail import read_interface_states
 from vakr.query.history_limits import SEARCH_TEXT_MAX
 from vakr.query.interface_rows import display_name, interface_row, order_key
+from vakr.query.interface_status import down_statuses
 from vakr.query.settings import QuerySettings
 from vakr.query.views import Reading
 
@@ -107,10 +108,12 @@ def list_rows(
             )
             states.update(found)
         position = collector.position if collector else "any collector"
+        down = down_statuses(telemetry if problem is None else None, interfaces,
+                             collector.id if collector else None, states, now)  # fmt: skip
         rows = [
             InterfaceListRow(
                 interface_ref(index, i),
-                interface_row(i, states.get(i.id), position),
+                interface_row(i, states.get(i.id), position, down.get(i.id)),
                 i.annotation.contracted_bps,
                 i.addresses,
             )

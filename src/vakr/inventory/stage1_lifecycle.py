@@ -12,8 +12,15 @@ one unit of work per batch.
 Rules beyond E.6, chosen to keep identity and evidence honest:
 
 - The interface is looked up by its persistent UUID; ``ifIndex`` plays no part.
-- Evidence older than the record's last change is ignored, so a late batch
-  cannot rewind a discovery's decision. ``retired`` never changes here.
+- Evidence is never compared with the record's ``updated_at``: annotation and
+  tag edits move it too, and the collector does not repeat an unchanged
+  status, so such a comparison lost changes for good (M6 review). Stage 1
+  evidence is the newest status the collector read; if discovery decided in
+  the seconds before the batch arrived and saw another status, the next
+  Stage 1 differs from the batch's and puts it right within one poll.
+- An interface discovery found missing (no current ``ifIndex``) keeps that
+  decision: Stage 1 evidence was read under an older plan. ``retired`` never
+  changes here.
 - Missing status (neither value read) is not evidence (the lifecycle rules).
 
 Dependencies:
@@ -82,8 +89,8 @@ def apply_stage1_status(
             stored = uow.interfaces.get(item.interface_id)
             if stored is None or stored.lifecycle is InterfaceLifecycle.RETIRED:
                 continue
-            if item.at < stored.updated_at:
-                continue  # older than the record's last change: never rewind it
+            if stored.if_index is None:
+                continue  # discovery lost it after this Stage 1: its decision stands
             evidence = InterfaceEvidence(item.at, LifecycleSource.STAGE1, True,
                                          item.admin_status, item.oper_status)  # fmt: skip
             state = apply_evidence(current_record(stored), evidence, stale_after).record.state

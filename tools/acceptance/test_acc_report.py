@@ -42,6 +42,9 @@ from acc_testkit import (
 HERE = Path(__file__).parent
 DATA = HERE / "testdata"
 
+KEY_ID = "shared-test-key"
+"""A pseudonym key id for fixtures; a hex string here reads as a credential to gitleaks."""
+
 
 def test_recorded_mrtg_and_smokeping_formats() -> None:
     """The rateup log, MRTG's RRD, and SmokePing's RRD parse to windows in bit/s and ms.
@@ -172,7 +175,7 @@ def test_report_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     assert report["traffic"][0]["phase_s"] == 40
     assert report["latency"][0]["medians_ms"] == pytest.approx([12.31, 12.3], abs=0.02)
     slow = tmp_path / "slow"
-    two_hosts(slow, vakr_rtt_us=15_000, key="0123456789abcdef")
+    two_hosts(slow, vakr_rtt_us=15_000, key=KEY_ID)
     assert acceptance_report.main(["--inbox", str(slow), "--gate"]) == 1
     assert "MVP-ACC-04 fail" in capsys.readouterr().out
     problems = json.loads((slow / "parallel-run-report.json").read_text())["problems"]
@@ -202,11 +205,11 @@ def test_e34_only_a_pseudonymized_report_leaves_the_inbox(
     assert "names devices and addresses" in capsys.readouterr().err
     assert list(evidence.iterdir()) == []
     mixed = tmp_path / "mixed"
-    two_hosts(mixed, key="0123456789abcdef")  # one bundle clear: names cannot be trusted
+    two_hosts(mixed, key=KEY_ID)  # one bundle clear: names cannot be trusted
     assert acceptance_report.main(["--inbox", str(mixed), "--output", str(evidence)]) == 2
     assert list(evidence.iterdir()) == []
     pseudo = tmp_path / "pseudo"
-    two_hosts(pseudo, key="0123456789abcdef", mon_key="0123456789abcdef")
+    two_hosts(pseudo, key=KEY_ID, mon_key=KEY_ID)
     assert acceptance_report.main(["--inbox", str(pseudo), "--output", str(evidence)]) == 0
     assert json.loads((evidence / "parallel-run-report.json").read_text())["pseudonymized"] is True
     assert NAMES[True] in (evidence / "parallel-run-report.md").read_text()

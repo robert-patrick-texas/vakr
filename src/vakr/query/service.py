@@ -50,6 +50,7 @@ from vakr.query.evidence import (
     telemetry_unavailable,
 )
 from vakr.query.interface_rows import interface_row, order_key
+from vakr.query.interface_status import down_statuses
 from vakr.query.labels import quality_words
 from vakr.query.listing import DeviceListRequest, bucket_counts, matches, ordered
 from vakr.query.settings import QuerySettings
@@ -162,9 +163,11 @@ class StatusQueries:
                 self._telemetry, device.id, best.collector.id, now, cap
             )
         position = best.collector.position if best.collector else "any collector"
-        table = [
-            interface_row(i, states.get(i.id), position) for i in sorted(interfaces, key=order_key)
-        ]
+        shown_id = best.collector.id if best.collector else None
+        down = down_statuses(self._telemetry if snap.available else None, interfaces, shown_id,
+                             states, now)  # fmt: skip
+        table = [interface_row(i, states.get(i.id), position, down.get(i.id))
+                 for i in sorted(interfaces, key=order_key)]  # fmt: skip
         state = best.judgement.state
         warnings = quality_words(state.quality) if state is not None else ()
         if problem:

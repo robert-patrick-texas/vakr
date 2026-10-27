@@ -179,7 +179,8 @@ def print_digest() -> int:
     store = SqliteMetadataStore(Path(METADATA))
     try:
         with sqlite_uow_factory(store)() as uow:
-            print(uow.replica.state().digest)
+            sqlite_uow: Any = uow  # the SQLite unit of work offers ``replica``
+            print(sqlite_uow.replica.state().digest)
     finally:
         store.close()
     return 0

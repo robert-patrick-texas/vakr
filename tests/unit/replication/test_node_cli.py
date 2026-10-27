@@ -223,7 +223,9 @@ def test_mpos003_promote_with_the_primary_gone_makes_this_node_primary(
     backup = Path(change["config_backup"])
     assert 'role = "peer"' in (backup / "conf.d" / "50-role.toml").read_text()
     assert _audit(west)[0] == "node.promote"
-    assert role_record.promotion(west.state_dir / role_record.ROLE_FILE)["fork_at"]
+    served = role_record.promotion(west.state_dir / role_record.ROLE_FILE)
+    assert served is not None
+    assert served["fork_at"] == change["last_pull_at"]
     code, _, err = _run(capsys, "node", "promote", "--yes")
     assert code == 1
     assert "already a primary" in err

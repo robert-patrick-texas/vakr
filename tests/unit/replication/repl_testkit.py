@@ -87,6 +87,8 @@ def seed(factory: Callable[[], Any], clock: ManualClock) -> dict[str, Any]:
 class FakePrimary:
     """Answers the replication endpoints from a store, as the API does."""
 
+    base_url = "https://east.test"
+
     def __init__(self, factory: Callable[[], Any], *, role: str = "primary") -> None:
         """Bind to the primary's store.
 

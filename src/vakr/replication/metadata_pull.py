@@ -33,7 +33,7 @@ from vakr.lifecycle.egress.errors import EgressError
 from vakr.ports.clock import Clock
 from vakr.ports.metadata.replica import ReplicaPage
 from vakr.replication import status
-from vakr.replication.client import PartnerClient, PartnerError
+from vakr.replication.client import PartnerError, PartnerReader
 from vakr.replication.resync import Resync
 
 _LOG = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ def _page(doc: Any, table: str) -> ReplicaPage:
 class MetadataPuller:
     """Pulls the primary's replicated metadata into this peer."""
 
-    def __init__(self, client: PartnerClient, uow_factory: Callable[[], Any], record: Path,
+    def __init__(self, client: PartnerReader, uow_factory: Callable[[], Any], record: Path,
                  clock: Clock, resync: Resync | None = None) -> None:  # fmt: skip
         """Bind the puller.
 

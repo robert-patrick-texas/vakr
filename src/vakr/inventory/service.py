@@ -39,6 +39,7 @@ Example:
 """
 
 import threading
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 
 from vakr.collectors.snmp.plan import PollPlan
@@ -52,6 +53,7 @@ from vakr.domain.inventory import Device
 from vakr.inventory.discovery_report import CapabilityMemory, DiscoveryReport
 from vakr.inventory.planning import PlanInputs, build_plan
 from vakr.inventory.reads import all_devices
+from vakr.inventory.stage1_lifecycle import StatusEvidence, apply_stage1_status
 from vakr.logic.lifecycle_model import STALE_AFTER
 from vakr.policy.keywords import KeywordSet, packaged_keywords
 from vakr.policy.rules import Policy
@@ -196,6 +198,20 @@ class InventoryService:
             ``record_discovery_report`` documents.
         """
         return self.record_discovery_report(device_id, result, now).plan
+
+    def record_stage1_status(self, items: Sequence[StatusEvidence]) -> int:
+        """Follow Stage 1 status changes in interface lifecycles (E.6); see ``stage1_lifecycle``.
+
+        Args:
+            items: At most one batch of status changes.
+
+        Returns:
+            int: Interfaces whose lifecycle changed.
+
+        Raises:
+            ConflictError, StorageError: The collector keeps the batch and retries.
+        """
+        return apply_stage1_status(self._factory, items, self._stale_after)
 
     def record_discovery_report(
         self, device_id: DeviceId, result: DiscoveryResult, now: datetime

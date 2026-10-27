@@ -1,7 +1,7 @@
 """Telemetry schema 4 (interface status records): additive, readable by schema 3, kept in place.
 
 ``0004_interface_status.sql`` declares ``compat: additive`` and passes the
-static additive check, so a release at schema 3 (0.5.0) rolled back onto it
+static additive check, so a release at schema 3 rolled back onto it
 still calls the database current (E.14). Its rows stay in their one table
 when the mover drains staging, are never written to ``repl_log`` (whose
 family CHECK stops at 5), and retention deletes them behind the horizon
@@ -56,7 +56,7 @@ def test_mig001_0004_is_additive_with_its_compat_header() -> None:
 
 
 def test_e14_a_schema_3_release_reads_schema_4(tmp_path: Path) -> None:
-    """E.14, MIG-002: 0.5.0's family (schema 3) calls a schema-4 file current and readable.
+    """E.14, MIG-002: a schema-3 release's family calls a schema-4 file current and readable.
 
     Args:
         tmp_path: Directory for the file.

@@ -45,6 +45,7 @@ from vakr.app.collector.snmp_parts import (
     stage1_plan,
     stage2_status,
 )
+from vakr.app.collector.status_tracker import StatusTracker
 from vakr.app.collector.tally import FaultTally
 from vakr.collectors.snmp import (
     SnmpPollResult,
@@ -58,6 +59,7 @@ from vakr.collectors.snmp import (
 from vakr.collectors.snmp.config import SnmpConfig
 from vakr.domain.enums import SnmpState, UptimeContinuity
 from vakr.domain.quality import Quality
+from vakr.domain.status_observations import InterfaceStatusObservation
 from vakr.ports.clock import Clock
 from vakr.ports.snmp import SnmpSessionError, SnmpSessionFactory
 from vakr.scheduler.steps import PollContext, SnmpResult, StepStatus
@@ -104,6 +106,7 @@ class CollectorSnmpStep:
         self.rates = RateSettings()
         self._factory, self._plans, self._baselines = factory, plans, baselines
         self._clock, self._tally, self._boot_id = clock, tally, boot_id
+        self.status = StatusTracker()
 
     async def stage1(self, ctx: PollContext, fallback: bool) -> SnmpResult:
         """Read uptime and exact interface status (9.5).
@@ -149,13 +152,16 @@ class CollectorSnmpStep:
         )
         eligible, unresolved = ((), 0) if fallback else split_eligible(plan, stage1)
         self._tally.unresolved_interfaces[device.id] = unresolved
-        return self._judge(
-            ctx, result, Stage1Detail(target, stage1, eligible, UNKNOWN, size), unresolved
-        )
+        flags = Quality.MAINTENANCE if ctx.target.maintenance else Quality.NONE
+        statuses = self.status.observe((ctx.poll_id, ctx.collector_id, device.id), plan, stage1,
+                                       flags)  # fmt: skip
+        detail = Stage1Detail(target, stage1, eligible, UNKNOWN, size)
+        return self._judge(ctx, result, detail, unresolved, statuses)
 
     def _judge(
-        self, ctx: PollContext, result: SnmpPollResult, detail: Stage1Detail, unresolved: int
-    ) -> SnmpResult:
+        self, ctx: PollContext, result: SnmpPollResult, detail: Stage1Detail, unresolved: int,
+        statuses: tuple[InterfaceStatusObservation, ...] = (),
+    ) -> SnmpResult:  # fmt: skip
         """Judge uptime continuity, build the device observation, and plan Stage 2.
 
         Args:
@@ -163,6 +169,7 @@ class CollectorSnmpStep:
             result: Stage 1 as an SNMP poll result.
             detail: Stage 2's inputs; its continuity is filled in here.
             unresolved: Up/up interfaces skipped for lack of an identity.
+            statuses: This Stage 1's interface status records (E.35), stored before ``obs``.
 
         Returns:
             SnmpResult: The Stage 1 outcome for the scheduler.
@@ -191,7 +198,11 @@ class CollectorSnmpStep:
             self._tally.fault("snmp_transport")
             quality |= Quality.COLLECTOR_DEGRADED
         detail = replace(detail, continuity=continuity)
-        return SnmpResult(answer_status(obs.state), len(detail.eligible), detail, (obs,), quality)
+        # Status records go first, so they are stored no later than the SNMP observation that
+        # replication attaches them to (E.35).
+        observations = (*statuses, obs)
+        return SnmpResult(answer_status(obs.state), len(detail.eligible), detail, observations,
+                          quality)  # fmt: skip
 
     async def stage2(self, ctx: PollContext, stage1: SnmpResult) -> SnmpResult:
         """Read counters for the interfaces this poll's Stage 1 chose, and derive rates.

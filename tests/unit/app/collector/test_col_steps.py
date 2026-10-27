@@ -47,6 +47,7 @@ from vakr.discovery import discover
 from vakr.domain.enums import AddressFamily, BaselineState, SnmpState
 from vakr.domain.observations import IcmpObservation, InterfaceObservation, SnmpDeviceObservation
 from vakr.domain.quality import Quality
+from vakr.domain.status_observations import InterfaceStatusObservation
 from vakr.ports.clock import SystemClock
 from vakr.scheduler.machine import Phase
 from vakr.scheduler.runner import PollProgress, run_poll
@@ -319,8 +320,10 @@ def test_stage1_then_stage2_sample_up_up_interfaces_with_identities() -> None:
             assert first.up_up == len(UP_UP) - 1
             assert first.quality & Quality.BASELINE_IDENTITY_UNRESOLVED
             assert tally.unresolved_interfaces[device.id] == 1
-            obs = first.observations[0]
+            *statuses, obs = first.observations  # E.35: status records come first
             assert isinstance(obs, SnmpDeviceObservation)
+            assert statuses
+            assert all(isinstance(r, InterfaceStatusObservation) and r.baseline for r in statuses)
             assert obs.state is SnmpState.RESPONDING
             second = await step.stage2(ctx, first)
             rows = [o for o in second.observations if isinstance(o, InterfaceObservation)]

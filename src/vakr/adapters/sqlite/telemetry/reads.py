@@ -45,6 +45,7 @@ SUBJECT_DICTIONARY = {
     "obs_snmp": "device",
     "obs_poll": "device",
     "obs_health": "collector",
+    "obs_ifstat": "interface",
 }
 """Native family to the dictionary of its ``series_key``."""
 

@@ -57,6 +57,7 @@ from vakr.domain.observations import (
     DevicePoll,
     IcmpObservation,
     InterfaceObservation,
+    InterfaceStatusObservation,
     SnmpDeviceObservation,
 )
 
@@ -154,5 +155,10 @@ SPECS: dict[ObservationType, Spec] = {
         Field("spool_used_pct", "float", optional=True),
         *_many("int", "active_devices", "active_interfaces"),
     )),
+    ObservationType.INTERFACE_STATUS: Spec(InterfaceStatusObservation, "timestamp", True, (
+        _DEVICE, Field("interface_id", "uuid"), Field("if_index", "int"),
+        _e("admin_status", IfAdminStatus, optional=True),
+        _e("oper_status", IfOperStatus, optional=True), Field("baseline", "bool"),
+    )),
 }  # fmt: skip
-"""Payload schema of every observation type, schema version 1."""
+"""Payload schema of every observation type, schema version 1 (``interface_status`` added later)."""

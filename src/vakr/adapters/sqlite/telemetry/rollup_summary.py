@@ -26,6 +26,8 @@ import sqlite3
 
 from vakr.adapters.sqlite.telemetry.payload_reader import PayloadReader
 from vakr.domain.errors import StorageError
+from vakr.domain.quality import Quality
+from vakr.ports.telemetry.acceptance import BucketMark
 
 _US = 1_000_000
 
@@ -127,3 +129,50 @@ def bucket_rows(
         {"s": keys[0], "c": keys[1],
          "lo": -(-(bounds[0] - month_us) // _US), "hi": -(-(bounds[1] - month_us) // _US)},
     ).fetchall()  # fmt: skip
+
+
+_QUALITY: dict[int, Quality] = {}
+
+
+def quality_of(bits: int) -> Quality:
+    """Return the ``Quality`` of stored bits, built once per distinct value.
+
+    A report reads millions of rows that share a handful of flag values, and
+    building an ``IntFlag`` costs more than the rest of a row.
+
+    Args:
+        bits: The stored integer.
+
+    Returns:
+        Quality: The flags.
+
+    Raises:
+        ValueError: If the bits are not a valid ``Quality``.
+    """
+    found = _QUALITY.get(bits)
+    if found is None:
+        found = _QUALITY.setdefault(bits, Quality(bits))
+    return found
+
+
+def bucket_mark(start: int, payload: bytes) -> BucketMark:
+    """Build one bucket mark, reading the common one-byte payload inline.
+
+    Args:
+        start: Bucket start.
+        payload: The stored blob.
+
+    Returns:
+        BucketMark: The mark.
+
+    Raises:
+        StorageError: If the payload is damaged.
+    """
+    if len(payload) > 5 and payload[2] == payload[0] and payload[3] < 0x80:
+        present = payload[0]
+        shared_rest = payload[1] == present & ~(present & -present)
+        if present and shared_rest and payload[4] < 0x80 and payload[5] < 0x80:
+            sample = payload[4]  # as rollup_summary's shared case, without the calls
+            return BucketMark(start, sample, present if sample else 0, quality_of(payload[5]))
+    samples, available, quality = payload_summary(payload)
+    return BucketMark(start, samples, available, quality_of(quality))

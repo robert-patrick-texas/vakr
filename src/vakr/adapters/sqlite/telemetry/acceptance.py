@@ -32,12 +32,11 @@ from vakr.adapters.sqlite.telemetry.layout import FAMILY_OF, METRIC_COLUMN, ROLL
 from vakr.adapters.sqlite.telemetry.partitions import ROLLUP_HORIZON, spans, state
 from vakr.adapters.sqlite.telemetry.reads import native_start, sources, subject_key, union
 from vakr.adapters.sqlite.telemetry.rollup_reads import rollup_dictionary
-from vakr.adapters.sqlite.telemetry.rollup_summary import bucket_rows, payload_summary
+from vakr.adapters.sqlite.telemetry.rollup_summary import bucket_mark, bucket_rows, quality_of
 from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.adapters.sqlite.telemetry.vocab import code_of
 from vakr.domain.enums import ObservationType, PollExecution
 from vakr.domain.ids import CollectorId, DeviceId
-from vakr.domain.quality import Quality
 from vakr.domain.rollups import ROLLUP_BUCKET_SECONDS
 from vakr.domain.series import TimeWindow
 from vakr.domain.timestamps import to_epoch_us
@@ -47,6 +46,7 @@ from vakr.ports.telemetry.acceptance import (
     Marks,
     PollMark,
     SampleMark,
+    StatusMark,
     check_request,
 )
 from vakr.ports.telemetry.rollup_source import ICMP_METRICS, INTERFACE_METRICS
@@ -56,28 +56,6 @@ _EXECUTION = {code_of(m): m for m in PollExecution}
 _POLL_COLUMNS = ("ts_us, observation_uuid, effective_interval_s, execution, quality_flags, "
                  "started_offset_us, completed_offset_us")  # fmt: skip
 _METRICS = {ObservationType.INTERFACE: INTERFACE_METRICS, ObservationType.ICMP: ICMP_METRICS}
-_QUALITY: dict[int, Quality] = {}
-
-
-def _quality(bits: int) -> Quality:
-    """Return the ``Quality`` of stored bits, built once per distinct value.
-
-    A report reads millions of rows that share a handful of flag values, and
-    building an ``IntFlag`` costs more than the rest of a row.
-
-    Args:
-        bits: The stored integer.
-
-    Returns:
-        Quality: The flags.
-
-    Raises:
-        ValueError: If the bits are not a valid ``Quality``.
-    """
-    found = _QUALITY.get(bits)
-    if found is None:
-        found = _QUALITY.setdefault(bits, Quality(bits))
-    return found
 
 
 def _presence(observation_type: ObservationType) -> str:
@@ -135,7 +113,7 @@ class SqliteAcceptanceQuery:
         rows = self._native("obs_poll", _POLL_COLUMNS, device_id, collector_id, window, limit,
                             descending=False)  # fmt: skip
         marks = [
-            PollMark(ts, interval, _EXECUTION[code], _quality(flags),
+            PollMark(ts, interval, _EXECUTION[code], quality_of(flags),
                      None if start is None else ts + start, None if end is None else ts + end)
             for ts, _uuid, interval, code, flags, start, end in rows[:limit]
         ]  # fmt: skip
@@ -166,7 +144,34 @@ class SqliteAcceptanceQuery:
         family = FAMILY_OF[observation_type]
         rows = self._native(family, columns, subject_id, collector_id, window, limit,
                             descending=newest_first)  # fmt: skip
-        marks = [SampleMark(ts, _quality(flags), bits) for ts, _u, flags, bits in rows[:limit]]
+        marks = [SampleMark(ts, quality_of(flags), bits) for ts, _u, flags, bits in rows[:limit]]
+        return Marks(tuple(marks), len(rows) > limit)
+
+    def status_marks(
+        self, interface_id: UUID, collector_id: CollectorId, window: TimeWindow, *,
+        limit: int = MAX_MARKS, newest_first: bool = False,
+    ) -> Marks[StatusMark]:  # fmt: skip
+        """Return one interface's status records as marks; see the port.
+
+        Args:
+            interface_id: The interface.
+            collector_id: The collector.
+            window: Window on the Stage 1 time.
+            limit: At most this many marks.
+            newest_first: Newest first.
+
+        Returns:
+            Marks[StatusMark]: The marks.
+
+        Raises:
+            ValidationError: If ``limit`` is out of range.
+        """
+        check_request(None, limit)
+        columns = "ts_us, observation_uuid, admin_status, oper_status, baseline"
+        rows = self._native("obs_ifstat", columns, interface_id, collector_id, window, limit,
+                            descending=newest_first)  # fmt: skip
+        marks = [StatusMark(ts, admin, oper, bool(base)) for ts, _u, admin, oper, base in
+                 rows[:limit]]  # fmt: skip
         return Marks(tuple(marks), len(rows) > limit)
 
     def bucket_marks(
@@ -209,7 +214,7 @@ class SqliteAcceptanceQuery:
                         continue  # ends at or before the rollup horizon: expired
                     if len(found) > limit:
                         break
-                    found.append(_bucket(start, payload))
+                    found.append(bucket_mark(start, payload))
         return Marks(tuple(found[:limit]), len(found) > limit)
 
     def _native(
@@ -246,41 +251,3 @@ class SqliteAcceptanceQuery:
             sql += f" ORDER BY ts_us {order}, observation_uuid {order} LIMIT :n"
             params = {"s": key, "c": col, "a": start, "b": end, "n": limit + 1}
             return conn.execute(sql, params).fetchall()
-
-
-def _bucket(start: int, payload: bytes) -> BucketMark:
-    """Build one bucket mark, reading the common one-byte payload inline.
-
-    Args:
-        start: Bucket start.
-        payload: The stored blob.
-
-    Returns:
-        BucketMark: The mark.
-
-    Raises:
-        StorageError: If the payload is damaged.
-    """
-    if len(payload) > 5 and payload[2] == payload[0] and payload[3] < 0x80:
-        present = payload[0]
-        shared_rest = payload[1] == present & ~(present & -present)
-        if present and shared_rest and payload[4] < 0x80 and payload[5] < 0x80:
-            sample = payload[4]  # as rollup_summary's shared case, without the calls
-            return BucketMark(start, sample, present if sample else 0, _quality(payload[5]))
-    return BucketMark(start, *_summary(payload))
-
-
-def _summary(payload: object) -> tuple[int, int, Quality]:
-    """Return a payload's sample count, presence bits, and quality as ``BucketMark`` fields.
-
-    Args:
-        payload: The stored blob.
-
-    Returns:
-        tuple[int, int, Quality]: Samples, presence, quality.
-
-    Raises:
-        StorageError: If the payload is damaged.
-    """
-    samples, available, quality = payload_summary(payload)
-    return samples, available, _quality(quality)

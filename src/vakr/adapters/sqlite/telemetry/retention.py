@@ -39,7 +39,13 @@ from datetime import datetime, timedelta
 from typing import Any, Protocol
 
 from vakr.adapters.sqlite.encoding import decode_time, encode_time
-from vakr.adapters.sqlite.telemetry.layout import NATIVE_FAMILIES, checked, hot_table
+from vakr.adapters.sqlite.telemetry.layout import (
+    KEPT_FAMILIES,
+    KEY_COLUMNS,
+    NATIVE_FAMILIES,
+    checked,
+    hot_table,
+)
 from vakr.adapters.sqlite.telemetry.partitions import (
     HORIZON,
     ROLLUP_HORIZON,
@@ -56,6 +62,9 @@ from vakr.adapters.sqlite.telemetry.store import SqliteTelemetryStore
 from vakr.domain.rollups import ROLLUP_BUCKET_SECONDS, bucket_start
 from vakr.domain.timestamps import require_utc
 from vakr.ports.telemetry.results import RetentionPolicy, RetentionReport
+
+KEPT_PURGE_ROWS = 100_000
+"""Status rows one retention pass deletes at most (E.35); a day holds a few thousand."""
 
 _DRIVERS = {"obs_iface": ("dict_interface", "interface_key"),
             "obs_health": ("dict_collector", "collector_key")}  # fmt: skip
@@ -171,7 +180,33 @@ class SqliteRetentionManager:
             rollups = _advance_rollups(conn, encode_time(rollup_cut))
             prune(conn, encode_time(now))  # the ranking projection never outlives native data
             purge_log(conn, state(conn, HORIZON))  # nor the replication log (MPOS-005)
+            purge_kept(conn, state(conn, HORIZON))  # status records live outside partitions
         return RetentionReport(now, cutoff, rollup_cut, native, rollups)
+
+
+def purge_kept(conn: sqlite3.Connection, horizon_us: int | None) -> int:
+    """Delete rows of the kept families behind the native horizon, oldest first, bounded.
+
+    Args:
+        conn: Connection holding the write lock.
+        horizon_us: The native horizon; nothing is removed without one.
+
+    Returns:
+        int: Rows removed.
+
+    Raises:
+        sqlite3.Error: If the delete fails; the caller rolls back.
+    """
+    if horizon_us is None:
+        return 0
+    removed = 0
+    for family in KEPT_FAMILIES:
+        table, keys = hot_table(family), ", ".join(KEY_COLUMNS)
+        removed += conn.execute(
+            f"DELETE FROM {table} WHERE ({keys}) IN (SELECT {keys} FROM {table} "
+            "WHERE ts_us < ? ORDER BY ts_us LIMIT ?)", (horizon_us, KEPT_PURGE_ROWS),
+        ).rowcount  # fmt: skip
+    return removed
 
 
 def _advance_native(conn: sqlite3.Connection, cutoff: int) -> int:

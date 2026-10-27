@@ -20,6 +20,7 @@ Example:
 """
 
 from datetime import datetime
+from enum import IntEnum
 from uuid import UUID
 
 from vakr.adapters.memory.telemetry_store import MemoryTelemetryStore
@@ -42,6 +43,7 @@ from vakr.ports.telemetry.acceptance import (
     Marks,
     PollMark,
     SampleMark,
+    StatusMark,
     check_request,
 )
 from vakr.ports.telemetry.rollup_source import ICMP_METRICS, INTERFACE_METRICS
@@ -84,6 +86,21 @@ def _us(moment: datetime | None) -> int | None:
         None
     """
     return None if moment is None else to_epoch_us(moment)
+
+
+def _int(member: IntEnum | None) -> int | None:
+    """Return an IF-MIB status as its integer.
+
+    Args:
+        member: An ``IntEnum`` member or ``None``.
+
+    Returns:
+        int | None: The integer.
+
+    Raises:
+        None
+    """
+    return None if member is None else int(member)
 
 
 class MemoryAcceptanceQuery:
@@ -182,6 +199,35 @@ class MemoryAcceptanceQuery:
         metrics = _METRICS[observation_type]
         marks = [
             SampleMark(to_epoch_us(o.timestamp), o.quality, _presence(o, metrics))
+            for o in found[:limit]
+        ]  # fmt: skip
+        return Marks(tuple(marks), len(found) > limit)
+
+    def status_marks(
+        self, interface_id: UUID, collector_id: CollectorId, window: TimeWindow, *,
+        limit: int = MAX_MARKS, newest_first: bool = False,
+    ) -> Marks[StatusMark]:  # fmt: skip
+        """Return one interface's status records as marks; see the port.
+
+        Args:
+            interface_id: The interface.
+            collector_id: The collector.
+            window: Window on the Stage 1 time.
+            limit: At most this many marks.
+            newest_first: Newest first.
+
+        Returns:
+            Marks[StatusMark]: The marks.
+
+        Raises:
+            ValidationError: If ``limit`` is out of range.
+        """
+        check_request(None, limit)
+        found = self._select(ObservationType.INTERFACE_STATUS, interface_id, collector_id, window)
+        found.sort(key=lambda o: (o.timestamp, str(o.observation_id)), reverse=newest_first)
+        marks = [
+            StatusMark(to_epoch_us(o.timestamp), _int(o.admin_status), _int(o.oper_status),
+                       o.baseline)
             for o in found[:limit]
         ]  # fmt: skip
         return Marks(tuple(marks), len(found) > limit)

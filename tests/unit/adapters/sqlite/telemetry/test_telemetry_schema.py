@@ -32,6 +32,7 @@ from vakr.adapters.sqlite.telemetry import (
 )
 from vakr.adapters.sqlite.telemetry.layout import (
     COLUMNS,
+    KEPT_FAMILIES,
     KEY_COLUMNS,
     NATIVE_FAMILIES,
     ROLLUP_COLUMNS,
@@ -92,7 +93,12 @@ def test_mig001_fresh_install_creates_the_fixed_schema(tmp_path: Path) -> None:
     manager = telemetry_migrations(path)
     assert manager.status().state is SchemaState.MISSING
     applied = manager.migrate()
-    assert [a.name for a in applied] == ["initial", "ranking_projection", "replication"]
+    assert [a.name for a in applied] == [
+        "initial",
+        "ranking_projection",
+        "replication",
+        "interface_status",
+    ]
     assert manager.status().state is SchemaState.CURRENT
     assert raw(path, "PRAGMA application_id") == [(TELEMETRY_APPLICATION_ID,)]
     assert TELEMETRY_APPLICATION_ID != METADATA_APPLICATION_ID
@@ -143,13 +149,17 @@ def test_column_lists_match_the_migrated_ddl(tmp_path: Path) -> None:
     store = open_store(tmp_path)
     dev, iface, col = s.device().id, new_id(InterfaceId), new_id(CollectorId)
     rows = [s.sample(dev, iface, col, T0), s.icmp(dev, col, T0), s.snmp(dev, col, T0),
-            s.poll(dev, col, T0), s.health(col, T0)]  # fmt: skip
+            s.poll(dev, col, T0), s.health(col, T0), s.status(dev, iface, col, T0)]  # fmt: skip
     backend = SqliteTelemetry(store)
     write(backend, rows)
     backend.maintain(T0 + s.MINUTE * 10)  # moves the rows into day partitions
     for family in NATIVE_FAMILIES:
         hot, day = f"{family}_hot", f"{family}_d20261001"
         assert _columns(store.path, hot) == list(all_columns(family))
+        if family in KEPT_FAMILIES:  # schema 4: never moved, keyed for per-interface reads
+            assert _primary_key(store.path, hot) == list(KEY_COLUMNS)
+            assert not _columns(store.path, day)
+            continue
         assert _columns(store.path, day) == list(KEY_COLUMNS + COLUMNS[family])
         assert _primary_key(store.path, day) == list(KEY_COLUMNS)
         assert _primary_key(store.path, hot) == ["ts_us", "series_key", "collector_key",

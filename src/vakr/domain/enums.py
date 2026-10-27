@@ -239,6 +239,8 @@ class ObservationType(StrEnum):
     SNMP_DEVICE = "snmp_device"
     INTERFACE = "interface"
     COLLECTOR_HEALTH = "collector_health"
+    # Appended with telemetry schema 4: status changes of interfaces (E.6, E.35).
+    INTERFACE_STATUS = "interface_status"
 
 
 class Freshness(StrEnum):

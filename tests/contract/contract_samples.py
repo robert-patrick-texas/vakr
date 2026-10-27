@@ -27,6 +27,8 @@ from vakr.domain.enums import (
     CounterFamily,
     IcmpState,
     IdentityDecisionSource,
+    IfAdminStatus,
+    IfOperStatus,
     InterfaceLifecycle,
     PollExecution,
     ReachabilityStrategy,
@@ -59,6 +61,7 @@ from vakr.domain.observations import (
     SnmpDeviceObservation,
 )
 from vakr.domain.quality import Quality
+from vakr.domain.status_observations import InterfaceStatusObservation
 
 T0 = datetime(2026, 10, 1, tzinfo=UTC)
 """Reference time, aligned to the 15-minute rollup grid."""
@@ -412,6 +415,39 @@ def poll(device_id: UUID, collector_id: UUID, at: datetime, **overrides: Any) ->
         "completed_at": at + timedelta(seconds=2),
     }
     return DevicePoll(**base | overrides)
+
+
+def status(
+    device_id: UUID, interface_id: UUID, collector_id: UUID, at: datetime, **overrides: Any
+) -> InterfaceStatusObservation:
+    """Build an interface status record: oper down, the first record since the collector started.
+
+    Args:
+        device_id: The device.
+        interface_id: The interface.
+        collector_id: The collector.
+        at: Stage 1 time.
+        **overrides: Field values to replace.
+
+    Returns:
+        InterfaceStatusObservation: The record.
+
+    Raises:
+        None
+    """
+    base: dict[str, Any] = {
+        "observation_id": new_id(ObservationId),
+        "poll_id": new_id(PollId),
+        "collector_id": collector_id,
+        "device_id": device_id,
+        "interface_id": interface_id,
+        "timestamp": at,
+        "if_index": 7,
+        "admin_status": IfAdminStatus.UP,
+        "oper_status": IfOperStatus.DOWN,
+        "baseline": True,
+    }
+    return InterfaceStatusObservation(**base | overrides)
 
 
 def health(collector_id: UUID, at: datetime, **overrides: Any) -> CollectorHealthObservation:

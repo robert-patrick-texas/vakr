@@ -147,6 +147,37 @@ class BucketMark(NamedTuple):
     quality: Quality
 
 
+class StatusMark(NamedTuple):
+    """One interface status record reduced to its time and IF-MIB statuses. Immutable.
+
+    Attributes:
+        ts_us: When Stage 1 read it, epoch microseconds (UTC).
+        admin_status: ``ifAdminStatus`` integer, or ``None``.
+        oper_status: ``ifOperStatus`` integer, or ``None``.
+        baseline: The collector's first record of the interface since it started.
+    """
+
+    ts_us: int
+    admin_status: int | None
+    oper_status: int | None
+    baseline: bool
+
+    @property
+    def up_up(self) -> bool:
+        """Whether both statuses were ``up`` (1).
+
+        Args:
+            None
+
+        Returns:
+            bool: Admin and oper up.
+
+        Raises:
+            None
+        """
+        return self.admin_status == 1 and self.oper_status == 1
+
+
 @dataclass(frozen=True, slots=True)
 class Marks[T]:
     """Marks of one call. Immutable.
@@ -227,6 +258,28 @@ class AcceptanceQuery(Protocol):
         Raises:
             NotImplementedError: If the backend has no rollups.
             ValidationError: If the type is not in ``MARK_TYPES`` or ``limit`` is out of range.
+            StorageError: If the store is unavailable.
+        """
+        ...
+
+    def status_marks(
+        self, interface_id: UUID, collector_id: CollectorId, window: TimeWindow, *,
+        limit: int = MAX_MARKS, newest_first: bool = False,
+    ) -> Marks[StatusMark]:  # fmt: skip
+        """Return one interface's status records from one collector (E.35).
+
+        Args:
+            interface_id: The interface.
+            collector_id: The collector.
+            window: Bounded window on the Stage 1 time.
+            limit: At most this many marks, 1 to ``MAX_MARKS``.
+            newest_first: Return the newest records first.
+
+        Returns:
+            Marks[StatusMark]: The marks.
+
+        Raises:
+            ValidationError: If ``limit`` is out of range.
             StorageError: If the store is unavailable.
         """
         ...

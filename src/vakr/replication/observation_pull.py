@@ -38,6 +38,7 @@ from vakr.domain.observations import Observation
 from vakr.ports.clock import Clock
 from vakr.ports.telemetry.replication import ReplicaWriter
 from vakr.replication import observation_status as rec
+from vakr.replication.attachments import verified_attachments
 from vakr.replication.client import EgressError, PartnerError, PartnerReader
 
 PAGE_LIMIT = 10_000
@@ -258,6 +259,7 @@ def _page(data: Any, source: CollectorId, after: int) -> _Page:
             raise ValidationError("the partner's page holds another collector's observation")
         observations.append(observation)
         last = seq
+    observations.extend(verified_attachments(data, source, after))
     return _Page(data, observations)
 
 

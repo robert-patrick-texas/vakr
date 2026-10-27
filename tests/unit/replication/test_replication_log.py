@@ -102,7 +102,7 @@ def test_mig002_a_schema_2_database_migrates_to_3_with_its_data(tmp_path: Path) 
             "INSERT INTO dict_collector (collector_uuid) VALUES (?)", (new_id(CollectorId).bytes,)
         )
     applied = SqliteMigrationManager(path, base).migrate()
-    assert [a.name for a in applied] == ["replication"]
+    assert [a.name for a in applied] == ["replication", "interface_status"]
     with closing(sqlite3.connect(path)) as conn:
         assert conn.execute("SELECT count(*) FROM dict_collector").fetchone()[0] == 1
     store = SqliteTelemetryStore(path)

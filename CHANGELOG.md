@@ -22,8 +22,8 @@ The first M6 (MVP acceptance) release. It adds the tools that turn the parallel 
   - **Export:** `vakr inventory export [--format toml|csv]` writes the stored sites, devices, and interface annotations with their UUIDs and owners, byte for byte the same for the same records. Importing an export unchanged plans as no changes, and a TOML `--owner file` export is a valid `inventory.toml`. `--unannotated` lists every interface with its description, for classifying interfaces in a spreadsheet.
 - **Node promotion** (MPOS-003, MPOS-006, ADR-024 decisions 23–30, E.39; [losing the primary](docs/operations/two-positions.md#losing-the-primary)).
   - **Promote:** `sudo vakr node promote` makes a peer the metadata primary when the primary is lost. It reports the newest metadata pull and its age, and refuses without `--force` while the old primary still answers or when that cannot be told. It rewrites `[node]` for you, with a backup, records the old values, audits the change, and restarts only `vakr-collector` and `vakr-api`. Observations keep replicating both ways.
-  - **Two primaries:** the `replication` check of `vakr check health` is CRITICAL and names the node to demote. `vakr status`, the TUI, and the web UI show `TWO PRIMARIES`. No device's state changes.
-  - **Demote:** `sudo vakr node demote` makes a returning old primary a peer of the new one. At its next pull it backs up `metadata.db`, takes the new primary's metadata exactly, and reports the edits it discarded.
+  - **Two primaries:** while the partner's latest "primary" answer is at most 5 minutes old, the `replication` check of `vakr check health` is CRITICAL and names the node to demote. `vakr status`, the TUI, and the web UI show `TWO PRIMARIES`. After 5 minutes with no newer answer, for example when the old primary was switched off instead of demoted, the check is a WARNING saying when the partner was last seen as a primary. No device's state changes.
+  - **Demote:** `sudo vakr node demote` makes a returning old primary a peer of the new one. It writes its resync marker before it changes the role; if it cannot, nothing changes and it exits 1. At its next pull the node takes one backup of `metadata.db`, however many attempts the resync needs. It writes its report of discarded edits before it discards anything, then takes the new primary's metadata exactly.
   - **Status:** `vakr node status [--json]` shows the role, the primary, the newest pull, any conflict, and the newest resync.
 - **Acceptance evidence from the node's own data** (MVP-ACC-01, MVP-ACC-02, MVP-ACC-10; E.35; [acceptance reports](docs/operations/acceptance.md)).
   - `vakr acceptance schedule` reports on-time poll starts, same-device overlap, and drift.
@@ -46,12 +46,14 @@ The first M6 (MVP acceptance) release. It adds the tools that turn the parallel 
 
 ### Changed
 
-- Interface lifecycle now follows each Stage 1 poll (blueprint E.6). An interface that goes down shows `inactive` and "not up/up" in `vakr status`, the TUI, and the web within seconds, instead of at the next rediscovery.
+- Interface lifecycle now follows each Stage 1 poll (blueprint E.6). An interface that goes down shows `inactive` in `vakr status`, the TUI, and the web within seconds, instead of at the next rediscovery. The interface table says "not up/up" only when a Stage 1 status record says so, and shows that status, such as "not up/up (up/down)". Stale, retired, and unsampled interfaces keep their usual wording. On a peer, lifecycle comes from the primary.
 
 ### Fixed
 
 - After a crash or power cut, the `unclean_stop` telemetry-loss incident now estimates the loss from the busiest second among the newest spool records. Its time range now runs from the last durable record to the restart (SPOOL-T08, E.24). Before, after a quiet spell, it could undercount a lost burst of poll results and give a time range that did not contain them.
 - `vakr replication status --json` no longer fails on a peer that has a pull record.
+- Observation and metadata replication keep running when a state file under `/var/lib/vakr/replication` cannot be written, for example on a full disk. The failure is recorded as node health (MPOS-006). Before, the replication task stopped until the collector restarted.
+- `sudo systemctl reload vakr-collector` on a peer now applies a copied `policies.toml` and interface keywords. Before, they took effect only after a restart.
 
 ### Notes for operators
 

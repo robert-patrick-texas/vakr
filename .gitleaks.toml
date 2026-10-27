@@ -1,0 +1,12 @@
+# gitleaks configuration for the secret scans (QG-007): CI's gitleaks-action
+# (pushed commits) and `make secrets` (every tracked file, also run in CI).
+# The default rules stay; only values that are never secrets are allowed here,
+# each with the reason. Never allow a real credential: remove it and rotate it.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Values that are never secrets"
+# Interface names: "access switch: ``GigabitEthernet0/0/0``" reads as an access key.
+regexes = ['''^[A-Za-z-]*Ethernet[0-9]+(?:[/.:][0-9]+)*$''']

@@ -42,7 +42,7 @@ How to read the statuses:
 - **Builder-image pins** in `packaging/Dockerfile` have their own rows: *uv (packaging/Dockerfile)*, *Go (packaging/Dockerfile)*, and *nfpm (packaging/Dockerfile)*. The builder's uv also decides which CPython patch release the package bundles, so it moves together with the developer uv. The Node image is kept equal to `web/.node-version` by a packaging test.
 - **update available**: apply the update (see the release policy below).
 - **held**: a recorded exception holds the item, because its latest release failed vakr's tests and nothing newer has been published. The detail names the failed release, the date, and what failed. Nothing to do until the row turns `update available`.
-- **reference**: vakr pins nothing for this item, and the row shows the latest release for information: `python-build-standalone`, which the uv version chooses, and `gitleaks`, which CI's gitleaks-action chooses.
+- **reference**: vakr pins nothing for this item, and the row shows the latest release for information: `python-build-standalone`, which the uv version chooses.
 - **unknown**: the tool could not decide, and the line under the table says why. Typical reasons:
   - a network failure or rate limit, in which case you re-run;
   - a commit-pinned action without a `# vX.Y.Z` comment;

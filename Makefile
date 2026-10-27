@@ -118,6 +118,20 @@ audit:
 	uvx $(PIP_AUDIT) --strict --disable-pip --require-hashes --progress-spinner off \
 		-r "$$reqs" $$(sed -e 's/#.*//' $(AUDIT_IGNORE) | awk 'NF { print "--ignore-vuln", $$1 }')
 
+# Secret scan of every tracked file: the current-tree half of QG-007 (CI's
+# gitleaks-action scans pushed commits, but only first-parent ones, so commits
+# that arrive on a merged branch were never scanned). The tracked files are
+# copied out first, so ignored build and test output is not scanned. Needs
+# docker; CI runs it too. Rules and the reasoned allowlist: .gitleaks.toml.
+GITLEAKS_IMAGE := ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+
+.PHONY: secrets
+secrets:
+	@set -e; tree=$$(mktemp -d); trap 'rm -rf "$$tree"' EXIT; \
+	git ls-files -z | tar --null --ignore-failed-read -T - -cf - | tar -xf - -C "$$tree"; \
+	docker run --rm -v "$$tree:/scan:ro" $(GITLEAKS_IMAGE) dir /scan \
+		--config /scan/.gitleaks.toml --redact --no-banner --exit-code 1
+
 # Packaging and release (blueprint 28.6, 28.7). These need docker and git.
 .PHONY: deb package-test release-dry-run github-update-test
 

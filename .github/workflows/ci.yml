@@ -81,6 +81,11 @@ jobs:
       - uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.30.1"  # the release `make secrets` pins; check-updates watches both
+      # The action scans only first-parent commits of a push, so a merged branch's own
+      # commits were never scanned; scan every tracked file as well (QG-007).
+      - name: Scan every tracked file
+        run: make secrets
 
   # Known vulnerabilities in every locked runtime and development dependency
   # (QG-008). Fails on any finding not justified in the ignore list that

@@ -117,8 +117,17 @@ regex = 'nfpm/v2/cmd/nfpm@v(\S+)'
 github = "goreleaser/nfpm"
 
 [[tools]]
-# CI's gitleaks-action chooses the gitleaks binary; vakr pins none.
-name = "gitleaks"
+# The secret scanner `make secrets` runs (QG-007); bump the digest with the tag.
+name = "gitleaks (Makefile)"
+file = "Makefile"
+regex = 'gitleaks/gitleaks:v(\d+\.\d+\.\d+)@'
+github = "gitleaks/gitleaks"
+
+[[tools]]
+# The release CI's gitleaks-action installs (GITLEAKS_VERSION), kept equal to the one above.
+name = "gitleaks (ci.yml)"
+file = ".github/workflows/ci.yml"
+regex = 'GITLEAKS_VERSION: "(\d+\.\d+\.\d+)"'
 github = "gitleaks/gitleaks"
 
 [[tools]]

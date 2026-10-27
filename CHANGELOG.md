@@ -4,9 +4,26 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Changed
+
+- Developers: vakr now ships on the newest release of every tool and dependency, however recently it was published. An update is held back only when it fails vakr's tests, as a recorded exception that is retested when the dependency publishes again (ADR-036, TOOLS-002, TOOLS-004; [keeping tools and dependencies current](docs/development/updates.md)).
+  - `tools/release` runs `check-updates --gate` in its preflight, when the release starts. It stops for any available update, any item it could not check, and any stale exception (TOOLS-005).
+  - `make updates` shows a held item as `held` and an item vakr does not pin as `reference`. It also checks the uv, Go, and nfpm pins of the package builder image, and compares `@types/node` with the newest release on the Node 24 line.
+  - Holds are recorded in `tools/check-updates/update-exceptions.toml` and listed under "Held dependencies" in each release's notes. They replace "Deferred updates".
+  - Nothing waits for a release to age. Dependabot's default 3-day cooldown is off for every ecosystem, `web/.npmrc` sets `min-release-age=0`, and the lockfile check overrides any local uv `exclude-newer`.
+- Toolchain and dependencies (TOOLS-001, TOOLS-002), every update `make updates` listed on 2026-10-27:
+  - The package bundles CPython 3.15.2 (3.15.1 before), through uv 0.13.6 in the builder image (0.13.5 before).
+  - Runtime: FastAPI 0.162.0 (0.159.1), Starlette 1.10.0 (1.9.0), and certifi 2026.10.23. FastAPI's two breaking changes, in 0.160.0 and 0.162.0, concern parameter models and form fields, which vakr does not use.
+  - Web UI: Svelte 5.57.3 and TanStack Svelte Query 6.3.6.
+  - Developers: ruff 0.17.3, ty 0.0.92, coverage 7.17.0, hypothesis 6.170.12, eslint-plugin-jsdoc 65.4.2, svelte-eslint-parser 1.10.0, typescript-eslint 8.72.1, and `astral-sh/setup-uv` 10.3.2 in CI.
+
 ### Fixed
 
 - `vakr setup`'s closing checklist no longer says the web UI arrives in a later release. It now ends with starting `vakr-api` behind the HTTPS reverse proxy and signing in, then giving read-only people and monitoring agents the `vakr-view` group, as the [install guide](docs/operations/install.md#first-run) does.
+
+### Held dependencies (TOOLS-004)
+
+- **TypeScript 7.0.2** (staying on 6.0.3): typescript-eslint refuses TypeScript 7.0 (8.72.0 and 8.72.1 both), and SvelteKit 3.1.0 crashes loading `tsconfig.json`. Lint, svelte-check, the unit tests, the API-types check, and the build all fail; all pass on 6.0.3. Tested 2026-10-27; revisited with the next TypeScript release.
 
 ## 0.4.0 - 2026-10-22
 

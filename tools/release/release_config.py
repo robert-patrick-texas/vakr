@@ -44,8 +44,9 @@ _STRINGS = (
     "prerelease",
 )
 _LISTS = ("build_command", "artifacts", "optional_artifacts")
-_OPTIONAL = ("build_tools", "node_version_file", "ci_ignore_checks")
-"""Keys that may be absent: build-host tools, a Node pin, and check runs that never block."""
+_OPTIONAL = ("build_tools", "node_version_file", "ci_ignore_checks", "update_check")
+"""Keys that may be absent: build-host tools, a Node pin, check runs that never block, and
+the dependency currency command."""
 
 EXAMPLE: dict[str, Any] = {
     **{key: key for key in _STRINGS},
@@ -90,6 +91,9 @@ class ReleaseConfig:
         node_version_file: File whose version (a major such as ``24``)
             the installed ``node`` must match; ``None`` skips the check.
         ci_ignore_checks: Check-run names the CI check disregards.
+        update_check: Command run in preflight that must exit 0, so every
+            dependency is current at release time or held by a recorded
+            exception (TOOLS-005); empty skips the check.
     """
 
     root: Path
@@ -111,6 +115,7 @@ class ReleaseConfig:
     build_tools: tuple[str, ...] = ()
     node_version_file: Path | None = None
     ci_ignore_checks: tuple[str, ...] = ()
+    update_check: tuple[str, ...] = ()
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any], root: Path) -> ReleaseConfig:
@@ -141,6 +146,7 @@ class ReleaseConfig:
         tools = _string_list(data, "build_tools") if "build_tools" in data else ()
         ignore = _string_list(data, "ci_ignore_checks") if "ci_ignore_checks" in data else ()
         pin = _string(data, "node_version_file") if data.get("node_version_file") else None
+        updates = _string_list(data, "update_check") if data.get("update_check") else ()
         return cls(
             root=root,
             repo=text["repo"],
@@ -161,6 +167,7 @@ class ReleaseConfig:
             build_tools=tools,
             node_version_file=_resolve(root, pin) if pin else None,
             ci_ignore_checks=ignore,
+            update_check=updates,
         )
 
     def placeholders(self, version: ReleaseVersion) -> dict[str, str]:

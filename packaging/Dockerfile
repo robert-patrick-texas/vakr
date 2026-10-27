@@ -16,8 +16,8 @@ ARG BASE_IMAGE=ubuntu:26.04
 FROM golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b AS nfpm
 RUN CGO_ENABLED=0 GOBIN=/out go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0
 
-# uv 0.13.5, pinned by image digest.
-FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
+# uv 0.13.6, pinned by image digest.
+FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 # Node.js 24.22.1 and its npm 11.19.1, pinned by image digest: the LTS line of
 # web/.node-version. They only build the web UI (ADR-035); the package ships

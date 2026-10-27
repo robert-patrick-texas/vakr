@@ -8,7 +8,9 @@ shipped app (``dependencies``) and the build and test tools
 (``devDependencies``). Each direct package is compared with the version
 behind the registry's ``latest`` dist-tag, the npm counterpart of the
 PyPI rows (TOOLS-001, ADR-035 #18). Transitive packages follow from the
-direct ones; ``extra`` names more locked packages to watch.
+direct ones; ``extra`` names more locked packages to watch. A package in
+``lines`` is compared instead with the newest release on the major line
+another file pins, as Node's type definitions follow the Node build pin.
 
 Dependencies:
     json: Reads ``package.json`` and ``package-lock.json``.
@@ -28,8 +30,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from updates_checks import Context, Outcome, Task, attempt, failed_task, make_row
+import updates_local as local
+from updates_checks import Context, Outcome, Task, attempt, failed_task, make_row, read_local
 from updates_report import Result
+from updates_versions import parse_version
 
 _DIRECT_KINDS = (("dependencies", "bundled"), ("devDependencies", "development"))
 _PREFIX = "node_modules/"
@@ -105,7 +109,9 @@ def locked_versions(lockfile: Path) -> dict[str, str]:
     return locked_from(data if isinstance(data, dict) else {})
 
 
-def check_package(ctx: Context, name: str, locked: Outcome, kind: str) -> list[Result]:
+def check_package(
+    ctx: Context, name: str, locked: Outcome, kind: str, line_file: str = ""
+) -> list[Result]:
     """Compare one locked npm package with the registry's ``latest`` release.
 
     Args:
@@ -113,6 +119,8 @@ def check_package(ctx: Context, name: str, locked: Outcome, kind: str) -> list[R
         name: Package name, scoped names included (``@scope/name``).
         locked: Locked version or why it is unknown.
         kind: ``bundled``, ``development``, or ``extra``, for the detail.
+        line_file: Version file whose major line the package follows
+            instead of ``latest`` (the ``lines`` table); empty for none.
 
     Returns:
         list[Result]: One row.
@@ -120,8 +128,19 @@ def check_package(ctx: Context, name: str, locked: Outcome, kind: str) -> list[R
     Raises:
         None
     """
-    latest = attempt(lambda: ctx.upstream.lookup("npm", name))
-    return [make_row(name, "npm", locked, latest, note=f"{kind} npm package")]
+    note = f"{kind} npm package"
+    if not line_file:
+        latest = attempt(lambda: ctx.upstream.lookup("npm", name))
+        return [make_row(name, "npm", locked, latest, note=note)]
+    text, error = read_local(lambda: local.read_version_file(ctx.root / line_file))
+    pinned = None if error else parse_version(text)
+    if pinned is None:
+        reason = f"{line_file}: {error or f'cannot parse {text!r}'}"
+        return [make_row(name, "npm", locked, (None, reason))]
+    line = pinned.release[0]
+    latest = attempt(lambda: ctx.upstream.npm_line(name, line))
+    note += f"; follows the {line}.x line of {line_file}"
+    return [make_row(name, "npm", locked, latest, note=note)]
 
 
 def plan_npm(ctx: Context, cfg: Mapping[str, Any]) -> list[Task]:
@@ -153,6 +172,7 @@ def plan_npm(ctx: Context, cfg: Mapping[str, Any]) -> list[Task]:
     tasks = []
     for name, kind in names.items():
         current = (locked[name], "") if name in locked else ("", "not in the lockfile")
-        run = functools.partial(check_package, ctx, name, current, kind)
+        line_file = cfg.get("lines", {}).get(name, "")
+        run = functools.partial(check_package, ctx, name, current, kind, line_file)
         tasks.append(Task(name, "npm", run))
     return tasks

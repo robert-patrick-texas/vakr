@@ -30,13 +30,18 @@ from typing import Any
 from updates_sources import SOURCES
 
 SECTIONS = frozenset(
-    {"settings", "python", "go", "node", "pypi", "lockfile", "npm", "actions", "tools", "assets"}
+    {
+        *("settings", "python", "go", "node", "pypi", "lockfile", "npm", "actions"),
+        *("tools", "assets", "exceptions"),
+    }
 )
 _ENTRY_KEYS = frozenset({"name", "command", "file", "version", "regex", "per_page", *SOURCES})
-# Keys of the front-end sections (ADR-035 #18); a misspelt key must not hide a row.
+# Keys of the checked tables; a misspelt key must not hide a row or a hold.
 _TABLE_KEYS = {
+    "go": frozenset({"releases_url", "binary", "go_mod", "modules", "pins"}),
     "node": frozenset({"releases_url", "version_file", "engines", "binary"}),
-    "npm": frozenset({"package_json", "lockfile", "direct_dependencies", "extra"}),
+    "npm": frozenset({"package_json", "lockfile", "direct_dependencies", "extra", "lines"}),
+    "exceptions": frozenset({"file"}),
 }
 
 
@@ -81,7 +86,7 @@ def _validate_entry(entry: Any, where: str, needs_version: bool) -> None:
 
 
 def _validate_table(table: Any, name: str, where: str) -> None:
-    """Check the keys and value types of a ``[node]`` or ``[npm]`` table.
+    """Check the keys and value types of one checked table, such as ``[npm]``.
 
     Args:
         table: Parsed TOML value of the section.
@@ -93,16 +98,50 @@ def _validate_table(table: Any, name: str, where: str) -> None:
 
     Raises:
         ConfigError: If the section is not a table, names an unknown key,
-            or has a list that is not a list of strings.
+            or has a value of the wrong type.
     """
     if not isinstance(table, dict):
         raise ConfigError(f"{where}: [{name}] must be a table")
     if unknown := sorted(set(table) - _TABLE_KEYS[name]):
         raise ConfigError(f"{where}: [{name}] unknown key(s) {', '.join(unknown)}")
-    for key in ("binary", "extra"):
+    for key in ("binary", "extra", "go_mod"):
         value = table.get(key, [])
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise ConfigError(f"{where}: [{name}] '{key}' must be a list of strings")
+    lines = table.get("lines", {})
+    if not isinstance(lines, dict) or not all(isinstance(v, str) for v in lines.values()):
+        raise ConfigError(f"{where}: [{name}] 'lines' must map package names to version files")
+    pins = table.get("pins", [])
+    if not isinstance(pins, list):
+        raise ConfigError(f"{where}: [{name}] 'pins' must be a list of tables")
+    for index, pin in enumerate(pins):
+        _validate_pin(pin, f"{where}: [{name}] pins[{index}]")
+    if name == "exceptions" and not isinstance(table.get("file"), str):
+        raise ConfigError(f"{where}: [exceptions] needs a string 'file'")
+
+
+def _validate_pin(pin: Any, where: str) -> None:
+    """Check one ``pins`` entry: a file and a regex whose first group is the version.
+
+    Args:
+        pin: Parsed TOML value.
+        where: Location for error messages.
+
+    Returns:
+        None
+
+    Raises:
+        ConfigError: If the entry is not a table of exactly ``file`` and
+            ``regex`` strings, or the regex does not compile.
+    """
+    if not isinstance(pin, dict) or set(pin) != {"file", "regex"}:
+        raise ConfigError(f"{where}: needs exactly 'file' and 'regex'")
+    if not all(isinstance(value, str) for value in pin.values()):
+        raise ConfigError(f"{where}: 'file' and 'regex' must be strings")
+    try:
+        re.compile(pin["regex"])
+    except re.error as exc:
+        raise ConfigError(f"{where}: invalid regex: {exc}") from None
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -116,7 +155,8 @@ def load_config(path: Path) -> dict[str, Any]:
 
     Raises:
         ConfigError: If the file cannot be read or parsed, names an unknown
-            section, or has an invalid tool, asset, ``[node]``, or ``[npm]`` entry.
+            section, or has an invalid tool, asset, ``[go]``, ``[node]``,
+            ``[npm]``, or ``[exceptions]`` entry.
     """
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))

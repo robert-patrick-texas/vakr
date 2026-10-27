@@ -67,11 +67,12 @@ class FakeFetcher(Fetcher):
         self.requests: list[str] = []
         self.commands_run: list[tuple[tuple[str, ...], Path | None]] = []
 
-    def get_json(self, url: str) -> Any:
+    def get_json(self, url: str, accept: str = "") -> Any:  # noqa: ARG002 - keyed by URL
         """Return the canned document for ``url``.
 
         Args:
             url: Requested URL.
+            accept: Ignored; recordings are keyed by URL alone.
 
         Returns:
             Any: The recorded JSON value.

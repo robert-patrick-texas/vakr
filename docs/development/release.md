@@ -41,11 +41,11 @@ Until step 2 is done, the shipped signers file is a placeholder, every signature
 
 ## Cutting a release
 
-1. Run `tools/check-updates` (TOOLS-001). Apply each update, or record why it is deferred in `CHANGELOG.md`.
+1. Run `make updates` and apply every update, however recently it was published (TOOLS-002, ADR-036). A release that fails vakr's tests is held as a recorded exception and listed in the changelog (TOOLS-004); nothing else is a reason to stay behind. [Keeping tools and dependencies current](updates.md#release-time-policy-tools-002) has the procedure. Step 5 checks again.
 2. Bump `VERSION` (`MAJOR.MINOR.PATCH`, or `MAJOR.MINOR.PATCH-rc.N` for a candidate). Add a `## <version> - <date>` section to `CHANGELOG.md` listing breaking changes, migrations, and new options (VER-004). That section becomes the release notes.
 3. Commit, push to `main`, and wait until every CI check for that commit is green, including the *Package* workflow.
 4. Run `make release-dry-run` and read its report (see [Dry run](#dry-run)).
-5. Run the release. `ssh-keygen` asks for the key's passphrase:
+5. Run the release. Its preflight runs `check-updates --gate` again (TOOLS-005), so a dependency published since step 1, even the same day, stops it: apply it (or hold it after a failed test), commit, and wait for CI again. `ssh-keygen` asks for the key's passphrase:
 
    ```sh
    uv run tools/release/release.py
@@ -65,7 +65,7 @@ Until step 2 is done, the shipped signers file is a placeholder, every signature
 
 The tool reads all project-specific values from `tools/release/release.toml` (see [its README](../../tools/release/README.md)). In order, it:
 
-1. Checks that `VERSION_OVERRIDE` is unset, the tree is clean, `HEAD` is on `main`, the tag `v<version>` exists neither locally nor on `origin`, every GitHub check run for `HEAD` passed (except Dependabot's update jobs, `ci_ignore_checks`), `CHANGELOG.md` has a section for the version, `packaging/release-signers` lists a key, `node` and `npm` answer `--version`, and `node` is the release `web/.node-version` pins. A real release stops at the first failed check, before building anything.
+1. Checks that `VERSION_OVERRIDE` is unset, the tree is clean, `HEAD` is on `main`, the tag `v<version>` exists neither locally nor on `origin`, every GitHub check run for `HEAD` passed (except Dependabot's update jobs, `ci_ignore_checks`), `CHANGELOG.md` has a section for the version, `packaging/release-signers` lists a key, `node` and `npm` answer `--version`, `node` is the release `web/.node-version` pins, and `check-updates --gate` passes (`update_check`): every dependency is on its newest release or held by a recorded exception, and every item could be checked. A real release stops at the first failed check, before building anything.
 2. Builds with `make deb`, in a clean `ubuntu:26.04` container.
 3. Copies the artifacts into `dist/release/v<version>/` and writes `SHA256SUMS` there in `sha256sum` format, with one `<sha256>  <file name>` line per artifact.
 4. Signs it: `ssh-keygen -Y sign -f ~/.config/vakr-release/release_ed25519 -n vakr-release SHA256SUMS`, producing `SHA256SUMS.sig`.
@@ -102,7 +102,7 @@ Both targets need Docker, git, and uv.
 
 How the build works (`packaging/build-deb.sh`, which runs `packaging/container/build.sh` in the builder image from `packaging/Dockerfile`):
 
-- **Pinned inputs.** uv 0.13.5 and Go 1.27.3 images are pinned by digest, and nfpm v2.48.0 is verified by the Go checksum database. `uv python install 3.15` fetches a checksum-verified python-build-standalone interpreter into `/opt/vakr/python`. Runtime wheels come from `uv export --frozen` with `--require-hashes --only-binary :all:`, and the hatchling build backend is pinned with hashes in `packaging/build-constraints.txt`.
+- **Pinned inputs.** uv 0.13.6 and Go 1.27.3 images are pinned by digest, and nfpm v2.48.0 is verified by the Go checksum database. `uv python install 3.15` fetches a checksum-verified python-build-standalone interpreter into `/opt/vakr/python`. Runtime wheels come from `uv export --frozen` with `--require-hashes --only-binary :all:`, and the hatchling build backend is pinned with hashes in `packaging/build-constraints.txt`.
 - **Reproducible.** `SOURCE_DATE_EPOCH` is the commit time. Every packaged file gets that mtime, bytecode is compiled with `PYTHONHASHSEED=0` and hash-based invalidation, and nfpm stamps the same time on the archive, so two builds of one commit are byte-identical (PKG-004).
 - **Checked.** Before packaging, the build imports every extension module, checks that no binary needs a newer glibc than the declared `libc6` dependency, and runs `systemd-analyze verify` on the units. After packaging, it runs `lintian --fail-on error`. The only accepted lintian tags are listed, each with its justification, in `packaging/lintian/vakr`: `dir-or-file-in-opt` (the owner's `/opt/vakr` decision) and tags caused by the bundled interpreter.
 - **Test builds.** `VERSION_OVERRIDE=X.Y.Z make deb` builds a package that reports version `X.Y.Z`. It exists only for upgrade tests; `tools/release` refuses to run while it is set, and removes it from the build environment.

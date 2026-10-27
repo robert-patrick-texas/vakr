@@ -1,8 +1,15 @@
 # Weekly automated update pull requests (TOOLS-002). They supplement, and
-# never replace, running `make updates` before each release: Dependabot does
-# not see Python and Go toolchain versions, PEP 723 inline script pins
-# (tools/md2html), the pip-audit pin in the Makefile, or vendored assets.
+# never replace, the release gate (`check-updates --gate`, run by
+# tools/release): Dependabot does not see Python and Go toolchain versions,
+# PEP 723 inline script pins (tools/md2html), the pip-audit pin in the
+# Makefile, builder-image pins, or vendored assets.
 # See docs/development/updates.md.
+#
+# Every entry turns the cooldown off for all dependencies. Without that,
+# Dependabot waits 3 days after a release before proposing it; vakr adopts a
+# release however recently it was published (ADR-036). A release that fails
+# vakr's tests is held by a recorded exception instead
+# (tools/check-updates/update-exceptions.toml).
 version: 2
 updates:
   # Workflow `uses:` pins. Dependabot also rewrites the "# vX.Y.Z" comment
@@ -14,6 +21,8 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+    cooldown:
+      exclude: ["*"]
     commit-message:
       prefix: ci
 
@@ -28,6 +37,8 @@ updates:
       python-minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    cooldown:
+      exclude: ["*"]
     commit-message:
       prefix: deps
 
@@ -47,5 +58,7 @@ updates:
       npm-minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    cooldown:
+      exclude: ["*"]
     commit-message:
       prefix: deps

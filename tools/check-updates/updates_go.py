@@ -4,7 +4,8 @@
 
 Go enters vakr only for components admitted under blueprint section 24
 and for build tooling, but once it does, three things can fall behind: the
-installed toolchain, the ``go`` directive of each module (the language
+installed toolchain (and any other file that pins it, such as a builder
+image tag), the ``go`` directive of each module (the language
 version the module promises to build with), and the module's own
 dependencies (TOOLS-001 "Go modules"). The first two are compared with the
 latest release on go.dev. For dependencies, Go itself is asked: ``go list
@@ -38,7 +39,7 @@ from typing import Any
 
 from updates_checks import Context, attempt, command_version, make_row, read_local
 from updates_fetch import FetchError
-from updates_local import discover
+from updates_local import discover, find_version
 from updates_report import Result
 from updates_versions import CURRENT, UNKNOWN, UPDATE
 
@@ -178,8 +179,9 @@ def check_go(ctx: Context, cfg: Mapping[str, Any]) -> list[Result]:
         cfg: The ``[go]`` table.
 
     Returns:
-        list[Result]: A row for the binary, then per ``go.mod`` a directive
-        row and, when ``modules`` is enabled, its requirement rows.
+        list[Result]: A row for the binary, one per other toolchain pin
+        (``pins``, such as a builder image tag), then per ``go.mod`` a
+        directive row and, when ``modules`` is enabled, its requirement rows.
 
     Raises:
         None
@@ -189,6 +191,12 @@ def check_go(ctx: Context, cfg: Mapping[str, Any]) -> list[Result]:
     if argv := cfg.get("binary"):
         current = read_local(lambda: command_version(ctx, argv))
         rows.append(make_row("Go (installed)", "go", current, latest))
+    for pin in cfg.get("pins", []):
+        path, regex = ctx.root / pin["file"], pin["regex"]
+        current = read_local(
+            lambda path=path, regex=regex: find_version(path.read_text(encoding="utf-8"), regex)
+        )
+        rows.append(make_row(f"Go ({pin['file']})", "go", current, latest))
     for path in discover(ctx.root, cfg.get("go_mod", [])):
         rel = path.relative_to(ctx.root).as_posix()
         current = read_local(lambda path=path: go_directive(path))

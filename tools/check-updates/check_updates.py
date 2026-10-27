@@ -11,15 +11,18 @@ CPython, Go, and Node ship patch releases, uv, ruff, and ty move weekly,
 locked PyPI and npm dependencies drift, and pinned GitHub Actions age
 silently. check-updates
 lists everything a project pins next to the latest stable upstream
-version, with release-notes links, so each release can apply or knowingly
-defer every update (TOOLS-001, TOOLS-002). What to check is declared in
+version, with release-notes links, so each release can apply every update
+or hold it after a failed test (TOOLS-001, TOOLS-002). What to check is declared in
 ``check-updates.toml`` beside this script; another project reuses the tool
 by copying the directory and editing only that file (blueprint section 29).
 
 The report is informational and exits 0. ``--fail-on-outdated`` exits 1
 when any update is available. An item whose status cannot be determined,
 for example because a release API is unreachable, is reported as unknown
-with the reason and never stops the run. Configuration errors exit 2.
+with the reason and never stops the run. ``--gate``, the release gate, exits
+1 for an available update, an unknown row, or an exception that no longer
+matches (TOOLS-005); items held by a recorded exception pass it (TOOLS-004).
+Configuration errors exit 2.
 
 Dependencies:
     updates_*: Sibling modules for configuration, checks, upstream
@@ -34,11 +37,12 @@ Safety:
     and size caps. No credentials are handled (``gh`` keeps its own token).
 
 Example:
-    $ uv run tools/check-updates/check_updates.py --fail-on-outdated
+    $ uv run tools/check-updates/check_updates.py --gate
     ITEM                      CURRENT  LATEST  STATUS   RELEASE NOTES
     Python (.python-version)  3.15     3.15.0  current  https://docs.python.org/release/...
     ...
-    check-updates: 27 items: 24 current, 0 update available, 3 unknown
+    check-updates: 27 items: 25 current, 0 update available, 1 held, 1 reference, 0 unknown
+    check-updates: gate passed
 """
 
 import argparse
@@ -52,6 +56,7 @@ from typing import Any
 from updates_actions import plan_actions
 from updates_checks import Context, Task, check_entry, check_python
 from updates_config import ConfigError, load_config
+from updates_exceptions import Hold, apply_exceptions, load_exceptions
 from updates_fetch import Fetcher
 from updates_go import check_go
 from updates_node import check_node
@@ -149,7 +154,7 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
 
     Returns:
         argparse.Namespace: ``config``, ``root``, ``json``,
-        ``fail_on_outdated``, and ``timeout``.
+        ``fail_on_outdated``, ``gate``, and ``timeout``.
 
     Raises:
         SystemExit: With status 2 on invalid arguments (argparse behaviour).
@@ -162,6 +167,11 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser.add_argument("--json", action="store_true", help="print JSON instead of a table")
     parser.add_argument(
         "--fail-on-outdated", action="store_true", help="exit 1 when any update is available"
+    )
+    parser.add_argument(
+        "--gate",
+        action="store_true",
+        help="release gate: exit 1 for any update, unknown row, or stale exception",
     )
     parser.add_argument("--timeout", type=float, help="seconds per request or command")
     return parser.parse_args(argv)
@@ -176,7 +186,8 @@ def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
 
     Returns:
         int: 0 normally, 1 for an available update with
-        ``--fail-on-outdated``, 2 for a configuration error.
+        ``--fail-on-outdated`` or anything that stops ``--gate``, 2 for a
+        configuration error.
 
     Raises:
         None
@@ -184,6 +195,7 @@ def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
     args = parse_args(argv)
     try:
         config = load_config(args.config)
+        holds = _holds(args.root.resolve(), config)
     except ConfigError as exc:
         print(f"check-updates: {exc}", file=sys.stderr)
         return 2
@@ -195,9 +207,29 @@ def main(argv: list[str] | None = None, fetcher: Fetcher | None = None) -> int:
     node_url = config.get("node", {}).get("releases_url", NODE_RELEASES_URL)
     upstream = Upstream(fetcher, python_url, go_url, node_url)
     ctx = Context(args.root.resolve(), fetcher, upstream)
-    results = run_tasks(plan(ctx, config), int(settings.get("max_workers", 8)))
-    print(render_json(results) if args.json else render_table(results))
-    return exit_code(results, args.fail_on_outdated)
+    found = run_tasks(plan(ctx, config), int(settings.get("max_workers", 8)))
+    results, problems = apply_exceptions(found, holds)
+    report = render_json(results, problems) if args.json else None
+    print(report or render_table(results, problems, gate=args.gate))
+    return exit_code(results, args.fail_on_outdated, args.gate, problems)
+
+
+def _holds(root: Path, config: Mapping[str, Any]) -> list[Hold]:
+    """Load the exceptions file the ``[exceptions]`` section names, if any.
+
+    Args:
+        root: Repository root; the file path is relative to it.
+        config: Validated configuration.
+
+    Returns:
+        list[Hold]: Recorded exceptions; empty without the section.
+
+    Raises:
+        ConfigError: If the file is missing or invalid.
+    """
+    if "exceptions" not in config:
+        return []
+    return load_exceptions(root / config["exceptions"]["file"])
 
 
 if __name__ == "__main__":

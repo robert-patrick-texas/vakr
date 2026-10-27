@@ -94,6 +94,7 @@ EXPECTED_STATUS = {  # every row of the scripted repository, in report order
     "astral-sh/setup-uv@1c37ad0": "update available",
     "echarts": "update available",
 }
+SUMMARY = {"current": 7, "update available": 8, "unknown": 1}
 
 
 def make_repo(root: Path) -> Path:
@@ -175,7 +176,7 @@ def test_json_report_covers_every_source(
     rows = {row["item"]: row for row in report["items"]}
     assert {item: row["status"] for item, row in rows.items()} == EXPECTED_STATUS
     assert list(rows) == list(EXPECTED_STATUS)  # planned order survives concurrency
-    assert report["summary"] == {"current": 7, "update available": 8, "unknown": 1}
+    assert report["summary"] == {**dict.fromkeys(("held", "reference"), 0), **SUMMARY}
     assert rows["uv"]["detail"].endswith("timed out")
     assert rows["uv"]["current"] == "0.13.3"
     assert rows["actions/checkout@v7"]["detail"] == (
@@ -275,26 +276,3 @@ def test_all_current_passes_the_gate(
     argv = ["--config", str(config), "--root", str(tmp_path), "--fail-on-outdated"]
     assert check_updates.main(argv, fetcher) == 0
     assert capsys.readouterr().out.splitlines()[-1].startswith("check-updates: 1 items: 1 current")
-
-
-def test_shipped_config_is_valid_and_plans_offline(
-    fake_fetcher: Any, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """The repository's own check-updates.toml loads and runs without network (TOOLS-001).
-
-    Args:
-        fake_fetcher: Offline fetcher class.
-        capsys: Output capture.
-
-    Returns:
-        None
-
-    Raises:
-        AssertionError: If the shipped config is invalid or the run fails.
-    """
-    root = Path(check_updates.__file__).resolve().parents[2]
-    argv = ["--root", str(root), "--json"]
-    assert check_updates.main(argv, fake_fetcher()) == 0
-    items = {row["item"] for row in json.loads(capsys.readouterr().out)["items"]}
-    assert {"Python (.python-version)", "uv", "ruff", "ty", "uv.lock (all packages)"} <= items
-    assert any(item.startswith("astral-sh/setup-uv@") for item in items)

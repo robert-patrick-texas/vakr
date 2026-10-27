@@ -29,7 +29,7 @@ jobs:
 
       # setup-uv no longer publishes floating major tags (there is no "v10"),
       # so it is pinned to the v10.3.1 commit as its README recommends.
-      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           # The script's inline metadata is the only dependency declaration.
           cache-dependency-glob: tools/md2html/md2html.py

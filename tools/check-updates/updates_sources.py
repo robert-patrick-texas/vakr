@@ -236,3 +236,27 @@ def npm_latest(data: Any, name: str) -> Latest:
     """
     best = _require(latest_stable([data.get("version", "")]), f"npm {name}")
     return Latest(best, npm_notes_url(data, name, best.text))
+
+
+def npm_line_latest(data: Any, name: str, major: int) -> Latest:
+    """Pick the newest stable release of one major line from an npm packument.
+
+    Some packages track another pin instead of npm's ``latest``: Node's type
+    definitions must describe the Node release the build runs, so they
+    follow its major line (ADR-036).
+
+    Args:
+        data: Decoded ``https://registry.npmjs.org/NAME`` document; the
+            abbreviated form is enough, since only ``versions`` is read.
+        name: Package name.
+        major: Major version to stay on, such as 24.
+
+    Returns:
+        Latest: The newest stable ``major.x`` release, linked to its npm page.
+
+    Raises:
+        FetchError: If the line has no stable release.
+    """
+    versions = [text for text in data["versions"] if text.split(".")[0] == str(major)]
+    best = _require(latest_stable(versions), f"npm {name} {major}.x")
+    return Latest(best, f"https://www.npmjs.com/package/{name}/v/{best.text}")

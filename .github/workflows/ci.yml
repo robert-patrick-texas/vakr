@@ -24,7 +24,7 @@ jobs:
         with:
           persist-credentials: false
       # setup-uv publishes no floating major tag; pinned to the v10.3.1 commit.
-      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       # Node is a build-time tool of the web UI (ADR-035). web/.node-version pins
       # the exact release: a bare major line let setup-node use whatever 24.x the
       # runner had cached, which can be older than the engines floor.
@@ -50,7 +50,7 @@ jobs:
         with:
           persist-credentials: false
       # setup-uv publishes no floating major tag; pinned to the v10.3.1 commit.
-      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - uses: actions/setup-node@v7
         with:
           node-version-file: web/.node-version
@@ -92,7 +92,7 @@ jobs:
         with:
           persist-credentials: false
       # setup-uv publishes no floating major tag; pinned to the v10.3.1 commit.
-      - uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
       - name: Scan locked dependencies with pip-audit
         run: make audit
       - uses: actions/setup-node@v7

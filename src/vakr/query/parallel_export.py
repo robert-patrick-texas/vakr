@@ -6,12 +6,12 @@ median and loss count per step, so a fair comparison re-aggregates vakr's
 data over *their* windows. That needs vakr's native measurements, not a
 downsampled graph: every interface sample's interval and in/out rates, and
 every ICMP cycle's probe RTTs. This service plans which devices and
-interfaces to read (from a targets file, ``vakr.query.acceptance_targets``)
+interfaces to read (from a targets file, ``vakr.query.parallel_targets``)
 and reads their observations page by page through the telemetry read port.
 
 Dependencies:
     vakr.ports.metadata, vakr.ports.telemetry: Inventory and raw observations.
-    vakr.query.acceptance_plan, acceptance_targets: The plan and the targets filter.
+    vakr.query.parallel_plan, parallel_targets: The plan and the targets filter.
     vakr.query.snapshot: Bounded paging of inventory lists.
 
 Safety:
@@ -40,8 +40,8 @@ from vakr.domain.series import TimeWindow
 from vakr.ports.clock import Clock, SystemClock
 from vakr.ports.metadata import DeviceFilter, InterfaceFilter, MetadataUnitOfWorkFactory
 from vakr.ports.telemetry import TelemetryBackend
-from vakr.query.acceptance_plan import ExportPlan, PlannedDevice, PlannedInterface, resolve, wanted
-from vakr.query.acceptance_targets import TargetSpec
+from vakr.query.parallel_plan import ExportPlan, PlannedDevice, PlannedInterface, resolve, wanted
+from vakr.query.parallel_targets import TargetSpec
 from vakr.query.settings import QuerySettings
 from vakr.query.snapshot import pages
 

@@ -9,10 +9,10 @@ carries the observed one), that a missing rate is an empty cell and never
 
 Dependencies:
     pytest; tests.unit.query.query_testkit; tests.contract.contract_samples.
-    vakr.query.acceptance*: The modules under test.
+    vakr.query.parallel_export*: The modules under test.
 
 Example:
-    $ uv run pytest tests/unit/query/test_acceptance_export.py
+    $ uv run pytest tests/unit/query/test_parallel_export.py
 """
 
 import csv
@@ -29,9 +29,9 @@ from vakr.domain.enums import BaselineState, CounterFamily, IcmpState
 from vakr.domain.errors import ValidationError
 from vakr.domain.quality import Quality
 from vakr.domain.series import TimeWindow
-from vakr.query.acceptance import AcceptanceExport, check_window
-from vakr.query.acceptance_stream import write_export
-from vakr.query.acceptance_targets import mac_key, parse_targets
+from vakr.query.parallel_export import AcceptanceExport, check_window
+from vakr.query.parallel_stream import write_export
+from vakr.query.parallel_targets import mac_key, parse_targets
 from vakr.query.settings import QuerySettings
 
 WINDOW = TimeWindow(NOW - timedelta(hours=1), NOW)

@@ -166,8 +166,10 @@ def collect_acceptance(ctx: Context) -> None:
         with ctx.steps.step("acceptance.detect") as record:
             record["note"] = f"{ctx.info.app_name or 'the application'} is not installed; skipped"
         return
-    argv = [program, *ctx.info.acceptance_command, "--since", f"{ctx.args.compare_hours:g}h",
-            "--max-rows", str(ctx.args.acceptance_max_rows)]  # fmt: skip
+    hours = ctx.args.compare_hours  # the export takes whole units: 50h, or 90m for 1.5 hours
+    since = f"{int(hours)}h" if hours == int(hours) else f"{round(hours * 60)}m"
+    argv = [program, *ctx.info.acceptance_command, "--window", since,
+            "--limit", str(ctx.args.acceptance_max_rows)]  # fmt: skip
     wanted = ctx.parsed.get("acceptance_targets")
     with tempfile.TemporaryDirectory(prefix=".fieldkit-", dir=ctx.args.output_dir) as work:
         targets = Path(work) / "targets.jsonl"

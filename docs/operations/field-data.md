@@ -190,11 +190,94 @@ A bundle that fails any check stays where it is, and nothing is extracted. Back 
 
 To replace the recipient, generate a new key pair, commit the new certificate in `tools/fieldkit/recipients/vakr-dev.pem`, and release a new field kit. Old kits keep encrypting to the old key until they are replaced.
 
+## The parallel run with MRTG and SmokePing
+
+MVP acceptance compares vakr with the tools it replaces during a parallel run of at least 14 days ([MVP-ACC-03, MVP-ACC-04, MVP-ACC-10](../../tool-blueprint.md#276-mvp-acceptance-criteria)). The developers need MRTG's and SmokePing's own data next to vakr's, so the field kit has three more profiles:
+
+| Profile | Collected | Needs |
+|---|---|---|
+| `mrtg` | <ul><li>every `Target[]` of the MRTG configuration: what it graphs (`ifIndex`, `#ifName`, `\ifDescr`, `/address`, `!MAC`, or something that can't be compared), the device's names and addresses, `MaxBytes`/`AbsMax`, `Options`, and the counter width</li><li>MRTG's data for the last `--compare-hours`: the rows of each `.log` file, or `rrdtool info` and `rrdtool fetch` of each RRD with `LogFormat: rrdtool`</li></ul> | MRTG configuration at `/etc/mrtg.cfg`, `/etc/mrtg/*.cfg`, or `--mrtg-config`, readable by you (usually `sudo`); `rrdtool` for RRD files |
+| `smokeping` | <ul><li>every probed host in the Targets tree with its probe, pings per round, step, and slaves</li><li>`rrdtool info` and `rrdtool fetch` of each target's RRD for the last `--compare-hours`: loss, median, and every ping</li></ul> | SmokePing configuration at `/etc/smokeping/config` (with the Debian and Ubuntu `config.d/` includes) or `--smokeping-config`, and `rrdtool` |
+| `acceptance` | `vakr acceptance export` for the same hours: every interface sample (interval, in/out bit/s, the `ifIndex` it was read from, quality flags) and every ICMP cycle (each probe's RTT). It is limited to the interfaces MRTG graphs and the hosts SmokePing probes when `mrtg` or `smokeping` runs in the same collection. | vakr installed |
+
+**Nothing secret is collected.** The MRTG and SmokePing configuration files are never copied into the bundle. Only the settings in the table above are kept: no SNMP community, SNMPv3 user or password (`SnmpOptions`), script command line, probe password, RADIUS secret, URL credential, or alert address. As a second safeguard, every community and credential-like value found in the configuration is redacted from every member, the same way the SNMP community is (FIELD-004). The configuration is read before collection starts, so a missing or unreadable file stops the run at once.
+
+### What to run, and how often
+
+Run the kit **once a day** for the whole parallel run, and never let more than 48 hours pass between runs. MRTG keeps 5-minute rows in its `.log` files for only about 50 hours before folding them into 30-minute rows. Bundles from consecutive days overlap, and the comparison counts each window once, so a day's extra run does no harm. A missed day loses 5-minute data only once it is older than 50 hours.
+
+**MRTG, SmokePing, and vakr on one host:**
+
+```sh
+sudo vakr field collect --profile host,mrtg,smokeping,acceptance,vakr --pseudonymize \
+    --max-bytes 1073741824
+```
+
+**MRTG and SmokePing on another host.** Run the kit there before vakr is installed on it, then run it on the vakr node:
+
+```sh
+# On the MRTG/SmokePing host
+sudo uv run --python 3.15 vakr-fieldkit.pyz collect --profile host,mrtg,smokeping --pseudonymize
+
+# On the vakr node
+sudo vakr field collect --profile acceptance,vakr --pseudonymize --max-bytes 1073741824
+```
+
+On the vakr node, the export then covers every interface and device, because the kit can't see MRTG's configuration there. To limit it, give it a list with `--acceptance-targets FILE`. Each line is `interface DEVICE[|ALIAS...] ifindex=N` (or `ifname=`, `ifdescr=`, `ip=`, `mac=`, `all`), or `icmp DEVICE`.
+
+**Pseudonyms across two hosts.** The developers join MRTG's targets with vakr's devices by name and address. With `--pseudonymize` that works only when both hosts use the same pseudonym key. Copy it once from the first host to the second before the first pseudonymized run there:
+
+```sh
+install -d -m 700 ~/.config/vakr-fieldkit
+install -m 600 pseudonym.key ~/.config/vakr-fieldkit/pseudonym.key   # copied from the first host
+```
+
+The key path is relative to the account that runs the kit. With `sudo`, that's root's home directory. The report on the development host says when two bundles were made with different keys.
+
+**Running it from a timer.** A daily systemd timer or cron entry that runs the command above is fine. Each run writes a new bundle file into `--output-dir`; send them all.
+
+### Options for the parallel run
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--mrtg-config FILE` | `/etc/mrtg.cfg`, `/etc/mrtg/*.cfg`, `/usr/local/etc/mrtg/*.cfg` | MRTG configuration; repeat it, `*` allowed |
+| `--smokeping-config FILE` | `/etc/smokeping/config` | SmokePing configuration; `@include` files are followed |
+| `--compare-hours H` | 50 | How far back MRTG's, SmokePing's, and vakr's data is read (1 to 744) |
+| `--max-targets N` | 5000 | Upper bound on MRTG targets and SmokePing hosts |
+| `--acceptance-targets FILE` | none | Interfaces and hosts vakr exports when MRTG and SmokePing run elsewhere |
+| `--acceptance-max-rows N` | 5000000 | Row budget of the vakr export |
+| `--rrdtool PATH` | `rrdtool` | The rrdtool program |
+
+### `vakr acceptance export`
+
+The `acceptance` profile runs this command, and you can run it yourself to look at the data:
+
+```sh
+sudo vakr acceptance export --window 2h --targets targets.txt > export.txt
+```
+
+It writes a *member stream*: `#member-stream 1`, then `@member NAME KIND` before each member's lines, then `@end`. The members are `icmp/<device>.csv`, `rates/<device>.csv`, `devices.csv`, `interfaces.csv`, and `export.json`. Rates are in bits per second, and RTTs are in microseconds, with `-1` for a probe without a reply. An empty cell is a value vakr doesn't have, never zero. It reads the databases and changes nothing. When run as root, it reads its files first and then switches to the `vakr` user, as `vakr status` does.
+
+| Option | Default | Purpose |
+|---|---|---|
+| `--targets FILE` | everything | Interfaces and hosts to export (the format above, or the JSON lines the kit writes) |
+| `--window DURATION` | `50h` | Window length, such as `50h` or `14d`, at most 31 days |
+| `--end UTC` | now | Window end, ISO 8601 with a time zone |
+| `--collector NAME` | this node's position | Which position's measurements to export |
+| `--limit N` | 5000000 | Row budget (1 to 20000000) |
+| `--output FILE` | standard output | Where the stream goes |
+
+Exit status 0 means the stream was written in full. 3 means it is incomplete (the row budget or an inventory cap cut it short, and `export.json` says so) or the databases could not be read. 2 is a usage error or an invalid targets file. These are the exit statuses of every `vakr acceptance` command.
+
+### On the development host
+
+After `field_inbox.py process`, run `uv run tools/acceptance/acceptance_report.py` (or `make acceptance-report`). It writes `parallel-run-report.md`, for committing as evidence, and `parallel-run-report.json`. The method and every explanation category are in [the parallel-run comparison](../development/parallel-run.md).
+
 ## Options and defaults
 
 | Option | Default | Purpose |
 |---|---|---|
-| `--profile` | `host` | Comma-separated: `host`, `snmp`, `paths`, `vakr` |
+| `--profile` | `host` | Comma-separated: `host`, `snmp`, `paths`, `mrtg`, `smokeping`, `acceptance`, `vakr` |
 | `--output-dir` | current directory | Where the bundle is written |
 | `--time-budget` | 1800 s | Upper bound for the whole run |
 | `--walk-timeout` | 60 s | Per walk and per `snmpget` |

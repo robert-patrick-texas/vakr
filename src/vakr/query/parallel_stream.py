@@ -22,7 +22,7 @@ never zero (invariant 1). Times are UTC epoch seconds.
 
 Dependencies:
     csv, io, json: Encoding.
-    vakr.query.acceptance, acceptance_plan, acceptance_rows: Reads, plan, and rows.
+    vakr.query.parallel_export, parallel_plan, parallel_rows: Reads, plan, and rows.
     vakr.query.member_stream: The stream format.
 
 Safety:
@@ -42,9 +42,11 @@ from dataclasses import dataclass, field
 from typing import Any, TextIO
 
 from vakr.domain.series import TimeWindow
-from vakr.query.acceptance import AcceptanceExport
-from vakr.query.acceptance_plan import ExportPlan, PlannedDevice
-from vakr.query.acceptance_rows import (
+from vakr.query.jsonable import iso_utc
+from vakr.query.member_stream import MemberStream
+from vakr.query.parallel_export import AcceptanceExport
+from vakr.query.parallel_plan import ExportPlan, PlannedDevice
+from vakr.query.parallel_rows import (
     DEVICE_COLUMNS,
     ICMP_COLUMNS,
     INTERFACE_COLUMNS,
@@ -54,10 +56,9 @@ from vakr.query.acceptance_rows import (
     interface_rows,
     rate_row,
 )
-from vakr.query.jsonable import iso_utc
-from vakr.query.member_stream import MemberStream
 
-FORMAT = 1
+FORMAT = "vakr-acceptance-export-1"
+"""The ``format`` member of ``export.json``, in the ``vakr acceptance`` naming."""
 
 
 @dataclass

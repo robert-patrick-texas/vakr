@@ -3,13 +3,14 @@
 The command is the composition root of the export: it opens both installed
 databases without creating either, reads the targets file and opens
 ``--output`` before any switch to the service user, and maps every failure
-to a documented exit status (0 written, 2 usage, 4 storage).
+to the ``vakr acceptance`` group's exit status (0 written in full, 2 usage,
+3 incomplete or unreadable).
 
 Dependencies:
     pytest; vakr.adapters.sqlite; tests.contract.contract_samples.
 
 Example:
-    $ uv run pytest tests/unit/query/test_acceptance_cli.py
+    $ uv run pytest tests/unit/query/test_parallel_cli.py
 """
 
 from datetime import UTC, datetime, timedelta
@@ -18,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from tests.contract import contract_samples as samples
-from tests.unit.query.test_acceptance_export import split, table
+from tests.unit.query.test_parallel_export import split, table
 from vakr.adapters.sqlite.metadata import METADATA_FILE, SqliteMetadataStore, metadata_migrations
 from vakr.adapters.sqlite.telemetry import (
     TELEMETRY_FILE,
@@ -127,7 +128,7 @@ def test_export_to_stdout_and_to_a_file(
     seed(state)
     targets = tmp_path / "targets.txt"
     targets.write_text("interface 192.0.2.10 ifindex=2\nicmp rtr1\ninterface sw9 all\n")
-    code, out, err = run(capsys, "--targets", str(targets), "--since", "1h")
+    code, out, err = run(capsys, "--targets", str(targets), "--window", "1h")
     assert code == 0, err
     members = split(out)
     assert len(table(members["rates/d0001.csv"])) == 10
@@ -135,19 +136,23 @@ def test_export_to_stdout_and_to_a_file(
     assert "1 interfaces on 1 devices, 10 samples, 10 ICMP cycles" in err
     assert "1 targets matched nothing" in err
     output = tmp_path / "export.txt"
-    code, out, err = run(capsys, "--output", str(output), "--since", "5m", "--collector", "east")
+    code, out, err = run(capsys, "--output", str(output), "--window", "5m", "--collector", "east")
     assert code == 0
     assert out == ""
     assert split(output.read_text())["export.json"][0] == "text"
+    code, out, err = run(capsys, "--window", "1h", "--limit", "5")
+    assert code == 3  # incomplete, as every vakr acceptance command reports it
+    assert "the row budget cut it short" in err
+    assert "export.json" in split(out)
 
 
 @pytest.mark.parametrize(
     ("args", "message"),
     [
-        (["--max-rows", "0"], "--max-rows must be 1 to"),
-        (["--since", "32d"], "longer than 31 days"),
+        (["--limit", "0"], "--limit must be 1 to"),
+        (["--window", "32d"], "longer than 31 days"),
         (["--end", "2026-10-27T12:00:00"], "needs a time zone"),
-        (["--since", "soon"], ""),
+        (["--window", "soon"], ""),
         (["--targets", "/nonexistent/targets.txt"], "No such file"),
         (["--collector", "west"], "no collector named"),
     ],
@@ -175,10 +180,10 @@ def test_usage_errors_exit_two(
     assert message in err
 
 
-def test_missing_databases_exit_four_and_create_nothing(
+def test_missing_databases_exit_three_and_create_nothing(
     state: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """No metadata or no telemetry database is a storage failure, and nothing is created.
+    """No metadata or no telemetry database is "could not be read" (3); nothing is created.
 
     Args:
         state: State directory.
@@ -191,12 +196,12 @@ def test_missing_databases_exit_four_and_create_nothing(
         None
     """
     code, _, err = run(capsys)
-    assert code == 4
+    assert code == 3
     assert "does not exist" in err
     assert list(state.iterdir()) == []
     seed(state, telemetry=False)
     code, _, err = run(capsys)
-    assert code == 4
+    assert code == 3
     assert TELEMETRY_FILE in err
     assert not (state / TELEMETRY_FILE).exists()
 

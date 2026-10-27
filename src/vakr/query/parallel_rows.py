@@ -16,7 +16,7 @@ alias.
 
 Dependencies:
     vakr.domain: Observations and quality flags.
-    vakr.query.acceptance_plan: Planned devices.
+    vakr.query.parallel_plan: Planned devices.
 
 Safety:
     Pure formatting; no I/O.
@@ -36,7 +36,7 @@ from vakr.domain.enums import CounterFamily
 from vakr.domain.observations import IcmpObservation, InterfaceObservation
 from vakr.domain.quality import Quality
 from vakr.domain.timestamps import to_epoch_us
-from vakr.query.acceptance_plan import PlannedDevice
+from vakr.query.parallel_plan import PlannedDevice
 
 RATE_COLUMNS = ("key", "end", "elapsed_s", "in_bps", "out_bps", "if_index", "counter_bits",
                 "flags")  # fmt: skip

@@ -10,23 +10,25 @@ puts the result in a bundle; ``tools/acceptance`` on the development host
 re-aggregates it over MRTG's and SmokePing's exact windows.
 
 Output is one member stream on standard output (``vakr.query.member_stream``)
-or ``--output FILE``. Exit status: 0 written (``export.json`` says whether
-the row budget cut it short); 2 usage error or invalid targets file;
-4 the databases are unavailable.
+or ``--output FILE``. The options and exit status follow the group's
+conventions (``vakr.cli.cmd_acceptance``): ``--window``, ``--collector``,
+``--limit`` (here the row budget); 0 written in full, 2 usage error or
+invalid targets file, 3 incomplete (the row budget or an inventory cap cut
+it short; ``export.json`` says which) or the databases could not be read.
 
 Dependencies:
     vakr.adapters.sqlite: The stores (this module is the composition root).
-    vakr.query.acceptance, acceptance_stream, acceptance_targets: Plan, reads, encoding.
+    vakr.query.parallel_export, parallel_stream, parallel_targets: Plan, reads, encoding.
     vakr.cli.service_user, status_stores: Privileges and configuration.
 
 Safety:
     Read-only. The targets file and ``--output`` are opened before a root
     invocation switches to the ``vakr`` user (as ``vakr status`` does), so
     files the operator owns stay usable and no database file becomes
-    root-owned. Bounded by the window (at most 31 days) and ``--max-rows``.
+    root-owned. Bounded by the window (at most 31 days) and ``--limit``.
 
 Example:
-    $ sudo vakr acceptance export --targets mrtg-targets.txt --since 50h > export.txt
+    $ sudo vakr acceptance export --targets mrtg-targets.txt --window 50h > export.txt
     vakr acceptance export: 412 interfaces on 96 devices, 1236004 samples, 28800 ICMP cycles
 """
 
@@ -54,23 +56,23 @@ from vakr.lifecycle.configmerge.values import parse_duration
 from vakr.paths import InstallPaths
 from vakr.ports.migrations import MigrationError
 from vakr.query import settings_from_config
-from vakr.query.acceptance import DEFAULT_MAX_ROWS, MAX_ROWS, AcceptanceExport, check_window
-from vakr.query.acceptance_stream import write_export
-from vakr.query.acceptance_targets import TargetSpec, parse_targets
+from vakr.query.parallel_export import DEFAULT_MAX_ROWS, MAX_ROWS, AcceptanceExport, check_window
+from vakr.query.parallel_stream import write_export
+from vakr.query.parallel_targets import TargetSpec, parse_targets
 from vakr.version import get_version
 
 COMMAND = "vakr acceptance export"
-EXIT_OK, EXIT_USAGE, EXIT_STORAGE = 0, 2, 4
-DEFAULT_SINCE = "50h"
+EXIT_OK, EXIT_USAGE, EXIT_INCOMPLETE = 0, 2, 3
+DEFAULT_WINDOW = "50h"
 """MRTG's ``.log`` files keep 5-minute rows for about 50 hours (E.34)."""
 MAX_TARGETS_BYTES = 4 * 1024 * 1024
 
 
-def register(subparsers: SubParsers) -> None:
-    """Add ``export`` to the ``acceptance`` group.
+def register(actions: SubParsers) -> None:
+    """Add ``export`` to the ``acceptance`` group (its ``SUBCOMMAND_MODULES`` contract).
 
     Args:
-        subparsers: The ``acceptance`` group's sub-parser collection.
+        actions: The ``acceptance`` group's sub-parser collection.
 
     Returns:
         None
@@ -78,7 +80,7 @@ def register(subparsers: SubParsers) -> None:
     Raises:
         None
     """
-    parser = subparsers.add_parser(
+    parser = actions.add_parser(
         "export",
         help="write vakr's samples and ICMP cycles for the MRTG/SmokePing comparison",
         description="Write this node's interface samples and ICMP cycles over a window "
@@ -86,18 +88,18 @@ def register(subparsers: SubParsers) -> None:
     )
     add = parser.add_argument
     add("--targets", type=Path, metavar="FILE", help="interfaces and hosts (default: all)")
-    add("--since", default=DEFAULT_SINCE, metavar="DURATION",
-        help=f"window length ending at --end (default {DEFAULT_SINCE})")  # fmt: skip
+    add("--window", default=DEFAULT_WINDOW, metavar="DURATION",
+        help=f"length ending at --end, such as 50h or 14d (default {DEFAULT_WINDOW})")  # fmt: skip
     add("--end", metavar="UTC", help="window end, ISO 8601 (default now)")
     add("--collector", default="", metavar="NAME", help="position (default this node's)")
-    add("--max-rows", type=int, default=DEFAULT_MAX_ROWS, metavar="N",
+    add("--limit", type=int, default=DEFAULT_MAX_ROWS, metavar="N",
         help=f"row budget, 1 to {MAX_ROWS} (default {DEFAULT_MAX_ROWS})")  # fmt: skip
     add("--output", type=Path, metavar="FILE", help="write here, not stdout")
     parser.set_defaults(func=run_export)
 
 
 def _window(args: argparse.Namespace, now: datetime) -> TimeWindow:
-    """Build the export window from ``--since`` and ``--end``.
+    """Build the export window from ``--window`` and ``--end``.
 
     Args:
         args: Parsed arguments.
@@ -116,7 +118,7 @@ def _window(args: argparse.Namespace, now: datetime) -> TimeWindow:
         if end.tzinfo is None:
             raise ValueError("--end needs a time zone, such as 2026-10-27T12:00:00Z")
         end = end.astimezone(UTC)
-    window = TimeWindow(end - timedelta(seconds=parse_duration(args.since)), end)
+    window = TimeWindow(end - timedelta(seconds=parse_duration(args.window)), end)
     check_window(window, now)
     return window
 
@@ -198,13 +200,13 @@ def _export(args: argparse.Namespace, targets: list[TargetSpec] | None, out: Tex
         plan = service.plan(targets, args.collector)
         about = {"tool": COMMAND, "vakr_version": get_version(), "host": host,
                  "targets_file": args.targets is not None}  # fmt: skip
-        counts = write_export(service, plan, window, out, max_rows=args.max_rows, about=about)
+        counts = write_export(service, plan, window, out, max_rows=args.limit, about=about)
     ifaces = sum(len(d.interfaces) for d in plan.devices)
     note = "; the row budget cut it short" if counts.truncated or plan.truncated else ""
     unmatched = f"; {len(plan.unmatched)} targets matched nothing" if plan.unmatched else ""
     print(f"{COMMAND}: {ifaces} interfaces on {len(plan.devices)} devices, {counts.rates} "
           f"samples, {counts.icmp} ICMP cycles{unmatched}{note}", file=sys.stderr)  # fmt: skip
-    return EXIT_OK
+    return EXIT_INCOMPLETE if note else EXIT_OK
 
 
 def run_export(args: argparse.Namespace) -> int:
@@ -214,13 +216,13 @@ def run_export(args: argparse.Namespace) -> int:
         args: Parsed arguments.
 
     Returns:
-        int: 0 written, 2 usage or targets error, 4 storage unavailable.
+        int: 0 written in full, 2 usage or targets error, 3 incomplete or unreadable.
 
     Raises:
         None
     """
-    if not 1 <= args.max_rows <= MAX_ROWS:
-        print(f"{COMMAND}: --max-rows must be 1 to {MAX_ROWS}", file=sys.stderr)
+    if not 1 <= args.limit <= MAX_ROWS:
+        print(f"{COMMAND}: --limit must be 1 to {MAX_ROWS}", file=sys.stderr)
         return EXIT_USAGE
     try:
         targets = _targets(args.targets)
@@ -231,14 +233,14 @@ def run_export(args: argparse.Namespace) -> int:
     try:
         if (problem := drop_to_service_user()) is not None:
             print(f"{COMMAND}: {problem}", file=sys.stderr)
-            return EXIT_STORAGE
+            return EXIT_INCOMPLETE
         return _export(args, targets, out)
     except (ValueError, ValidationError) as exc:
         print(f"{COMMAND}: {exc}", file=sys.stderr)
         return EXIT_USAGE
     except (StorageError, MigrationError, OSError) as exc:
         print(f"{COMMAND}: databases unavailable: {exc}", file=sys.stderr)
-        return EXIT_STORAGE
+        return EXIT_INCOMPLETE
     finally:
         if out is not sys.stdout:
             out.close()

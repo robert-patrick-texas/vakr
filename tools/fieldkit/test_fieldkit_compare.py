@@ -414,7 +414,7 @@ def test_pseudonymized_tables_still_join(tmp_path: Path, stand_ins: dict[str, Pa
             assert clear not in data
     assert content["acceptance/rates/d0001.csv"].startswith(b"key,end,elapsed_s")
     sent = json.loads(stand_ins["vakr"].read_text())
-    assert sent["argv"][:4] == ["acceptance", "export", "--since", "50h"]
+    assert sent["argv"][:6] == ["acceptance", "export", "--window", "50h", "--limit", "5000000"]
     lines = [json.loads(line) for line in sent["targets"].splitlines()]
     assert {"kind": "interface", "device": ["192.0.2.10"], "ifindex": "2"} in lines
     assert {"kind": "interface", "device": ["rtr1.example.net", "rtr1", "192.0.2.10"],

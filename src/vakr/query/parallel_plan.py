@@ -1,6 +1,6 @@
 """What ``vakr acceptance export`` reads: devices, interfaces, and their short keys.
 
-The targets file (``vakr.query.acceptance_targets``) names devices by name
+The targets file (``vakr.query.parallel_targets``) names devices by name
 or address and interfaces by ``ifIndex``, name, description, address, or
 MAC. This module matches it against the inventory and gives every device
 and interface a short key (``d0001``, ``i00001``) that each exported row
@@ -10,7 +10,7 @@ vakr does not monitor.
 
 Dependencies:
     vakr.domain: Collectors, devices, interfaces.
-    vakr.query.acceptance_targets: Matching rules.
+    vakr.query.parallel_targets: Matching rules.
 
 Safety:
     Pure functions over records already read; no I/O.
@@ -27,7 +27,7 @@ from uuid import UUID
 from vakr.domain.catalog import Collector
 from vakr.domain.interfaces import Interface
 from vakr.domain.inventory import Device
-from vakr.query.acceptance_targets import TargetSpec, device_matches, interface_matches
+from vakr.query.parallel_targets import TargetSpec, device_matches, interface_matches
 
 
 @dataclass(frozen=True, slots=True)

@@ -106,7 +106,9 @@ def test_e6_lifecycle_follows_stage1_without_rediscovery() -> None:
     down = StatusEvidence(iface.id, s.T0 + s.MINUTE, IfAdminStatus.UP, DOWN)
     assert apply_stage1_status(uow, [down], stale) == 1
     queries = StatusQueries(uow, memory_telemetry_factory())
-    (row,) = queries.device_detail(str(device.id)).interfaces
+    detail = queries.device_detail(str(device.id))
+    assert detail is not None
+    (row,) = detail.interfaces
     assert row.lifecycle is InterfaceLifecycle.INACTIVE
     assert row.state.text == "not up/up (inactive)"
     assert apply_stage1_status(uow, [down], stale) == 0  # nothing changes twice
@@ -115,7 +117,9 @@ def test_e6_lifecycle_follows_stage1_without_rediscovery() -> None:
     up = StatusEvidence(iface.id, s.T0 + 2 * s.MINUTE, IfAdminStatus.UP, UP)
     assert apply_stage1_status(uow, [up], stale) == 1
     with uow() as u:
-        assert u.interfaces.get(iface.id).lifecycle is InterfaceLifecycle.ACTIVE
+        stored = u.interfaces.get(iface.id)
+    assert stored is not None
+    assert stored.lifecycle is InterfaceLifecycle.ACTIVE
 
 
 def test_e6_the_flush_loop_hands_batches_to_the_inventory_and_retries() -> None:

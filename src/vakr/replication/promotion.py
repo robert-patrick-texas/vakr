@@ -15,9 +15,7 @@ acts. The decisions:
   the command exists for.
 - **demote** refuses on a peer, and without a URL for the new primary;
   it never needs ``--force``, because a peer cannot edit metadata.
-- **two primaries**: a primary whose partner's observation state says
-  ``primary`` too reports CRITICAL node health, naming which one looks
-  like the old primary. It never touches a target's state (MPOS-006).
+Two primaries are found by ``vakr.replication.conflict``.
 
 Dependencies:
     vakr.replication.client: The partner client and its errors.
@@ -31,10 +29,9 @@ Example:
     'https://east.example.net'
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
 
 from vakr.config.node import PEER, PRIMARY, NodeSettings
 from vakr.query.text import age_text
@@ -255,34 +252,3 @@ def demoted(url: str) -> dict[str, str | None]:
         None
     """
     return {"role": PEER, "primary_url": url, "peer_url": None}
-
-
-def two_primaries(node: NodeSettings, partner: Mapping[str, Any] | None,
-                  own_promoted_at: str | None) -> str | None:  # fmt: skip
-    """Say why this node and its partner are both primaries, or ``None`` (E.39).
-
-    Args:
-        node: This node's settings.
-        partner: ``partner.json``: what the partner's state reported last.
-        own_promoted_at: When this node was promoted, if it was.
-
-    Returns:
-        str | None: The CRITICAL summary, naming the node to demote.
-
-    Raises:
-        None
-    """
-    if node.is_peer or not node.peer_url or not partner or partner.get("role") != PRIMARY:
-        return None
-    where = partner.get("position") or node.peer_url
-    theirs = partner.get("promoted_at")
-    if theirs and (not own_promoted_at or theirs > own_promoted_at):
-        advice = f"{where} was promoted at {theirs}: this node looks like the old primary; " \
-            "run `sudo vakr node demote` here"  # fmt: skip
-    elif own_promoted_at:
-        advice = f"this node was promoted at {own_promoted_at}: {where} looks like the old " \
-            "primary; run `sudo vakr node demote` there"  # fmt: skip
-    else:
-        advice = "run `sudo vakr node demote` on the node whose metadata edits may be discarded"
-    return f"two primaries: this node and {where} both have node.role = primary, and " \
-        f"metadata edits on either diverge; {advice} ({DOC})"  # fmt: skip

@@ -14,6 +14,7 @@ Example:
 
 import json
 import tomllib
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -90,7 +91,6 @@ def west(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> InstallPaths:
     (paths.config_dir / "conf.d" / "50-role.toml").write_text(
         f'[node]\nrole = "peer"\nposition = "west"\nprimary_url = "{EAST}"\n'
     )
-    from datetime import UTC, datetime
 
     status.record(paths.state_dir / status.FILE, "unchanged", datetime.now(UTC), digest="0" * 64)
     return paths
@@ -272,10 +272,13 @@ def test_mpos003_demote_makes_the_old_primary_a_peer_that_resyncs(
     _partner(monkeypatch, EgressError("tcp", "down"))
     assert _run(capsys, "node", "promote", "--yes")[0] == 0
     _partner(monkeypatch, {"role": "primary", "position": "east"})
+    partner = west.state_dir / role_record.PARTNER_FILE
+    before = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+    role_record.write_json(partner, {"role": "primary", "position": "east", "seen_at": before})
     code, out, _ = _run(capsys, "node", "status")
-    assert "CRITICAL" not in out  # no observation pull has seen the partner yet
-    role_record.write_json(west.state_dir / role_record.PARTNER_FILE,
-                           {"role": "primary", "position": "east"})  # fmt: skip
+    assert "CRITICAL" not in out  # seen as its primary, before the promotion
+    after = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
+    role_record.write_json(partner, {"role": "primary", "position": "east", "seen_at": after})
     code, out, _ = _run(capsys, "node", "status")
     assert code == 0
     assert "CRITICAL two primaries" in out

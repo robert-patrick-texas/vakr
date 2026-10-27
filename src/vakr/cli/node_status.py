@@ -29,7 +29,7 @@ from vakr.config.node import NodeSettings
 from vakr.paths import InstallPaths
 from vakr.query.text import age_text
 from vakr.replication import role_record, status
-from vakr.replication.promotion import two_primaries
+from vakr.replication.conflict import conflict_at
 
 
 def node_status(paths: InstallPaths, node: NodeSettings, now: datetime) -> tuple[list[str], dict]:
@@ -50,8 +50,7 @@ def node_status(paths: InstallPaths, node: NodeSettings, now: datetime) -> tuple
     pull = status.read_status(state / status.FILE) if node.is_peer else None
     partner = role_record.read_json(state / role_record.PARTNER_FILE)
     changes = role_record.read_changes(state / role_record.ROLE_FILE)
-    own = role_record.promotion(state / role_record.ROLE_FILE)
-    conflict = two_primaries(node, partner, own["at"] if own else None)
+    conflict = conflict_at(state, node)
     resync = role_record.read_json(state / role_record.RESYNC_FILE)
     report = role_record.read_json(state / role_record.REPORT_FILE)
     lines = [f"role {node.role}, position {node.position or '(none)'}"]

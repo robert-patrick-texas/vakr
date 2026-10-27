@@ -32,7 +32,8 @@ from vakr.config.node import NodeSettings
 from vakr.query.text import age_text
 from vakr.query.views import Reading
 from vakr.replication import observation_status as obs
-from vakr.replication import role_record, status
+from vakr.replication import status
+from vakr.replication.conflict import conflict_at
 
 
 def replication_reader(state_dir: Path, node: NodeSettings) -> Callable[[], Reading | None]:
@@ -65,10 +66,8 @@ def replication_reader(state_dir: Path, node: NodeSettings) -> Callable[[], Read
             return None
         now = datetime.now(UTC)
         parts = [_metadata(state_dir, now)] if node.is_peer else []
-        partner = role_record.read_json(state_dir / role_record.PARTNER_FILE)
-        if not node.is_peer and partner and partner.get("role") == "primary":
-            parts.append(f"TWO PRIMARIES: {partner.get('position') or 'the partner'} is a "
-                         "primary too; see vakr node status")  # fmt: skip
+        if conflict_at(state_dir, node):
+            parts.append("TWO PRIMARIES: the partner is a primary too; see vakr node status")
         record = obs.read_status(state_dir / obs.FILE)
         lag = None if record is None else record.lag_s(now)
         if record is None or lag is None:

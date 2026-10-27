@@ -37,8 +37,8 @@ from vakr.health.model import CheckResult, PerfDatum, Status
 from vakr.paths import InstallPaths
 from vakr.ports.clock import SystemClock
 from vakr.replication import observation_status as obs_status
-from vakr.replication import role_record, status
-from vakr.replication.promotion import two_primaries
+from vakr.replication import status
+from vakr.replication.conflict import conflict_at
 from vakr.replication.status import PullStatus
 
 NAME = "replication"
@@ -98,9 +98,7 @@ def two_primaries_check(paths: InstallPaths, node: NodeSettings) -> CheckResult 
     Raises:
         None
     """
-    partner = role_record.read_json(paths.state_dir / role_record.PARTNER_FILE)
-    own = role_record.promotion(paths.state_dir / role_record.ROLE_FILE)
-    why = two_primaries(node, partner, own["at"] if own else None)
+    why = conflict_at(paths.state_dir, node)
     if why is None:
         return None
     return CheckResult(NAME, Status.CRITICAL, why, (PerfDatum("replication_primaries", 2),))

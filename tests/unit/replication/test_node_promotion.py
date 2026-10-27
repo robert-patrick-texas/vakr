@@ -27,8 +27,8 @@ from vakr.health.replication_check import check_replication
 from vakr.lifecycle.egress.errors import EgressError
 from vakr.paths import InstallPaths
 from vakr.ports.clock import ManualClock
+from vakr.replication import conflict, promotion, role_record
 from vakr.replication import observation_status as rec
-from vakr.replication import promotion, role_record
 from vakr.replication.client import PartnerError
 from vakr.replication.observation_pull import ObservationPuller
 from vakr.replication.overview import replication_reader
@@ -269,20 +269,25 @@ def test_mpos006_two_primaries_names_the_node_to_demote() -> None:
         None
     """
     later = {"role": "primary", "position": "west", "promoted_at": "2026-10-27T11:00:00+00:00"}
-    why = promotion.two_primaries(PRIMARY, later, None)
+    why = conflict.two_primaries(PRIMARY, later, None)
     assert why is not None
     assert "this node looks like the old primary" in why
     assert "demote` here" in why
-    own = promotion.two_primaries(PRIMARY, {"role": "primary", "position": "west"},
-                                  "2026-10-27T11:00:00+00:00")  # fmt: skip
+    promoted_here = "2026-10-27T11:00:00+00:00"
+    seen_after = {"role": "primary", "position": "west", "seen_at": "2026-10-27T11:00:30.5+00:00"}
+    own = conflict.two_primaries(PRIMARY, seen_after, promoted_here)
     assert own is not None
     assert "west looks like the old primary" in own
-    neither = promotion.two_primaries(PRIMARY, {"role": "primary"}, None)
+    # As a peer this node saw its primary say "primary"; that is not a conflict after promotion.
+    seen_before = {**seen_after, "seen_at": "2026-10-27T10:59:00+00:00"}
+    assert conflict.two_primaries(PRIMARY, seen_before, promoted_here) is None
+    assert conflict.two_primaries(PRIMARY, {"role": "primary"}, promoted_here) is None
+    neither = conflict.two_primaries(PRIMARY, {"role": "primary"}, None)
     assert neither is not None
     assert "may be discarded" in neither
-    assert promotion.two_primaries(PRIMARY, {"role": "peer"}, None) is None
-    assert promotion.two_primaries(PEER, later, None) is None
-    assert promotion.two_primaries(PRIMARY, None, None) is None
+    assert conflict.two_primaries(PRIMARY, {"role": "peer"}, None) is None
+    assert conflict.two_primaries(PEER, later, None) is None
+    assert conflict.two_primaries(PRIMARY, None, None) is None
 
 
 @pytest.fixture

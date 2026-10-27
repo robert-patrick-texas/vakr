@@ -41,6 +41,7 @@ def as_json(inbox: Inbox, traffic: TrafficReport, latency: LatencyReport,
         None
     """
     return {
+        "pseudonymized": inbox.pseudonymized,  # E.34 decision 11: only these may be committed
         "criteria": {"MVP-ACC-03": overall(r.verdict for r in traffic.results),
                      "MVP-ACC-04": overall(r.verdict for r in latency.results)},
         "bundles": [{"id": b, "created": c, "data": p} for b, c, p in inbox.bundles],

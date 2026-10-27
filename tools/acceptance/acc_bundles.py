@@ -115,6 +115,24 @@ class Inbox:
     key_ids: set[str] = field(default_factory=set)
     problems: list[str] = field(default_factory=list)
 
+    @property
+    def pseudonymized(self) -> bool:
+        """Report whether every bundle used was pseudonymized with one key.
+
+        Only then may the reports be committed (E.34 decision 11): a clear
+        bundle names devices and addresses.
+
+        Args:
+            None
+
+        Returns:
+            bool: True when at least one bundle was read and all share one key.
+
+        Raises:
+            None
+        """
+        return bool(self.bundles) and len(self.key_ids) == 1 and "" not in self.key_ids
+
 
 def limit_bps(row: dict[str, str], direction: str) -> float | None:
     """Return the rate above which MRTG ignores a value, in bits per second.

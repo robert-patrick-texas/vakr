@@ -25,6 +25,7 @@ import acceptance_report
 import pytest
 from acc_config import ConfigError, load_rules, rules_from
 from acc_format import overall, summary
+from acc_render import NAMES
 from acc_sources import mrtg_windows, parse_log, smokeping_rounds
 from acc_testkit import (
     MRTG_COLUMNS,
@@ -103,12 +104,13 @@ def test_configuration_file_and_its_bounds(tmp_path: Path) -> None:
     assert summary(["pass", "pass", "fail"]) == "2 pass, 1 fail"
 
 
-def two_hosts(root: Path, *, key: str = "", vakr_rtt_us: int = 12_300) -> None:
+def two_hosts(root: Path, *, key: str = "", mon_key: str = "", vakr_rtt_us: int = 12_300) -> None:
     """Write the MRTG/SmokePing host's bundle and vakr's bundle.
 
     Args:
         root: Inbox.
         key: Pseudonym key id of the vakr bundle (``""`` for clear).
+        mon_key: Pseudonym key id of the MRTG/SmokePing bundle (``""`` for clear).
         vakr_rtt_us: vakr's RTT.
 
     Returns:
@@ -132,7 +134,7 @@ def two_hosts(root: Path, *, key: str = "", vakr_rtt_us: int = 12_300) -> None:
                                         "probe", "pings", "step", "slave", "data", "comparable",
                                         "note"], [sp]),
         "smokeping/rrd/s0001.fetch.txt": smokeping_fetch(rows),
-    })  # fmt: skip
+    }, key_id=mon_key)  # fmt: skip
     rtts = " ".join(str(vakr_rtt_us + d) for d in (-100, 0, 0, 0, 100))
     cycles = [f"{T0 + 60 * m + 7}.000,{rtts}" for m in range(30 * 60)]
     bundle(root, "field-vakr1-20261020T120500Z", vakr_members(truth, cycles=cycles), key_id=key)
@@ -151,10 +153,9 @@ def test_report_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     Raises:
         None
     """
-    inbox, out = tmp_path / "inbox", tmp_path / "out"
-    out.mkdir()
+    inbox = out = tmp_path / "inbox"
     two_hosts(inbox)
-    argv = ["--inbox", str(inbox), "--output", str(out), "--gate"]
+    argv = ["--inbox", str(inbox), "--gate"]  # clear bundles: the report stays in the inbox
     assert acceptance_report.main(argv) == 0
     line = capsys.readouterr().out
     assert "MVP-ACC-03 pass (1 pass); MVP-ACC-04 pass (1 pass)" in line
@@ -172,10 +173,44 @@ def test_report_end_to_end(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
     assert report["latency"][0]["medians_ms"] == pytest.approx([12.31, 12.3], abs=0.02)
     slow = tmp_path / "slow"
     two_hosts(slow, vakr_rtt_us=15_000, key="0123456789abcdef")
-    assert acceptance_report.main(["--inbox", str(slow), "--output", str(out), "--gate"]) == 1
+    assert acceptance_report.main(["--inbox", str(slow), "--gate"]) == 1
     assert "MVP-ACC-04 fail" in capsys.readouterr().out
-    problems = json.loads((out / "parallel-run-report.json").read_text())["problems"]
+    problems = json.loads((slow / "parallel-run-report.json").read_text())["problems"]
     assert any("different pseudonym keys" in p for p in problems)
+
+
+def test_e34_only_a_pseudonymized_report_leaves_the_inbox(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """E.34 decision 11: a clear report is refused outside the inbox; a pseudonymized one is not.
+
+    Args:
+        tmp_path: Scratch directory.
+        capsys: Captures the refusal.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    evidence = tmp_path / "docs"
+    evidence.mkdir()
+    clear = tmp_path / "clear"
+    two_hosts(clear)
+    assert acceptance_report.main(["--inbox", str(clear), "--output", str(evidence)]) == 2
+    assert "names devices and addresses" in capsys.readouterr().err
+    assert list(evidence.iterdir()) == []
+    mixed = tmp_path / "mixed"
+    two_hosts(mixed, key="0123456789abcdef")  # one bundle clear: names cannot be trusted
+    assert acceptance_report.main(["--inbox", str(mixed), "--output", str(evidence)]) == 2
+    assert list(evidence.iterdir()) == []
+    pseudo = tmp_path / "pseudo"
+    two_hosts(pseudo, key="0123456789abcdef", mon_key="0123456789abcdef")
+    assert acceptance_report.main(["--inbox", str(pseudo), "--output", str(evidence)]) == 0
+    assert json.loads((evidence / "parallel-run-report.json").read_text())["pseudonymized"] is True
+    assert NAMES[True] in (evidence / "parallel-run-report.md").read_text()
+    assert not (clear / "parallel-run-report.md").exists()  # refused before anything was written
 
 
 def test_usage_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

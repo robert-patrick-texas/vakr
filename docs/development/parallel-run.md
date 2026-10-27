@@ -79,6 +79,10 @@ Every table member (MRTG targets, SmokePing targets, vakr's devices and interfac
 
 ## Committing the evidence
 
-At the end of the parallel run, run the report over every bundle of the run. Commit `parallel-run-report.md` where the acceptance evidence is kept (`--output`). Keep the JSON beside it, or at least its checksum: the JSON lists every window. Reports from pseudonymized bundles hold only pseudonyms. A report from clear bundles names devices and addresses, so it should not be committed to a public repository.
+At the end of the parallel run, run the report over every bundle of the run. Only a report built from pseudonymized bundles is committed (the owner's decision of 2026-10-27, Appendix E.34 decision 11): a report from clear bundles names devices and addresses, and the repository is public.
+
+- The reports go into the inbox by default, which git ignores. A report from clear bundles, or from a mix of clear and pseudonymized ones, can only be written there: `--output` anywhere else is refused with exit 2.
+- A report whose bundles all share one pseudonym key says so under its title, and its JSON has `"pseudonymized": true`. Write it where the acceptance evidence is kept, for example `make acceptance-report ACCEPTANCE_OUT=docs/acceptance`, and commit `parallel-run-report.md` with the JSON beside it, or at least its checksum: the JSON lists every window.
+- `make check` fails if a clear report is ever tracked (`tests/unit/test_evidence_reports.py`).
 
 The capture (the field kit profiles and `vakr acceptance export`) must ship in a release before the run starts. The report can be refined afterwards from the same bundles, because the bundles hold the data as MRTG, SmokePing, and vakr recorded it.

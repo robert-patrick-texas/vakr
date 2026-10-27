@@ -14,10 +14,10 @@ For vakr these are [MVP-ACC-03 and MVP-ACC-04](../../tool-blueprint.md#276-mvp-a
 # Decrypt and extract the operator's bundles first
 uv run tools/fieldkit/field_inbox.py process
 
-# Write parallel-run-report.md and parallel-run-report.json here
+# Write parallel-run-report.md and parallel-run-report.json into the inbox
 uv run tools/acceptance/acceptance_report.py
 
-# Somewhere else, from other bundles, or as a gate (exit 1 unless both criteria pass)
+# Somewhere else (pseudonymized bundles only), from other bundles, or as a gate (exit 1 unless both criteria pass)
 uv run tools/acceptance/acceptance_report.py --output docs/acceptance --bundle vakr-field-... --gate
 make acceptance-report ACCEPTANCE_OUT=docs/acceptance
 ```
@@ -26,7 +26,7 @@ make acceptance-report ACCEPTANCE_OUT=docs/acceptance
 |---|---|---|
 | `--inbox DIR` | `inbox` in `acceptance.toml` (the repository's `inbox/`) | Where `field_inbox.py` extracted the bundles |
 | `--bundle ID` | every bundle with comparison data | Read only these bundles (repeat the option) |
-| `--output DIR` | current directory | Where the two reports go |
+| `--output DIR` | the inbox | Where the two reports go. A report from clear or mixed bundles may only go under the inbox, which git ignores (E.34 decision 11) |
 | `--stem NAME` | `parallel-run-report` | Report file names |
 | `--config TOML` | `acceptance.toml` beside the script | The rules |
 | `--gate` | off | Exit 1 unless both criteria pass |

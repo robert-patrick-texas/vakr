@@ -35,6 +35,14 @@ from acc_format import categories, cell, overall, percent, rate, summary, table,
 from acc_latency import LATENCY_CATEGORIES, LatencyReport
 from acc_traffic_run import TrafficReport
 
+# The Markdown counterpart of the JSON's "pseudonymized" (E.34 decision 11); the
+# repository check matches the first sentence of each.
+NAMES = {
+    True: "Names are pseudonymized (FIELD-005): this report may be committed.",
+    False: "**Names are not pseudonymized: keep this report out of the repository** "
+    "(E.34 decision 11). It names devices and addresses.",
+}
+
 
 def traffic_section(report: TrafficReport, rules: Rules) -> list[str]:
     """Render MVP-ACC-03.
@@ -210,7 +218,7 @@ def render_markdown(inbox: Inbox, traffic: TrafficReport, latency: LatencyReport
     lines = [f"# {rules.title}", "",
              f"Generated {generated:%Y-%m-%d %H:%M} UTC from {len(inbox.bundles)} field bundles "
              "by `tools/acceptance/acceptance_report.py`; the rules are in `acceptance.toml` "
-             "(blueprint Appendix E.34).", ""]  # fmt: skip
+             "(blueprint Appendix E.34).", "", NAMES[inbox.pseudonymized], ""]  # fmt: skip
     lines += table(("Criterion", "Result", "Subjects"), [
         ("MVP-ACC-03: 5-minute traffic rates agree with MRTG within the tolerance",
          f"**{acc03}**", summary(r.verdict for r in traffic.results)),

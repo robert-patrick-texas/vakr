@@ -163,7 +163,9 @@ resilience-test:
 # Parallel-run evidence (MVP-ACC-03, MVP-ACC-04): compare the field bundles in inbox/
 # with MRTG and SmokePing and write the Markdown and JSON reports (tools/acceptance).
 TY_PATHS += --extra-search-path tools/acceptance
-ACCEPTANCE_OUT ?= .
+# The reports go into inbox/ unless ACCEPTANCE_OUT names a directory; only a report from
+# pseudonymized bundles may go elsewhere (E.34 decision 11).
+ACCEPTANCE_OUT ?=
 .PHONY: acceptance-report
 acceptance-report:
-	uv run tools/acceptance/acceptance_report.py --output $(ACCEPTANCE_OUT)
+	uv run tools/acceptance/acceptance_report.py $(if $(ACCEPTANCE_OUT),--output $(ACCEPTANCE_OUT))

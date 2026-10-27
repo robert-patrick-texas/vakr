@@ -4,9 +4,13 @@
 peer's metadata pull runs as a ``Resync``: its next successful pull
 replaces the replicated metadata with the new primary's, removing or
 overwriting every row the new primary does not hold exactly (the
-replica's replace mode), even when the digests already match. Just
-before it writes, ``backup`` takes a verified online copy of
-``metadata.db``. Afterwards ``resync-report.json`` lists:
+replica's replace mode), even when the digests already match. Before the
+first replacing attempt, ``backup`` takes a verified online copy of
+``metadata.db``; its path goes into the marker, and every later attempt
+of the same resync reuses it, so failed attempts never add copies. Inside
+the replacing transaction, before its commit, ``resync-report.json`` is
+written (``state`` ``applying``), so nothing is discarded without its
+report; after the commit it becomes ``done``. It lists:
 
 - the backup, so a discarded edit can be read back and made again on the
   new primary;
@@ -17,7 +21,9 @@ before it writes, ``backup`` takes a verified online copy of
   minus one pull interval (at most ``MAX_EDITS``); node-local actions
   (sign-ins, kiosk and replication tokens, role changes) are left out.
 
-Then the marker goes, and later pulls are ordinary again.
+Then the marker goes, and later pulls are ordinary again. A pass that
+finds the digests equal never replaces a report of the same demotion that
+lists discarded rows or a backup with an empty one.
 
 Dependencies:
     vakr.replication.role_record: The marker and the report.
@@ -74,6 +80,7 @@ class Resync:
         """
         self._dir, self._uow, self._backup, self._now = state_dir, uow_factory, backup, now
         self._copy: Path | None = None
+        self._report: dict[str, Any] | None = None
 
     @staticmethod
     def pending(state_dir: Path) -> bool:
@@ -90,8 +97,28 @@ class Resync:
         """
         return (state_dir / role_record.RESYNC_FILE).exists()
 
+    def _marker(self) -> dict[str, Any]:
+        """Read the marker this resync works for.
+
+        Args:
+            None
+
+        Returns:
+            dict: ``resync.json``, or empty when it is gone or unreadable.
+
+        Raises:
+            None
+        """
+        return role_record.read_json(self._dir / role_record.RESYNC_FILE) or {}
+
     def before_apply(self) -> None:
-        """Back up ``metadata.db`` before anything is discarded.
+        """Back up ``metadata.db`` once per resync, before anything is discarded (E.39).
+
+        The backup's path is kept in the marker, and every later attempt of the
+        same resync reuses it while the file exists: until the resync is done,
+        this node is a peer that refuses edits and applies nothing, so its
+        replicated rows still equal the copy. A backup whose path cannot be
+        recorded is removed again, so attempts never pile up copies.
 
         Args:
             None
@@ -101,37 +128,85 @@ class Resync:
 
         Raises:
             StorageError: If the backup fails; nothing is applied then.
+            OSError: If its path cannot be recorded; nothing is applied then.
         """
-        self._copy = self._backup()
+        marker = self._marker()
+        kept = marker.get("backup")
+        if isinstance(kept, str) and Path(kept).is_file():
+            self._copy = Path(kept)
+            return
+        copy = self._backup()
+        if copy is None:
+            return
+        try:
+            role_record.write_json(self._dir / role_record.RESYNC_FILE,
+                                   {**marker, "backup": str(copy)})  # fmt: skip
+        except OSError:
+            copy.unlink(missing_ok=True)
+            raise
+        self._copy = copy
 
-    def finish(self, result: ApplyResult | None, remote: Any) -> dict[str, Any]:
-        """Write the report and remove the marker.
+    def report(self, result: ApplyResult | None, remote: Any) -> dict[str, Any]:
+        """Write the report; for a replacing apply, before its commit.
+
+        The report is durable before anything is discarded: if it cannot be
+        written, the caller rolls the apply back and the next pull tries again.
+        A report of the same demotion that lists discarded rows or a backup is
+        never replaced by an empty one: a pass that finds the digests equal
+        (``result`` ``None``) keeps them.
 
         Args:
             result: What the replacing apply did; ``None`` when the digests matched.
             remote: The new primary's state answer (its ``promotion``).
 
         Returns:
-            dict: The report.
+            dict: The report written.
 
         Raises:
-            OSError: If the report cannot be written; the marker then stays.
+            OSError: If the report cannot be written.
+            StorageError: If the audit cannot be read.
         """
-        marker = role_record.read_json(self._dir / role_record.RESYNC_FILE) or {}
+        marker = self._marker()
         promo = remote.get("promotion") if isinstance(remote, dict) else None
         fork = promo.get("fork_at") if isinstance(promo, dict) else None
         edits, total = self._edits(fork if isinstance(fork, str) else None)
-        discarded = [] if result is None else [_row(d) for d in result.discarded]
         report = {"at": self._now().isoformat(timespec="seconds"),
                   "primary_url": marker.get("primary_url"), "demoted_at": marker.get("at"),
-                  "fork_at": fork, "backup": str(self._copy) if self._copy else None,
+                  "fork_at": fork, "backup": _text(self._copy) or marker.get("backup"),
                   "discarded_total": 0 if result is None else result.discarded_total,
-                  "discarded": discarded, "edits_total": total, "edits": edits}  # fmt: skip
+                  "discarded": [] if result is None else [_row(d) for d in result.discarded],
+                  "edits_total": total, "edits": edits,
+                  "state": "done" if result is None else "applying"}  # fmt: skip
+        earlier = role_record.read_json(self._dir / role_record.REPORT_FILE) or {}
+        if result is None and earlier.get("demoted_at") == marker.get("at") and \
+                (earlier.get("discarded_total") or earlier.get("backup")):  # fmt: skip
+            for key in ("discarded_total", "discarded", "backup"):
+                report[key] = earlier.get(key)
         role_record.write_json(self._dir / role_record.REPORT_FILE, report)
+        self._report = report
+        return report
+
+    def finish(self) -> dict[str, Any]:
+        """Mark the report done and remove the marker; later pulls are ordinary.
+
+        Args:
+            None
+
+        Returns:
+            dict: The report.
+
+        Raises:
+            OSError: If the report or the marker cannot be updated; the marker
+                then stays, and the next pull finishes without losing the report.
+        """
+        report = self._report or {}
+        if report.get("state") != "done":
+            report = {**report, "state": "done"}
+            role_record.write_json(self._dir / role_record.REPORT_FILE, report)
         (self._dir / role_record.RESYNC_FILE).unlink(missing_ok=True)
-        _LOG.warning("resynced metadata from the new primary: %d local row(s) discarded, "
-                     "%d edit(s) since the fork point; see vakr node status",
-                     report["discarded_total"], total,
+        _LOG.warning("resynced metadata from the new primary: %s local row(s) discarded, "
+                     "%s edit(s) since the fork point; see vakr node status",
+                     report.get("discarded_total"), report.get("edits_total"),
                      extra={"event_id": "replication.resync_done"})  # fmt: skip
         return report
 
@@ -168,6 +243,21 @@ class Resync:
                 if (since is None and total >= MAX_EDITS) or (cursor := page.next_cursor) is None:
                     break
         return found, total
+
+
+def _text(path: Path | None) -> str | None:
+    """Render an optional path for the report.
+
+    Args:
+        path: The path, or ``None``.
+
+    Returns:
+        str | None: Its text.
+
+    Raises:
+        None
+    """
+    return None if path is None else str(path)
 
 
 def _row(row: Any) -> dict[str, str]:

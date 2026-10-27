@@ -18,7 +18,7 @@ Safety considerations:
     Tests only write beneath ``tmp_path`` and never access the network.
 
 Example:
-    $ uv run --with pytest==9.1.1 --with markdown-it-py==4.2.0 \
+    $ uv run --with pytest==9.2.0 --with markdown-it-py==4.2.0 \
         --with mdit-py-plugins==0.6.1 pytest tools/md2html
 """
 

@@ -88,7 +88,7 @@ The directory holds `md2html.py` (the entry point, site assembly, and command li
 ## Development
 
 ```sh
-uv run --with pytest==9.1.1 --with markdown-it-py==4.2.0 --with mdit-py-plugins==0.6.1 \
+uv run --with pytest==9.2.0 --with markdown-it-py==4.2.0 --with mdit-py-plugins==0.6.1 \
     pytest tools/md2html
 uvx ruff@0.17.3 check tools/md2html && uvx ruff@0.17.3 format --check tools/md2html
 ```

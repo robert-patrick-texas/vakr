@@ -2,7 +2,9 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
-## Unreleased
+## 0.6.2 - 2026-10-27
+
+Fix release. Editing a down interface's annotation or tags no longer restarts its stale countdown. Metadata migration `0007_interface_inactive_since.sql` adds one column; self-update backs up `metadata.db` first and restores it on rollback, so this release carries no manual-update marker, the update timer installs it, and `sudo vakr self-update --rollback` returns to 0.6.1. On two positions, update the peer right after the primary, as for every release: the metadata pull requires both to have the same schema. No options are added.
 
 ### Fixed
 
@@ -11,6 +13,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ### Changed
 
+- Developers: pytest 9.2.0 (TOOLS-002).
 - Developers: `make secrets` scans every tracked file for secrets with gitleaks 8.30.1 (QG-007), and CI's `secrets` job runs it after the gitleaks action. The action scans only the first-parent commits of a push, so commits that arrived on a merged branch were never scanned. `.gitleaks.toml` keeps the default rules and allows only interface names such as `GigabitEthernet0/0/0`, which read as access keys. The action now installs the same gitleaks release, and `make updates` watches both pins. `make secrets-history` scans every commit on every branch. A full-history scan on 2026-10-27 found no real secret, only a test fixture's made-up key id, which `.gitleaksignore` records.
 
 ## 0.6.1 - 2026-10-27

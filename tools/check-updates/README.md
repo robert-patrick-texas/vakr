@@ -208,7 +208,7 @@ The directory holds `check_updates.py` (entry point and command line), its `upda
 The tests are offline: every request and command is answered from `testdata/` or canned results.
 
 ```sh
-uv run --with pytest==9.1.1 pytest tools/check-updates
+uv run --with pytest==9.2.0 pytest tools/check-updates
 uvx ruff@0.17.3 check tools/check-updates && uvx ruff@0.17.3 format --check tools/check-updates
 ```
 

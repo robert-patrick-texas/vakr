@@ -91,7 +91,7 @@ Set these keys in `/etc/vakr/config.toml` or in a file under `/etc/vakr/conf.d/`
 ```toml
 [update]
 channel = "stable"
-hold_version = "0.6.2"
+hold_version = "1.4.0"
 
 [network]
 https_proxy = "http://proxy.corp.example:3128"

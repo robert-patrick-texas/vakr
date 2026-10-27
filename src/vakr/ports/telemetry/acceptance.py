@@ -1,20 +1,15 @@
 """Lean read port for the MVP acceptance reports (MVP-ACC-01, MVP-ACC-02, MVP-ACC-10, E.35).
 
-The acceptance reports judge a 7- to 14-day run of a whole node: about a
-million poll records per collector and week, and 1,600 interfaces whose
-native samples are far too many to rebuild as observations (ADR-021
-measured 0.84 µs warm and 4 µs cold per native sample read). This port
-returns only what the reports need, as integers in immutable named tuples
-(cheaper to build by the million than frozen dataclasses):
+The reports judge a week or two of a whole node, far too many native samples
+to rebuild as observations (ADR-021: 4 µs per cold sample), so this port
+returns only what they need, as integers in named tuples:
 
-- ``poll_marks``: one device's poll records from one collector, with
-  scheduled, start, and completion times in epoch microseconds.
-- ``sample_marks``: the time, quality, and per-metric presence of one
-  interface's (or device's ICMP) native observations, for the short
-  stretches a report inspects closely.
-- ``bucket_marks``: the 15-minute rollup buckets of one subject, reduced
-  to sample count, per-metric presence, and quality, so a report can find
-  the few quarter-hours worth a native read without scanning every sample.
+- ``poll_marks``: one device's poll records, times in epoch microseconds.
+- ``sample_marks``: time, quality, and per-metric presence of one subject's
+  native interface or ICMP observations, for the stretches inspected closely.
+- ``bucket_marks``: one subject's 15-minute rollup buckets as sample count,
+  per-metric presence, and quality: the quarter-hours worth a native read.
+- ``status_marks``: one interface's status records (schema 4, E.35).
 
 Shared semantics every backend reproduces (contract ``contract_acceptance``):
 

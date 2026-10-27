@@ -7,8 +7,7 @@ into the SQLite telemetry store (the only telemetry writer), discovery runs
 beside polling (with manual rediscoveries an administrator queued, picked up
 by the operation watcher), and timers checkpoint rate baselines every minute, write a
 collector-health observation every minute, and keep the telemetry store in
-shape. A watcher follows the inventory change counter, and SIGHUP reloads
-the configuration.
+shape. A watcher follows the inventory change counter; SIGHUP reloads config.
 
 Shutdown follows 16.4 in order: stop discovery and the timers; stop the
 scheduler, which gives running polls ``scheduler.shutdown_grace`` and

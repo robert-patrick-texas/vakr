@@ -72,19 +72,24 @@ Each row carries one cause. Only `unexplained` fails the report; unexplained row
 | `snmp_timeout`, `snmp_error` | The poll's SNMP device result timed out, erred, answered in part, or Stage 2 did not finish |
 | `admin_state` | The device is disabled or retired since before the slot, or the poll ran in maintenance |
 | `not_yet_discovered` | The interface's identity was created after the slot, or the poll reported an unresolved identity |
+| `interface_down` | The interface's newest status record at or before the poll says it was not up/up (see below) |
 | `interface_not_up` | The interface's lifecycle is not active, and has not been since before the slot |
 | `inventory_change` | The device was created after the slot, or an audited change to it (or an `inventory.apply`) falls within two intervals of the stretch |
 | `unexplained` | None of the above |
 
 Collector or storage trouble is never reported as the device being down, and a slot without data is never a zero.
 
+### Interface status records
+
+Interfaces that are not up/up get no traffic samples (E.27 #7). So that their gaps are still explained, Stage 1 records an interface's admin and oper status whenever it changes, and every interface's status at its device's first Stage 1 after the collector starts. A link that went down and came back while its device answered SNMP is therefore `interface_down`, not `unexplained`. The records are small and few (about 73 MB per node at a pessimistic rate, blueprint E.35), replicate to the partner with their poll, and expire with native data.
+
+The same changes drive interface lifecycle (E.6): an interface that goes down is `inactive` in `vakr status`, the TUI, and the web UI within seconds, and `active` again when it comes back, without waiting for rediscovery.
+
 ### What vakr does not record
 
-Four things the report cannot see, which an operator may need to explain by hand:
+Two things the report cannot see, which an operator may need to explain by hand:
 
-- **An interface that went down and came back.** Interfaces that are not up/up get no samples and no stored status (E.27 #7), so a link that flapped while its device answered SNMP is `unexplained`. Telling it apart would need a status record for interfaces that are not sampled, which is a telemetry schema change.
 - **Admin-state history.** The inventory keeps a device's current admin state and when it last changed. A device disabled and re-enabled inside the window explains its gap only through the audit entries at either end (`inventory_change`).
-- **An interface that has just gone down.** Its lifecycle changes at the next rediscovery (every 24 h), so until then its gap is `unexplained` rather than `interface_not_up`.
 - **Why a poll was not attempted.** The record says not attempted, and `COLLECTOR_DEGRADED` for a capacity or storage refusal, but not which. The spool fill level in the health reports separates a full spool from a busy collector.
 
 ## Coverage (MVP-ACC-02)

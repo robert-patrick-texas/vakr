@@ -29,7 +29,7 @@ from vakr.adapters.sqlite.telemetry import (
     telemetry_family,
     telemetry_migrations,
 )
-from vakr.adapters.sqlite.telemetry.retention import purge_kept
+from vakr.adapters.sqlite.telemetry.kept import purge_kept
 from vakr.domain.ids import BatchId, CollectorId, InterfaceId, new_id
 from vakr.ports.migrations import SchemaState
 

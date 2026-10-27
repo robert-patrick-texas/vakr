@@ -1,4 +1,4 @@
-"""The two-position system-test harness, MPOS-T01 to MPOS-T04 (blueprint 27.5).
+"""The two-position system-test harness, MPOS-T01 to MPOS-T05 (blueprint 27.5).
 
 ``run.sh`` starts an ``east`` and a ``west`` node and a simulated fleet in
 containers, cuts and delays traffic between them, and checks what each node

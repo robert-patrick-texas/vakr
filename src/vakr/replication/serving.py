@@ -130,22 +130,27 @@ def _answer(collector: CollectorId, after: int, page: FeedPage) -> dict[str, Any
     Raises:
         None
     """
-    batch, size, served, last = new_id(BatchId), 0, [], after
+    batch, size, served, attached, last = new_id(BatchId), 0, [], [], after
     more = page.has_more
+    # Status records ride with their poll's SNMP entry (schema 4, E.35), and a partner
+    # that predates them ignores the member. They count against the same budget, or a
+    # page could outgrow the partner's answer limit and be refused on every retry.
+    riders: dict[int, list[dict[str, Any]]] = {}
+    for a in page.attached:
+        rider = {"seq": a.seq, "envelope": envelope_to_dict(seal(a.observation, batch))}
+        riders.setdefault(a.seq, []).append(rider)
     for entry in page.entries:
         wire = envelope_to_dict(seal(entry.observation, batch))
-        size += len(json.dumps(wire, separators=(",", ":"), default=str))
+        rides = riders.get(entry.seq, [])
+        size += sum(len(json.dumps(w, separators=(",", ":"), default=str)) for w in (wire, *rides))
         if served and size > BYTE_BUDGET:
             more = True
             break
         served.append({"seq": entry.seq, "envelope": wire})
+        attached.extend(rides)
         last = entry.seq
     else:
         last = page.next_after  # entries skipped as missing still advance the cursor
-    # Status records ride with their poll's SNMP entry (schema 4, E.35); a partner that
-    # predates them ignores the member.
-    attached = [{"seq": a.seq, "envelope": envelope_to_dict(seal(a.observation, batch))}
-                for a in page.attached if a.seq <= last]  # fmt: skip
     return {"collector": str(collector), "after": after, "next_after": last, "has_more": more,
             "oldest_seq": page.oldest_seq, "newest_seq": page.newest_seq,
             "missing": sum(1 for seq in page.missing if seq <= last),

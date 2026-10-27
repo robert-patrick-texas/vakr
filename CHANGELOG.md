@@ -2,6 +2,12 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## Unreleased
+
+### Fixed
+
+- Two positions: a replication page now counts the interface status records it carries against its 6 MiB budget (E.13, ADR-024 decision 31). Before, a page near the budget whose polls carried many status records, such as the baseline recorded at every collector start, could pass the partner's 8 MiB answer limit and be refused on every retry, stopping observation replication at that point. Only two-position deployments are affected.
+
 ## 0.6.0 - 2026-10-27
 
 The first M6 (MVP acceptance) release. It adds the tools that turn the parallel run with MRTG and SmokePing into acceptance evidence, manual device entry, bulk inventory import and export, and node promotion. It adds no options. Telemetry migration `0004_interface_status.sql` is additive (`compat: additive`), and every release that can be rolled back to (0.4.0 and later) reads it, so this release carries no manual-update marker and the update timer installs it (E.14).

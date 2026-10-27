@@ -1,4 +1,4 @@
-# The two-position system tests, MPOS-T01..T04 (blueprint 27.5), in quick mode:
+# The two-position system tests, MPOS-T01..T05 (blueprint 27.5), in quick mode:
 # two systemd nodes and a simulated fleet in privileged containers, with
 # partitions and netem. Manual only: it takes 10 to 20 minutes and is not a
 # gate on pushes. See docs/development/two-position-tests.md.

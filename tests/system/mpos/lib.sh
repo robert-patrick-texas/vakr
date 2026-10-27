@@ -1,5 +1,5 @@
 # Helpers for tests/system/mpos/run.sh, the two-position system tests
-# (MPOS-T01..T04, blueprint 27.5). Sourced after packaging/container/testlib.sh,
+# (MPOS-T01..T05, blueprint 27.5). Sourced after packaging/container/testlib.sh,
 # whose pass/fail/check/section/finish this file reuses.
 #
 # Containers and networks have fixed names, so cleanup never needs a variable:

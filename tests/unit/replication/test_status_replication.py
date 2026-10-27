@@ -133,3 +133,46 @@ def test_mpos004_stray_or_foreign_attachments_are_refused() -> None:
     with pytest.raises(ValidationError):
         verified_attachments({"next_after": 5, "attachments": [{"seq": 4, "envelope": icmp}]},
                              east, 3)  # fmt: skip
+
+
+def test_mpos004_status_records_count_against_the_page_byte_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """MPOS-004, E.13: attachments share the page's byte budget, so no page outgrows the client.
+
+    The partner reads at most ``MAX_ANSWER_BYTES``; a page whose observations fit
+    the budget but whose status records did not would be refused on every retry,
+    stalling replication at that cursor.
+
+    Args:
+        monkeypatch: Shrinks the budget to a few entries.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    from vakr.ports.telemetry.replication import FeedEntry, FeedPage
+    from vakr.replication import serving
+
+    east = new_id(CollectorId)
+    snmp = [o for o in k.minutes(east, 4) if isinstance(o, SnmpDeviceObservation)]
+    entries = tuple(FeedEntry(seq, o) for seq, o in enumerate(snmp, start=1))
+    riders = tuple(
+        FeedEntry(seq, s.status(o.device_id, new_id(InterfaceId), east, o.timestamp,
+                                poll_id=o.poll_id))
+        for seq, o in enumerate(snmp, start=1) for _ in range(20)
+    )  # fmt: skip
+    page = FeedPage(entries, len(entries), False, 1, len(entries), (), riders)
+    one = len(serving.json.dumps(envelope_to_dict(seal(snmp[0], new_id(BatchId)))))
+    monkeypatch.setattr(serving, "BYTE_BUDGET", one * (len(entries) + 2))
+    answer = serving._answer(east, 0, page)
+    served = len(answer["observations"])
+    assert 1 <= served < len(entries), "the status records must cut the page short"
+    assert answer["has_more"] is True
+    assert answer["next_after"] == answer["observations"][-1]["seq"]
+    assert {a["seq"] for a in answer["attachments"]} <= {o["seq"] for o in answer["observations"]}
+    assert len(answer["attachments"]) == 20 * served
+    body = sum(len(serving.json.dumps(x)) for x in answer["observations"] + answer["attachments"])
+    assert body <= serving.BYTE_BUDGET + one * 21  # at most one entry and its riders past it

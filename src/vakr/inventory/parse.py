@@ -3,7 +3,10 @@
 Each table is read through ``TableReader`` and the field readers in
 ``parse_fields``, so unknown keys, wrong types, and out-of-range values are
 reported with their path, and every problem in the file is listed in one
-run. Array lengths are bounded (E.26).
+run. Array lengths are bounded (E.26). The per-table parsers are public
+because CSV import rows go through the same checks (E.38); with
+``partial`` (an import) a device may leave out ``address``, since an
+import row that omits a field keeps the stored value.
 
 Dependencies:
     vakr.policy.reader: Typed table reads that collect problems.
@@ -18,7 +21,7 @@ Example:
     ('192.0.2.1', 'enabled')
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -41,17 +44,49 @@ _DEVICE = {
 _ANNOTATION = {
     "device", "ifname", "tags", "interest", "high_priority", "wan_circuit", "sticky", "provider",
     "circuit_id", "contracted_bps", "capacity_override_bps", "public_dashboard_eligible",
-    "display_rank", "comment",
+    "display_rank", "comment", "uuid",
 }  # fmt: skip
+SITE_KEYS, DEVICE_KEYS, ANNOTATION_KEYS = (
+    frozenset(_SITE),
+    frozenset(_DEVICE),
+    frozenset(_ANNOTATION),
+)
+
+_FIELD = {"interval": "interval_s", "discovery_interval": "discovery_interval_s",
+          "high_priority": "interest", "public_dashboard_eligible": "public_dashboard"}  # fmt: skip
+"""Entry field of each key whose name differs; every other key names its field."""
 
 
-def _site(table: object, at: str, issues: list[Issue]) -> SiteEntry | None:
+def given_fields(
+    table: object, keys: Collection[str] | None, allowed: Collection[str]
+) -> frozenset[str]:
+    """Name the entry fields a table wrote, for an import's change-only-what-is-given rule.
+
+    Args:
+        table: The table as loaded.
+        keys: Keys present (a CSV header); ``None`` uses the table's own keys.
+        allowed: Keys the table may hold.
+
+    Returns:
+        frozenset[str]: Entry field names, such as ``interval_s``.
+
+    Raises:
+        None
+    """
+    present = keys if keys is not None else (table if isinstance(table, Mapping) else ())
+    return frozenset(_FIELD.get(str(k), str(k)) for k in present if k in allowed)
+
+
+def parse_site(
+    table: object, at: str, issues: list[Issue], *, keys: Collection[str] | None = None
+) -> SiteEntry | None:
     """Parse one ``[[sites]]`` table.
 
     Args:
         table: The table as loaded.
         at: Its location.
         issues: Problems are appended here.
+        keys: Keys present, when the table omits empty values (a CSV row).
 
     Returns:
         SiteEntry | None: The entry, or ``None`` when it has problems.
@@ -70,16 +105,22 @@ def _site(table: object, at: str, issues: list[Issue]) -> SiteEntry | None:
     description, uuid = (r.text("description") or "").strip(), fields.uuid_value(r, "uuid")
     if name is None or len(issues) > before:
         return None
-    return SiteEntry(at, name, code or name.upper(), region, zone, description, uuid)
+    given = given_fields(table, keys, _SITE)
+    return SiteEntry(at, name, code or name.upper(), region, zone, description, uuid, given)
 
 
-def _device(table: object, at: str, issues: list[Issue]) -> DeviceEntry | None:
+def parse_device(
+    table: object, at: str, issues: list[Issue], *, keys: Collection[str] | None = None,
+    partial: bool = False,
+) -> DeviceEntry | None:  # fmt: skip
     """Parse one ``[[devices]]`` table.
 
     Args:
         table: The table as loaded.
         at: Its location.
         issues: Problems are appended here.
+        keys: Keys present, when the table omits empty values (a CSV row).
+        partial: An import row, which may leave out ``address``.
 
     Returns:
         DeviceEntry | None: The entry, or ``None`` when it has problems.
@@ -89,7 +130,8 @@ def _device(table: object, at: str, issues: list[Issue]) -> DeviceEntry | None:
     """
     before, r = len(issues), TableReader(table, at, issues, _DEVICE)
     family = fields.enum_value(r, "address_family", AddressFamily)
-    name, address = fields.name(r, "name", required=True), fields.address(r, family)
+    name = fields.name(r, "name", required=True)
+    address = fields.address(r, family, required=not partial)
     entry = DeviceEntry(
         at, name or "", address or "", site=fields.name(r, "site"),
         credential=fields.name(r, "credential"), tags=fields.labels(r, "tags"),
@@ -99,6 +141,7 @@ def _device(table: object, at: str, issues: list[Issue]) -> DeviceEntry | None:
         discovery_interval_s=fields.seconds(r, "discovery_interval", "discovery_interval"),
         reachability=fields.enum_value(r, "reachability", ReachabilityStrategy),
         address_family=family, uuid=fields.uuid_value(r, "uuid"),
+        given=given_fields(table, keys, _DEVICE),
     )  # fmt: skip
     return None if len(issues) > before else entry
 
@@ -122,13 +165,16 @@ def _interest(r: TableReader) -> InterestClass:
     return interest or implied or InterestClass.SECONDARY
 
 
-def _annotation(table: object, at: str, issues: list[Issue]) -> AnnotationEntry | None:
+def parse_annotation(
+    table: object, at: str, issues: list[Issue], *, keys: Collection[str] | None = None
+) -> AnnotationEntry | None:
     """Parse one ``[[interface_annotations]]`` table.
 
     Args:
         table: The table as loaded.
         at: Its location.
         issues: Problems are appended here.
+        keys: Keys present, when the table omits empty values (a CSV row).
 
     Returns:
         AnnotationEntry | None: The entry, or ``None`` when it has problems.
@@ -149,6 +195,7 @@ def _annotation(table: object, at: str, issues: list[Issue]) -> AnnotationEntry 
         capacity_override_bps=r.integer("capacity_override_bps", 1),
         public_dashboard=bool(r.boolean("public_dashboard_eligible")),
         display_rank=r.integer("display_rank", 0, 1_000_000), comment=fields.comment(r),
+        uuid=fields.uuid_value(r, "uuid"), given=given_fields(table, keys, _ANNOTATION),
     )  # fmt: skip
     return None if len(issues) > before else entry
 
@@ -182,12 +229,13 @@ def _entries[T](
     return tuple(e for i, t in enumerate(tables) if (e := parse(t, f"{key}[{i}]", issues)))
 
 
-def parse_document(data: Mapping[str, Any], source: str) -> InventoryFile:
+def parse_document(data: Mapping[str, Any], source: str, *, partial: bool = False) -> InventoryFile:
     """Check a loaded ``inventory.toml`` document, table by table.
 
     Args:
         data: The top-level table from ``tomllib``.
         source: File name for messages.
+        partial: A TOML import (E.38), whose devices may leave out ``address``.
 
     Returns:
         InventoryFile: Every entry, in file order.
@@ -197,9 +245,26 @@ def parse_document(data: Mapping[str, Any], source: str) -> InventoryFile:
     """
     issues: list[Issue] = []
     TableReader(data, "", issues, _TOP)
-    sites = _entries(data, "sites", MAX_SITES, _site, issues)
-    devices = _entries(data, "devices", MAX_DEVICES, _device, issues)
-    notes = _entries(data, "interface_annotations", MAX_ANNOTATIONS, _annotation, issues)
+
+    def device(table: object, at: str, found: list[Issue]) -> DeviceEntry | None:
+        """Parse a device table in this document's mode.
+
+        Args:
+            table: The table.
+            at: Its location.
+            found: Problems are appended here.
+
+        Returns:
+            DeviceEntry | None: The entry.
+
+        Raises:
+            None
+        """
+        return parse_device(table, at, found, partial=partial)
+
+    sites = _entries(data, "sites", MAX_SITES, parse_site, issues)
+    devices = _entries(data, "devices", MAX_DEVICES, device, issues)
+    notes = _entries(data, "interface_annotations", MAX_ANNOTATIONS, parse_annotation, issues)
     if issues:
         raise InventoryError(source, issues)
     return InventoryFile(source, sites, devices, notes)

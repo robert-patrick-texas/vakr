@@ -115,7 +115,7 @@ sudo usermod -aG vakr-view bob
 To start monitoring:
 
 1. Store the SNMP community in `/etc/vakr/secrets/credentials.toml` ([credentials](credentials.md)).
-2. List the devices in `/etc/vakr/inventory.toml`, then run `vakr inventory validate`, `vakr inventory plan`, and `sudo vakr inventory apply` ([inventory](inventory.md)).
+2. List the devices in `/etc/vakr/inventory.toml`, then run `vakr inventory validate`, `vakr inventory plan`, and `sudo vakr inventory apply` ([inventory](inventory.md)). To load a device list from a spreadsheet as UI-managed records instead, use `sudo vakr inventory import devices.csv` ([bulk import and export](inventory.md#bulk-import-and-export)).
 3. Enable the collector and `vakr.target`, the unit that starts and stops all vakr services together: `sudo systemctl enable --now vakr-collector.service vakr.target` ([collector](collector.md)).
 4. Watch the result with `vakr status` or `vakr tui` ([status and TUI](status-and-tui.md)).
 5. Start the API for the web UI, integrations, and the local socket: `sudo systemctl enable --now vakr-api.service`, then put it behind TLS with a reverse proxy ([API](api.md), [web access](web-access.md)). The same service serves the web UI at the proxy's address; sign in with the account `vakr setup` created ([web UI](web-ui.md)).

@@ -174,12 +174,13 @@ def comment(r: TableReader) -> str:
     return text
 
 
-def address(r: TableReader, family: AddressFamily | None) -> str | None:
+def address(r: TableReader, family: AddressFamily | None, *, required: bool = True) -> str | None:
     """Read the poll address: a canonical IP literal or an RFC 1123 host name.
 
     Args:
         r: The table reader.
         family: The preferred family, if set.
+        required: Whether the key must be present (an import row may omit it).
 
     Returns:
         str | None: The address, IP literals in canonical form.
@@ -187,7 +188,7 @@ def address(r: TableReader, family: AddressFamily | None) -> str | None:
     Raises:
         None
     """
-    text = name(r, "address", required=True)
+    text = name(r, "address", required=required)
     if text is None:
         return None
     try:

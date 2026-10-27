@@ -9,7 +9,12 @@ problem is reported where the operator can find it.
 Every record vakr creates from the file is owned by ``FILE_OWNER``
 (``file:inventory.toml``, META-008). The owner names the file, not its
 directory, so relocating the configuration with ``VAKR_ROOT`` never
-changes who owns a record.
+changes who owns a record. ``vakr inventory import`` reads the same
+entries from a CSV or TOML file but writes API-managed records, owned by
+``IMPORT_OWNER`` when it creates them (E.38): an import is a bulk API
+write, not another file source. ``given`` records which fields an import
+row wrote, because an import changes only those (an absent column keeps
+the stored value).
 
 Dependencies:
     dataclasses: Frozen records.
@@ -26,7 +31,13 @@ Example:
 from dataclasses import dataclass
 from uuid import UUID
 
-from vakr.domain.enums import AddressFamily, AdminState, InterestClass, ReachabilityStrategy
+from vakr.domain.enums import (
+    AddressFamily,
+    AdminState,
+    InterestClass,
+    ManagedByKind,
+    ReachabilityStrategy,
+)
 from vakr.domain.ownership import ManagedBy
 
 INVENTORY_SOURCE = "inventory.toml"
@@ -34,6 +45,9 @@ INVENTORY_SOURCE = "inventory.toml"
 
 FILE_OWNER = ManagedBy.file(INVENTORY_SOURCE)
 """Owner of records created from ``inventory.toml``."""
+
+IMPORT_OWNER = ManagedBy(ManagedByKind.API, "import")
+"""Owner of records ``vakr inventory import`` creates; API-managed (E.38)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +62,8 @@ class SiteEntry:
         timezone: Optional IANA timezone.
         description: Free-form text.
         uuid: Explicit UUID to keep across re-creation, if given.
+        given: Fields the entry wrote; an import changes only these.
+        managed_by: Owner an import row states (CSV ``managed_by``), if any.
     """
 
     at: str
@@ -57,6 +73,8 @@ class SiteEntry:
     timezone: str | None = None
     description: str = ""
     uuid: UUID | None = None
+    given: frozenset[str] = frozenset()
+    managed_by: ManagedBy | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +96,8 @@ class DeviceEntry:
         reachability: Reachability strategy override (ICMP-006).
         address_family: Preferred family when a name resolves to both.
         uuid: Explicit UUID, if given.
+        given: Fields the entry wrote; an import changes only these.
+        managed_by: Owner an import row states (CSV ``managed_by``), if any.
     """
 
     at: str
@@ -94,6 +114,8 @@ class DeviceEntry:
     reachability: ReachabilityStrategy | None = None
     address_family: AddressFamily | None = None
     uuid: UUID | None = None
+    given: frozenset[str] = frozenset()
+    managed_by: ManagedBy | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,6 +137,10 @@ class AnnotationEntry:
         public_dashboard: Eligible for public dashboards.
         display_rank: Ordering hint; lower first.
         comment: Operator comment (META-004).
+        uuid: The interface's UUID, if given; it then names the interface
+            even after a rename, and ``ifname`` is only a label.
+        given: Fields the entry wrote; an import changes only these.
+        managed_by: Owner an import row states (CSV ``managed_by``), if any.
     """
 
     at: str
@@ -131,6 +157,9 @@ class AnnotationEntry:
     public_dashboard: bool = False
     display_rank: int | None = None
     comment: str = ""
+    uuid: UUID | None = None
+    given: frozenset[str] = frozenset()
+    managed_by: ManagedBy | None = None
 
 
 @dataclass(frozen=True, slots=True)

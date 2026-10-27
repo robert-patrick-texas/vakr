@@ -82,7 +82,7 @@ A peer's metadata is replaced at every pull, so local changes are refused, namin
 | Where | What is refused |
 |---|---|
 | API and web UI | Every change except sign-in, sign-out, kiosk display setup, and kiosk tokens: 409 `peer_read_only`, "this node is a peer; its primary is https://vakr-east.example.net: change metadata there (MPOS-003)". That covers dashboards, identity-review decisions, and manual rediscovery. |
-| CLI | `vakr user add`, `passwd`, `disable`, `enable`, `role`; `vakr inventory apply`; `vakr interface claim`; `vakr interface review map` and `new`; `vakr inventory rediscover`. Each exits 1 with the same message. |
+| CLI | `vakr user add`, `passwd`, `disable`, `enable`, `role`; `vakr inventory apply`; `vakr inventory import --apply` (the dry run works); `vakr interface claim`; `vakr interface review map` and `new`; `vakr inventory rediscover`. Each exits 1 with the same message. |
 | Discovery | The peer's collector still walks its devices, but writes nothing to metadata: interface identity belongs to the primary, and the peer polls with the interfaces it copied. |
 
 Kiosk tokens and sessions are each node's own: create a kiosk token on the node the display points at.

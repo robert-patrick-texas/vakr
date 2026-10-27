@@ -36,7 +36,7 @@ from vakr.inventory.plan_interfaces import interface_changes
 from vakr.inventory.plan_model import Action, Change, InventoryPlan, diff
 from vakr.inventory.snapshot import Snapshot, StoredDevice
 
-__all__ = ["Action", "Change", "InventoryPlan", "device_diff", "make_plan"]
+__all__ = ["Action", "Change", "InventoryPlan", "device_diff", "device_pairs", "make_plan"]
 
 _ENDED = frozenset({AdminState.DISABLED, AdminState.RETIRED})
 
@@ -71,6 +71,33 @@ def _site_changes(inv: InventoryFile, snapshot: Snapshot) -> tuple[list[Change],
     return changes, same
 
 
+def device_pairs(entry: DeviceEntry, stored: StoredDevice) -> list[tuple[str, object, object]]:
+    """Pair each device field's stored value with the entry's; labels are entry field names.
+
+    Args:
+        entry: The file or import entry.
+        stored: The stored device.
+
+    Returns:
+        list[tuple[str, object, object]]: ``(field, stored, wanted)`` in a fixed order.
+
+    Raises:
+        None
+    """
+    d = stored.device
+    return [
+        ("name", d.name, entry.name), ("address", d.poll_address, entry.address),
+        ("site", stored.site, entry.site), ("credential", d.credential_ref, entry.credential),
+        ("tags", stored.tags, entry.tags), ("groups", stored.groups, entry.groups),
+        ("admin_state", d.admin_state.value, entry.admin_state.value),
+        ("interval_s", d.poll_interval_s, entry.interval_s),
+        ("discovery_interval_s", d.discovery_interval_s, entry.discovery_interval_s),
+        ("reachability", d.reachability, entry.reachability),
+        ("address_family", d.address_family, entry.address_family),
+        ("comment", d.comment, entry.comment),
+    ]  # fmt: skip
+
+
 def device_diff(entry: DeviceEntry, stored: StoredDevice) -> tuple[str, ...]:
     """List the fields in which a stored device differs from its entry.
 
@@ -84,18 +111,7 @@ def device_diff(entry: DeviceEntry, stored: StoredDevice) -> tuple[str, ...]:
     Raises:
         None
     """
-    d = stored.device
-    return diff([
-        ("name", d.name, entry.name), ("address", d.poll_address, entry.address),
-        ("site", stored.site, entry.site), ("credential", d.credential_ref, entry.credential),
-        ("tags", stored.tags, entry.tags), ("groups", stored.groups, entry.groups),
-        ("admin_state", d.admin_state.value, entry.admin_state.value),
-        ("interval_s", d.poll_interval_s, entry.interval_s),
-        ("discovery_interval_s", d.discovery_interval_s, entry.discovery_interval_s),
-        ("reachability", d.reachability, entry.reachability),
-        ("address_family", d.address_family, entry.address_family),
-        ("comment", d.comment, entry.comment),
-    ])  # fmt: skip
+    return diff(device_pairs(entry, stored))
 
 
 def _device_changes(inv: InventoryFile, snapshot: Snapshot) -> tuple[list[Change], int]:

@@ -17,6 +17,7 @@ Example:
     True
 """
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -138,6 +139,10 @@ class Snapshot:
         self._devices: dict[UUID | str, StoredDevice] = {d.device.id: d for d in devices} | {
             d.device.name: d for d in devices
         }
+        self._interfaces = {i.interface.id: i for i in interfaces}
+        self._by_device: dict[UUID, list[StoredInterface]] = {}
+        for i in interfaces:
+            self._by_device.setdefault(i.interface.device_id, []).append(i)
 
     def site(self, key: UUID | str) -> Site | None:
         """Return a site by UUID or name.
@@ -167,17 +172,49 @@ class Snapshot:
         """
         return self._devices.get(key)
 
+    def interface(self, key: UUID) -> StoredInterface | None:
+        """Return a read interface by UUID.
+
+        Args:
+            key: The interface UUID.
+
+        Returns:
+            StoredInterface | None: The interface, if it was read.
+
+        Raises:
+            None
+        """
+        return self._interfaces.get(key)
+
+    def interfaces_of(self, device_id: UUID) -> tuple[StoredInterface, ...]:
+        """Return the read interfaces of one device, in storage order.
+
+        Args:
+            device_id: The device.
+
+        Returns:
+            tuple[StoredInterface, ...]: Its interfaces; empty when none were read.
+
+        Raises:
+            None
+        """
+        return tuple(self._by_device.get(device_id, ()))
+
 
 EMPTY = Snapshot()
 """The snapshot of a node with no metadata database yet."""
 
 
-def load_snapshot(uow: MetadataUnitOfWork, inventory: InventoryFile | None) -> Snapshot:
+def load_snapshot(
+    uow: MetadataUnitOfWork, inventory: InventoryFile | None, also: Collection[UUID] = ()
+) -> Snapshot:
     """Read what the plan compares against, in one unit of work.
 
     Args:
         uow: The open unit of work.
         inventory: The file, whose annotated devices' interfaces are read too.
+        also: Further devices whose interfaces are read (an import that
+            renames a device and annotates it under the new name).
 
     Returns:
         Snapshot: Stored sites, devices, and governable interfaces.
@@ -195,7 +232,7 @@ def load_snapshot(uow: MetadataUnitOfWork, inventory: InventoryFile | None) -> S
     annotated = {a.device for a in inventory.annotations} if inventory else set()
     interfaces = []
     for stored in devices:
-        if stored.file_managed or stored.device.name in annotated:
+        if stored.file_managed or stored.device.name in annotated or stored.id in also:
             for i in device_interfaces(uow, stored.device.id):
                 interfaces.append(StoredInterface(i, stored.device.name, tag_names(uow, i.tags)))
     return Snapshot(sites, devices, tuple(interfaces))

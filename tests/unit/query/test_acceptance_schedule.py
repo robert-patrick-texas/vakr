@@ -164,6 +164,7 @@ def test_mvp_acc01_overlap_and_double_record_fail() -> None:
     """
     device = marks(8)
     long = device[100]
+    assert long.started_us is not None
     device[100] = PollMark(long.scheduled_us, 60, PollExecution.COMPLETE, Quality.NONE,
                            long.started_us, long.started_us + 61 * US)  # fmt: skip
     device.insert(500, device[500])
@@ -208,7 +209,7 @@ def test_mvp_acc01_slot_phase_drift_is_drift() -> None:
         None
     """
     device = [PollMark(m.scheduled_us + (i // DAY_SLOTS) * 500_000, 60, m.execution, m.quality,
-                       m.started_us + (i // DAY_SLOTS) * 500_000, m.completed_us)
+                       (m.started_us or 0) + (i // DAY_SLOTS) * 500_000, m.completed_us)
               for i, m in enumerate(marks(8))]  # fmt: skip
     section = tally_of(device)
     assert section.phase_slope_ms_per_day == 500.0

@@ -13,13 +13,14 @@ Example:
 """
 
 from datetime import timedelta
+from typing import cast
 
 import pytest
 
 from tests.contract import contract_samples as s
 from vakr.domain.enums import BaselineState, IcmpState, ObservationType, PollExecution
 from vakr.domain.errors import ValidationError
-from vakr.domain.ids import BatchId, CollectorId, InterfaceId, new_id
+from vakr.domain.ids import BatchId, CollectorId, DeviceId, InterfaceId, new_id
 from vakr.domain.quality import Quality
 from vakr.domain.rollups import ROLLUP_BUCKET_SECONDS, RollupBucket
 from vakr.domain.series import Metric, TimeWindow
@@ -45,7 +46,7 @@ def backend_of(factory: TelemetryBackendFactory) -> AcceptanceBackend:
     """
     backend = factory()
     assert hasattr(backend, "acceptance")
-    return backend  # type: ignore[return-value]
+    return cast(AcceptanceBackend, backend)
 
 
 def bucket(subject, col, metric: Metric, start, samples: int, valid: int, quality=Quality.NONE):
@@ -105,6 +106,7 @@ class AcceptanceContract:
         t0 = to_epoch_us(s.T0)
         assert [m.scheduled_us - t0 for m in marks.items] == [0, 0, 60_000_000, 120_000_000]
         third = marks.items[2]
+        assert third.started_us is not None
         assert (third.started_us - third.scheduled_us, third.duration_us) == (6_250_001, 2_749_999)
         missed = marks.items[3]
         assert (missed.execution, missed.started_us, missed.completed_us) == (
@@ -114,7 +116,7 @@ class AcceptanceContract:
         capped = backend.acceptance.poll_marks(dev, col, DAY, limit=3)
         assert capped.truncated
         assert len(capped.items) == 3
-        assert backend.acceptance.poll_marks(new_id(CollectorId), col, DAY).items == ()
+        assert backend.acceptance.poll_marks(new_id(DeviceId), col, DAY).items == ()
 
     def test_e35_sample_marks_report_presence_never_zero(
         self, telemetry_factory: TelemetryBackendFactory

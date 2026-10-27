@@ -304,13 +304,14 @@ class Fleet:
         for o in list(self.store.observations.values()):
             start = bucket_start(o.timestamp, ROLLUP_BUCKET_SECONDS)
             if getattr(o, "uptime_continuity", None) is UptimeContinuity.RESET_DETECTED:
-                restarts.add((o.device_id, o.collector_id, start))  # RET-006
+                restarts.add((getattr(o, "device_id", None), o.collector_id, start))  # RET-006
             subject = getattr(o, "interface_id", None)
             if subject is None and type(o).__name__ != "IcmpObservation":
                 continue
             if start + timedelta(seconds=ROLLUP_BUCKET_SECONDS) <= until:
                 for kind in INTERFACE_METRICS if subject is not None else ICMP_METRICS:
-                    groups[subject or o.device_id, o.collector_id, kind, start].append(o)
+                    owner = subject or getattr(o, "device_id", None)
+                    groups[owner, o.collector_id, kind, start].append(o)
         buckets = []
         for (subject, col, metric, start), members in groups.items():
             values = [getattr(m, metric.field) for m in members]

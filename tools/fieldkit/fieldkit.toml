@@ -21,7 +21,12 @@ egress_head = ["https://github.com/robert-patrick-texas/vakr/releases"]
 [fieldkit.app]
 # The installed application's profile (`--profile vakr`): read-only commands and journald units.
 name = "vakr"
-commands = [["--version"], ["doctor"], ["config", "show-effective"], ["check", "health"]]
+# The acceptance reports (MVP-ACC-01, -02, -10) bring their evidence to the development host.
+commands = [
+    ["--version"], ["doctor"], ["config", "show-effective"], ["check", "health"],
+    ["acceptance", "schedule", "--json"], ["acceptance", "gaps", "--json"],
+    ["acceptance", "coverage", "--json"],
+]
 units = ["vakr*"]
 
 [inbox]

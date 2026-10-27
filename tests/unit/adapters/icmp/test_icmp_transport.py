@@ -16,9 +16,12 @@ Example:
 """
 
 import asyncio
+import secrets
 import socket
 import struct
 import time
+
+import pytest
 
 from tests.unit.adapters.icmp.icmp_fakes import (
     START,
@@ -125,7 +128,9 @@ async def noisy_replies(clock: ManualClock, net: FakeNet) -> tuple[ProbeResult, 
         await deliver_after(clock, sock, 0, 800)
         request = sock.sent[0][0]
         sock.deliver(echo_reply(request), V4)  # duplicate
-        sock.deliver(echo_reply(request[:-1] + b"\xff"), V4)  # wrong token
+        # Flip the token's last byte: writing a fixed 0xff left it unchanged whenever the
+        # random token already ended in 0xff (1 run in 256), making this a duplicate.
+        sock.deliver(echo_reply(request[:-1] + bytes([request[-1] ^ 0xFF])), V4)  # wrong token
         sock.deliver(echo_reply(sock.sent[1][0]), ("192.0.2.66", 0))  # wrong source
         sock.deliver(b"\x00\x00", V4)  # not even a header
         await drain(sock)
@@ -148,6 +153,31 @@ def test_duplicates_and_foreign_replies_are_dropped_and_counted() -> None:
     result, counters = asyncio.run(noisy_replies(manual_clock(), FakeNet()))
     assert [s.outcome for s in result.samples] == [ProbeOutcome.REPLY, ProbeOutcome.TIMEOUT]
     assert result.raw_rtts_us == (800, -1)
+    assert (counters.duplicate, counters.foreign, counters.timeouts) == (1, 3, 1)
+
+
+@pytest.mark.parametrize("last", [b"\xff", b"\x00"])
+def test_a_forged_token_is_foreign_whatever_the_token_ends_with(
+    monkeypatch: pytest.MonkeyPatch, last: bytes
+) -> None:
+    """OBS-001: the forged reply differs from the real token even when it ends in 0xff.
+
+    A fixed replacement byte left the token unchanged once in 256 runs, so the
+    forged reply counted as a duplicate (a CI failure on 2026-10-27).
+
+    Args:
+        monkeypatch: Fixes the last byte of every probe token.
+        last: The byte the tokens end with.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    real = secrets.token_bytes
+    monkeypatch.setattr(secrets, "token_bytes", lambda n: real(n - 1) + last)
+    _result, counters = asyncio.run(noisy_replies(manual_clock(), FakeNet()))
     assert (counters.duplicate, counters.foreign, counters.timeouts) == (1, 3, 1)
 
 

@@ -104,10 +104,13 @@ def collector_stand_in(root: Path, east: Collector, error: str | None) -> thread
             for _ in range(200):
                 if queued := runs.pending():
                     claimed = runs.claim(queued[0])
+                    # A lost claim (the CLI's own write committed in between) is retried,
+                    # as the collector does at its next pickup; giving up left the wait
+                    # running to its 300 s default on a loaded host.
                     if claimed is not None:
                         time.sleep(0.1)
                         runs.finish(claimed, None if error else RESULT, error)
-                    return
+                        return
                 time.sleep(0.02)
         finally:
             store.close()
@@ -203,7 +206,7 @@ def test_wait_reports_failure_timeout_and_a_missing_collector(
     assert code == 3
     assert "still queued after 1 s" in out
     stand_in = collector_stand_in(tmp_path, node, "the agent did not answer")
-    code, out = run(capsys, "inventory", "rediscover", "core1", "--wait")
+    code, out = run(capsys, "inventory", "rediscover", "core1", "--wait", "--timeout", "30")
     stand_in.join(5)
     assert code == 1
     assert "core1: failed: the agent did not answer" in out

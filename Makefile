@@ -27,7 +27,7 @@ loc:
 # web/package-lock.json is allowed for the same reason as uv.lock: a dependency's own
 # version may equal vakr's. web/package.json carries the fixed placeholder 0.0.0.
 version:
-	uv run python tools/check-version/check_version.py --allow CHANGELOG.md --allow uv.lock \
+	uv run python tools/check-version/check_version.py --project vakr --allow CHANGELOG.md --allow uv.lock \
 		--allow web/package-lock.json --allow src/vakr/defaults/options.toml
 
 # Docstring sections and Args entries (QG-003); rules in [tool.check-docstrings].

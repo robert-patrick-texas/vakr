@@ -2,11 +2,17 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
-## Unreleased
+## 0.6.1 - 2026-10-27
+
+Fix release for two-position deployments. It changes no database schema and adds no options, so the update timer installs it, and `sudo vakr self-update --rollback` returns to 0.6.0. A single-position node behaves exactly as on 0.6.0.
 
 ### Fixed
 
 - Two positions: a replication page now counts the interface status records it carries against its 6 MiB budget (E.13, ADR-024 decision 31). Before, a page near the budget whose polls carried many status records, such as the baseline recorded at every collector start, could pass the partner's 8 MiB answer limit and be refused on every retry, stopping observation replication at that point. Only two-position deployments are affected.
+
+### Changed
+
+- Developers: `make version` (VER-003) no longer counts another package's pin at the same number as a hard-coded copy of vakr's version, so a dependency pinned at `==`, `>=`, `<=`, `~=`, `!=`, or `===` that number passes; a pin of vakr itself still fails (`--project vakr`).
 
 ## 0.6.0 - 2026-10-27
 

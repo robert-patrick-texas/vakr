@@ -1,4 +1,4 @@
-"""Read what one node knows, inside its container (MPOS-T01, MPOS-T02, MPOS-T04).
+"""Read what one node knows, inside its container (MPOS-T01, MPOS-T02, MPOS-T04, MPOS-T05).
 
 The harness runs this with the package's own interpreter,
 ``/opt/vakr/venv/bin/python /mpos/probe.py WHAT``, so it needs nothing the
@@ -15,15 +15,19 @@ shell to compare:
 - ``rows``: per observation family and collector, ``family collector rows
   distinct``, over every partition and the staging tables of
   ``telemetry.db`` in one read transaction (MPOS-T02's counts and
-  duplicate UUIDs).
+  duplicate UUIDs);
+- ``digest``: the replicated metadata's digest, as the replication state
+  answers it (MPOS-T05's convergence), run as the ``vakr`` user.
 
 Dependencies:
     json, sqlite3, statistics, subprocess, uuid: Standard library.
     vakr.client.transport: ``get`` over ``/run/vakr/api.sock``.
+    vakr.adapters.sqlite.metadata: The replica's digest.
 
 Safety:
-    Read-only: the telemetry database is opened with ``mode=ro``, and the
-    API calls are GETs. Nothing printed carries a credential.
+    Read-only: the telemetry database is opened with ``mode=ro``, the
+    metadata store is only read, and the API calls are GETs. Nothing
+    printed carries a credential.
 
 Example:
     $ /opt/vakr/venv/bin/python /mpos/probe.py status
@@ -36,12 +40,14 @@ import subprocess
 import sys
 import uuid
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from vakr.client.transport import get
 
 SOCKET = "/run/vakr/api.sock"
 TELEMETRY = "/var/lib/vakr/telemetry.db"
+METADATA = "/var/lib/vakr/metadata.db"
 FAMILIES = ("obs_icmp", "obs_poll", "obs_snmp", "obs_iface")
 
 
@@ -153,11 +159,37 @@ def print_rows() -> int:
     return 0
 
 
+def print_digest() -> int:
+    """Print the digest of the node's replicated metadata, as a partner would see it (MPOS-T05).
+
+    Run it as the ``vakr`` user (``runuser -u vakr``), so opening the store
+    leaves no root-owned journal file behind.
+
+    Args:
+        None
+
+    Returns:
+        int: 0.
+
+    Raises:
+        StorageError: If the database cannot be read.
+    """
+    from vakr.adapters.sqlite.metadata import SqliteMetadataStore, sqlite_uow_factory
+
+    store = SqliteMetadataStore(Path(METADATA))
+    try:
+        with sqlite_uow_factory(store)() as uow:
+            print(uow.replica.state().digest)
+    finally:
+        store.close()
+    return 0
+
+
 def main(argv: Sequence[str]) -> int:
     """Run one probe command.
 
     Args:
-        argv: ``status``, ``latency NAME``, or ``rows``.
+        argv: ``status``, ``latency NAME``, ``rows``, or ``digest``.
 
     Returns:
         int: The command's status; 2 for a usage error.
@@ -172,7 +204,9 @@ def main(argv: Sequence[str]) -> int:
             return print_latency(name)
         case ["rows"]:
             return print_rows()
-    print("usage: probe.py status | latency NAME | rows", file=sys.stderr)
+        case ["digest"]:
+            return print_digest()
+    print("usage: probe.py status | latency NAME | rows | digest", file=sys.stderr)
     return 2
 
 

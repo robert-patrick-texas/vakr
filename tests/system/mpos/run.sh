@@ -1,5 +1,5 @@
 #!/bin/bash
-# `make mpos-test`: the two-position system tests MPOS-T01..T04 (blueprint 27.5,
+# `make mpos-test`: the two-position system tests MPOS-T01..T05 (blueprint 27.5,
 # ADR-024). Opt-in, never part of `make check`. Needs docker with privileged
 # containers, uv, curl, and outbound HTTPS (Ubuntu archive, PyPI for snmpsim).
 #
@@ -9,7 +9,8 @@
 #     network and a device network; installs the package; applies the same
 #     inventory; starts vakr-collector and vakr-api.
 #  3. Adds 30 ms netem each way between the nodes (60 ms RTT) and 60 ms on
-#     west's path to the devices, then runs MPOS-T04, T01, T02, and T03.
+#     west's path to the devices, then runs MPOS-T04, T01, T02, T03, and T05
+#     (losing the primary: promote, two primaries, demote; MPOS_FEATURES=promote).
 #
 # Checks that need M5 parts A (node roles, replication credential) or B
 # (observation replication) run only when MPOS_FEATURES names them, and print
@@ -21,7 +22,7 @@
 #   MPOS_PARTITION_SECONDS  MPOS-T01's partition (default 1800, quick 120)
 #   MPOS_HOLD_SECONDS       T01's composite and T03's windows (default 300, quick 120)
 #   MPOS_DEVICES            simulated devices, 2 to 200 (default 8)
-#   MPOS_FEATURES           comma list: roles, replication (default none)
+#   MPOS_FEATURES           comma list: roles, replication, promote (default none)
 #   MPOS_KEEP               1 keeps the containers after the run, for debugging
 set -uo pipefail
 
@@ -140,8 +141,11 @@ done
 
 # shellcheck source=tests/system/mpos/phases.sh
 . tests/system/mpos/phases.sh
+# shellcheck source=tests/system/mpos/promote.sh
+. tests/system/mpos/promote.sh
 mpos_t04
 mpos_t01
 mpos_t02
 mpos_t03
+mpos_t05
 finish mpos-test

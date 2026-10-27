@@ -410,3 +410,38 @@ def test_e39_a_failed_audit_write_is_reported_not_fatal(
     assert "warning" in err
     assert "metadata.db" in err
     assert _node(west)["role"] == "primary"
+
+
+def test_e39_node_status_summarises_the_resync_report(
+    west: InstallPaths, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """E.39: the peer's primary, the newest pull, and the resync report's totals and first rows.
+
+    Args:
+        west: The node (a peer).
+        capsys: Output capture.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    rows = [{"table": "device", "key": f"k{n}", "label": f"edge{n}", "change": "removed"}
+            for n in range(25)]  # fmt: skip
+    edit = {"at": "2026-10-27T11:20:05+00:00", "actor": "cli:bob", "action": "device.create",
+            "summary": "created edge9"}  # fmt: skip
+    report = {"at": "2026-10-27T12:03:15+00:00", "primary_url": EAST,
+              "fork_at": "2026-10-27T09:58:12+00:00", "backup": "/var/lib/vakr/backups/m.db",
+              "discarded_total": 25, "discarded": rows, "edits_total": 1,
+              "edits": [edit]}  # fmt: skip
+    role_record.write_json(west.state_dir / role_record.REPORT_FILE, report)
+    code, out, _ = _run(capsys, "node", "status")
+    assert code == 0
+    assert f"primary {EAST}" in out
+    assert "newest metadata pull: 20" in out
+    assert "25 local row(s) discarded, 1 metadata edit(s) here since 2026-10-27T09:58:12" in out
+    assert "  discarded removed device edge0" in out
+    assert "  edit 2026-10-27T11:20:05+00:00 cli:bob device.create: created edge9" in out
+    assert "vakr node status --json" in out
+    assert "edge24" not in out

@@ -82,8 +82,9 @@ def reload_service(inventory: InventorySource, config: EffectiveConfig, config_d
     """Give a running service the reloaded rules and keywords.
 
     Args:
-        inventory: The running source; anything but an ``InventoryService``
-            (a test fake) is left as it is.
+        inventory: The running source: an ``InventoryService``, or the
+            ``PeerInventory`` wrapping one on a peer, whose ``policies.toml``
+            is node-local too. Anything else (a test fake) is left as it is.
         config: The validated new configuration.
         config_dir: The configuration directory, which holds ``policies.toml``.
 
@@ -93,7 +94,9 @@ def reload_service(inventory: InventorySource, config: EffectiveConfig, config_d
     Raises:
         PolicyError: If the reloaded rules are invalid; the caller keeps the old ones.
     """
-    if isinstance(inventory, InventoryService):
+    from vakr.app.collector.replication_loop import PeerInventory
+
+    if isinstance(inventory, (InventoryService, PeerInventory)):
         policy = load_policy(config_dir)
         _note_unapplied(policy)
         inventory.replace_policy(policy, keywords_from_config(config))

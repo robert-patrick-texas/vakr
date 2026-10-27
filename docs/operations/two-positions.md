@@ -33,7 +33,7 @@ Contents:
 | Proxy | `network.https_proxy` and `network.no_proxy` apply, as for self-update. |
 | Release | Both nodes must run the same vakr release: the peer refuses metadata from another schema version. |
 
-Configuration files stay node-local. Copy `/etc/vakr/policies.toml` and any `[interface_classification]` keywords from the primary to the peer, so both classify interfaces the same way.
+Configuration files stay node-local. Copy `/etc/vakr/policies.toml` and any `[interface_classification]` keywords from the primary to the peer, so both classify interfaces the same way, then run `sudo systemctl reload vakr-collector` on the peer to apply them without a restart.
 
 ## Setting up the primary
 

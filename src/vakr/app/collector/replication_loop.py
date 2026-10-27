@@ -63,7 +63,9 @@ def _pull(service: Any) -> str:
         token = read_token(token_path(parts.paths.secrets_dir))
         settings = build_egress_settings(parts.paths, parts.config)
     except (TokenFileError, OSError, ValueError) as exc:
-        status.record(record, "failed", service.clock.now_utc(), error=str(exc))
+        # An unwritable record (a full disk) must not hide why the pull failed.
+        with contextlib.suppress(OSError):
+            status.record(record, "failed", service.clock.now_utc(), error=str(exc))
         raise PullError(str(exc)) from None
     client = PartnerClient(node.primary_url, token, settings)
     return MetadataPuller(client, parts.uow_factory, record, service.clock,
@@ -128,7 +130,7 @@ async def metadata_pull_loop(service: Any) -> None:
     while not stop.is_set():
         try:
             await asyncio.to_thread(_pull, service)
-        except PullError as exc:
+        except (PullError, OSError) as exc:  # a state-file write must not end the task
             _LOG.warning("metadata pull from the primary failed; keeping last-known metadata: %s",
                          exc, extra={"event_id": "replication.metadata_failed"})  # fmt: skip
         with contextlib.suppress(TimeoutError):

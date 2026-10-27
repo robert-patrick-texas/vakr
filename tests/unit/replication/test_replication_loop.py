@@ -123,3 +123,65 @@ def test_mpos006_the_check_is_ok_on_a_primary_and_ages_a_peer(
     assert result.status is Status.OK
     assert result.perfdata[0].label == "replication_metadata_age_s"
     assert "observations from east" in result.summary
+
+
+def test_mpos006_the_metadata_pull_loop_survives_an_unwritable_state_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MPOS-006: a full disk under the state directory is a failed pull, never the task's end.
+
+    Args:
+        tmp_path: The install root.
+        monkeypatch: Makes every status write fail.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    paths = InstallPaths.under(tmp_path)
+    peer = _service(paths, PEER)
+    calls: list[int] = []
+
+    def unwritable(*_args: object, **_kwargs: object) -> None:
+        """Fail like a full disk.
+
+        Args:
+            *_args: Ignored.
+            **_kwargs: Ignored.
+
+        Returns:
+            None
+
+        Raises:
+            OSError: Always.
+        """
+        calls.append(1)
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(status, "record", unwritable)
+    monkeypatch.setattr(replication_loop, "PULL_INTERVAL_S", 0.01)
+    with pytest.raises(PullError, match="replication token"):
+        replication_loop._pull(peer)
+
+    async def survive() -> None:
+        """Run the peer's loop through several failed pulls, then stop it.
+
+        Args:
+            None
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        task = asyncio.create_task(replication_loop.metadata_pull_loop(peer))
+        while len(calls) < 3:
+            await asyncio.sleep(0.01)
+        assert not task.done()
+        peer.loops_stop.set()
+        await asyncio.wait_for(task, 1)
+
+    asyncio.run(asyncio.wait_for(survive(), 10))

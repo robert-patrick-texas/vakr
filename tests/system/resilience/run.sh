@@ -66,7 +66,7 @@ if wants update; then
 fi
 [ "$(realpath "$deb")" = "$(realpath "$WORK/vakr.deb" 2>/dev/null)" ] || cp "$deb" "$WORK/vakr.deb"
 rm -rf "$WORK/fleet" "$WORK/wheels" "$WORK/logs" "$EVENTS" "$WORK/powercut.txt" "$WORK/polls.tsv" \
-    "$WORK/incidents.jsonl" "$WORK/update-journal.json" "$WORK/update-runs.tsv"
+    "$WORK/incidents.jsonl" "$WORK/update-journal.json" "$WORK/update-runs.tsv" "$WORK/self-update.log"
 uv run --quiet python -m tests.system.mpos.simdata "$WORK/fleet" \
     --devices "$devices" --prefix "$NET_PREFIX" --interval 30s || exit 2
 mkdir -p "$WORK/wheels"

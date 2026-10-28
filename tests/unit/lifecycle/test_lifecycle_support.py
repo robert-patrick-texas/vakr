@@ -132,7 +132,9 @@ def test_run_command_and_apt_installer(tmp_path: Path) -> None:
     package = tmp_path / "vakr_7.3.0_amd64.deb"
     assert apt_installer(fake)(package).returncode == 0
     argv, env = seen[0]
-    assert argv == ["/usr/bin/apt-get", "install", "-y", "--allow-downgrades", str(package)]
+    assert argv == [
+        "/usr/bin/apt-get", "install", "-y", "--reinstall", "--allow-downgrades", str(package)
+    ]  # fmt: skip
     assert env == {"DEBIAN_FRONTEND": "noninteractive"}
 
 

@@ -10,8 +10,10 @@
 # copied over, while the collector and the API run against the fleet. The
 # real release key cannot sign a package that is not published yet, so the
 # harness signs it with a throwaway key made for the run, and trusts that key
-# beside the release key on the FROM node only. The package under test ships
-# the release key alone, so the throwaway key is gone once the update lands.
+# beside the release key on that node only. The package under test ships the
+# release key alone, so the throwaway key is gone once the update lands. The
+# package's own updater then reinstalls it, which checks the updater code the
+# next update will run (FROM's updater ran the first one).
 # shellcheck shell=bash
 
 CANDIDATE=$WORK/candidate
@@ -83,36 +85,53 @@ update_runs() {
     return "$rc"
 }
 
+self_update() {
+    # self_update WHAT FROM: run `vakr self-update --file` with the staged package while
+    # a poll is under way, as FROM, and check its record and the collector's runs.
+    # Sets RESTARTS, the collector's restarts, and HOOK_RESTARTS, those that the
+    # updater's own restart hook made beside the package's postinst (none since
+    # E.36 decision 6; earlier releases' updaters made one).
+    local cursor started state=/var/lib/vakr-update/update-state.json
+    cursor=$(on journalctl -n 0 --show-cursor --no-pager | sed -n 's/^-- cursor: //p')
+    check "trust the run's throwaway signer beside the release key (this node only)" \
+        on_sh "cat /work/candidate/allowed-signers >>/opt/vakr/share/release-signers"
+    mid_poll
+    started=$SECONDS
+    check "vakr self-update $1 while the collector and the API run" on_sh \
+        "vakr self-update --yes --file /work/candidate/$CANDIDATE_FILE \
+        --sums /work/candidate/SHA256SUMS --sig /work/candidate/SHA256SUMS.sig >/tmp/self-update.log 2>&1"
+    note "self-update took $((SECONDS - started)) s"
+    { echo "== vakr self-update $1, from $2"; on cat /tmp/self-update.log; } >>"$WORK/self-update.log"
+    on cat /tmp/self-update.log | grep -E '^vakr self-update:|rollback|CRITICAL' | indent
+    check "the update record says success from $2: no automatic rollback (UPD-006)" on_sh \
+        "grep -q '\"result\": \"success\"' $state && grep -q '\"from_version\": \"$2\"' $state"
+    check "the package's release signers replaced the throwaway key" \
+        on_sh "! grep -q $TEST_SIGNER /opt/vakr/share/release-signers"
+    check "no collector run crashed or failed during the update" update_runs "$cursor"
+    RESTARTS=$(grep -c '^run_start' "$WORK/update-runs.tsv")
+    HOOK_RESTARTS=$(on grep -c 'restart services: ok' /tmp/self-update.log)
+    note "the collector restarted $RESTARTS time(s), $HOOK_RESTARTS of them by the updater's hook"
+}
+
 scenario_update() {
     section "S0: self-update while collecting, $FROM_VERSION -> $TO_VERSION (MVP-ACC-07, UPD-002, UPD-006)"
-    local old before cursor started took restarts
+    local old before
     check "the node runs $FROM_VERSION" bash -c \
         "[ \"\$(docker exec $NODE vakr --version)\" = 'vakr $FROM_VERSION' ]"
     old=$(invocation)
     before=$(incident_count)
-    cursor=$(on journalctl -n 0 --show-cursor --no-pager | sed -n 's/^-- cursor: //p')
-    check "trust the run's throwaway signer beside the release key (FROM node only)" \
-        on_sh "cat /work/candidate/allowed-signers >>/opt/vakr/share/release-signers"
-    mid_poll
-    started=$SECONDS
-    check "vakr self-update installs $TO_VERSION while the collector and the API run" on_sh \
-        "vakr self-update --yes --file /work/candidate/$CANDIDATE_FILE \
-        --sums /work/candidate/SHA256SUMS --sig /work/candidate/SHA256SUMS.sig >/tmp/self-update.log 2>&1"
-    took=$((SECONDS - started))
-    on cat /tmp/self-update.log | grep -E '^vakr self-update:|rollback|CRITICAL' | indent
-    note "self-update took $took s"
+    self_update "installs $TO_VERSION" "$FROM_VERSION"
     check "now running $TO_VERSION" bash -c "[ \"\$(docker exec $NODE vakr --version)\" = 'vakr $TO_VERSION' ]"
-    check "the update record says success: no automatic rollback (UPD-006)" \
-        on grep -q '"result": "success"' /var/lib/vakr-update/update-state.json
     check "both databases are at the current schema" on vakr db status
-    check "the package's release signers replaced the throwaway key" \
-        on_sh "! grep -q $TEST_SIGNER /opt/vakr/share/release-signers"
-    check "no collector run crashed or failed during the update" update_runs "$cursor"
-    restarts=$(grep -c '^run_start' "$WORK/update-runs.tsv")
-    note "the update restarted the collector $restarts time(s)"
-    check "the update restarted the collector" test "$restarts" -ge 1
+    check "the package restarted the collector once, and the $FROM_VERSION updater's hook $HOOK_RESTARTS time(s)" \
+        test "$RESTARTS" -eq $((1 + HOOK_RESTARTS))
     check "the $FROM_VERSION run logged a clean stop (16.4)" on_sh \
         "journalctl _SYSTEMD_INVOCATION_ID=$old --no-pager | grep -q collector.stopped"
+    # The first leg ran the previous release's updater. Reinstalling with the
+    # package's own updater checks the code the next update will run.
+    self_update "reinstalls $TO_VERSION with its own updater" "$TO_VERSION"
+    check "the package under test's updater restarts the collector once, by the package (E.36 decision 6)" \
+        test "$RESTARTS:$HOOK_RESTARTS" = 1:0
     check "a clean update records no telemetry-loss incident" test "$(incident_count)" -eq "$before"
     check "vakr-api is back and answers on its socket" wait_until 60 api_mentions /api/v1/health/ready ready
     steady "S0"

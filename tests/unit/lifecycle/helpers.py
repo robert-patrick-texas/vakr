@@ -972,9 +972,9 @@ def make_harness(root: Path, signer: Signer, http: FakeHttp | None) -> Harness:
         events.append((event_id, message))
 
     restart = Hook("restart services", ("/usr/bin/systemctl", "try-restart", "vakr.target"))
+    # As vakr binds it: the package's postinst restarts, so only a rollback does (E.36).
     hooks = (
         Hook("config upgrade", ("/new/vakr", "config", "upgrade"), skip_codes=frozenset({3})),
-        restart,
         Hook("health check", ("/new/vakr", "check", "health"), ok_codes=frozenset({0, 1, 3})),
     )
     installer, runner = FakeInstaller(), HookRunner()

@@ -134,6 +134,9 @@ def apt_installer(run: Runner, apt_get: str = "/usr/bin/apt-get") -> Callable[[P
 
     ``apt-get`` (not ``dpkg -i``) resolves the package's dependencies
     (UPD-002); ``--allow-downgrades`` lets the same call perform rollbacks.
+    ``--reinstall`` makes an explicit install of the installed version
+    replace its files and run its scripts: without it apt reports "already
+    the newest version", changes nothing, and exits 0 (E.36 decision 7).
 
     Args:
         run: Command runner.
@@ -158,7 +161,8 @@ def apt_installer(run: Runner, apt_get: str = "/usr/bin/apt-get") -> Callable[[P
         Raises:
             None
         """
-        argv = [apt_get, "install", "-y", "--allow-downgrades", str(package.resolve())]
+        flags = ["-y", "--reinstall", "--allow-downgrades"]
+        argv = [apt_get, "install", *flags, str(package.resolve())]
         return run(argv, env={"DEBIAN_FRONTEND": "noninteractive"})
 
     return install

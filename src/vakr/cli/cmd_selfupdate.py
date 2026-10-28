@@ -215,10 +215,13 @@ def _updater(
     project = Project(str(repository), PACKAGE, ARCH, trust, api_base=API_BASE)
     new_vakr = str(paths.opt_dir / "venv/bin/vakr")
     restart = Hook("restart services", (SYSTEMCTL, "try-restart", "vakr.target"))
+    # No restart among the post-install hooks: the package's postinst already
+    # restarts vakr.target, and a second restart cost another gap in collection
+    # (E.36 decision 6). A rollback still needs one, because it restores the
+    # configuration and the database after the reinstalled package restarted.
     hooks = (
         # Exit 3 means "not implemented yet" until the config upgrade command lands.
         Hook("config upgrade", (new_vakr, "config", "upgrade"), skip_codes=frozenset({3})),
-        restart,
         health_hook(new_vakr, int(config.get("update.health_settle_seconds") or 0)),
     )
     layout = Layout(

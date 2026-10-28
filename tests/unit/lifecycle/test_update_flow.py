@@ -100,7 +100,7 @@ def test_upd_t01_update_to_next_release(harness: Harness) -> None:
     outcome = h.updater.update(V("7.2.0"), Request(), yes)
     assert (outcome.status, outcome.exit_code) == ("updated", 0)
     assert h.installer.installed == ["vakr_7.3.0_amd64.deb"]
-    assert h.runner.calls == ["config upgrade", "try-restart vakr.target", "check health"]
+    assert h.runner.calls == ["config upgrade", "check health"]  # the package restarts (E.36)
     state = load_state(h.kit.layout.state_file)
     assert (state.result, state.from_version, state.to_version) == ("success", "7.2.0", "7.3.0")
     with tarfile.open(state.backup) as archive:
@@ -161,7 +161,7 @@ def test_upd_t03_health_failure_rolls_back_and_is_not_retried(harness: Harness) 
     assert config.read_text() == original
     assert _rows(h) == [("rtr1",)]
     assert not (h.kit.layout.db_dir / "meta.db-wal").exists()
-    assert h.runner.calls.count("try-restart vakr.target") == 2
+    assert h.runner.calls.count("try-restart vakr.target") == 1  # after the restore only
     assert "update.rollback.done" in h.ids()
     state = load_state(h.kit.layout.state_file)
     assert (state.result, state.failed_versions) == ("failed", ("7.3.0",))

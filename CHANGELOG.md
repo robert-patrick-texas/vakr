@@ -4,10 +4,15 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 ## Unreleased
 
+### Fixed
+
+- `vakr self-update` restarts the collector and the API once, not twice (UPD-002, Appendix E.36 decision 6). The package's install script already restarts `vakr.target`, and a post-install hook restarted it again, so collection paused twice, about 3 seconds each in the resilience test. The hook is gone; only a rollback restarts after restoring the configuration and the database. The installed release's updater runs an update, so updating *to* this release from an earlier one still restarts twice. Updates from this release on restart once.
+- `vakr self-update --version X` or `--file` with the version already installed now reinstalls it, as the update guide says, so it repairs a damaged install (UPD-004, Appendix E.36 decision 7). Before, `apt-get` reported "already the newest version" and changed nothing, and self-update still reported success.
+
 ### Changed
 
 - Field kit: a pseudonymized run's final line now ends with `pseudonym key id <16 hex digits>`, a one-way id of the pseudonym key (FIELD-005, FIELD-009). The key belongs to the collection: every host that pseudonymizes for it, the vakr nodes and the MRTG and SmokePing host alike, must use the same key, or the parallel-run report cannot join their bundles (Appendix E.34 decision 7). After the first run on each host, check that they all show the same id.
-- Developers: `make resilience-test` now starts the node on the previous published release and, as its first scenario (S0), updates it to the package under test with `vakr self-update --file` while the collector and the API run (MVP-ACC-07). The accounting covers the update, so a poll lost to it fails the run. `RESIL_FROM` picks another starting release. The package is signed for the run with a throwaway key that only the starting node trusts (Appendix E.36 decision 5).
+- Developers: `make resilience-test` now starts the node on the previous published release and, as its first scenario (S0), updates it to the package under test with `vakr self-update --file` while the collector and the API run (MVP-ACC-07). The accounting covers the update, so a poll lost to it fails the run. `RESIL_FROM` picks another starting release. The package is signed for the run with a throwaway key that only the starting node trusts (Appendix E.36 decision 5). S0 then reinstalls the package with its own updater and checks that it restarts the collector exactly once.
 
 ## 0.6.2 - 2026-10-27
 

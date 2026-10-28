@@ -190,6 +190,47 @@ def test_offline_file_install_without_trust_store(
     assert main(["self-update", "--check"]) == 1
 
 
+def test_e36_only_a_rollback_restarts_services(
+    host: tuple[InstallPaths, FakeInstaller],
+    signer: Signer,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """UPD-002, E.36 decision 6: the package restarts vakr.target, so the hooks do not.
+
+    The package's postinst try-restarts vakr.target on every upgrade; a restart
+    hook as well gave the collector a second gap in collection. A rollback
+    restores the configuration and the database after the reinstalled
+    package restarted, so it still restarts.
+
+    Args:
+        host: Relocated installation and fake installer.
+        signer: Release signer.
+        tmp_path: Temporary directory.
+        monkeypatch: Pytest monkeypatch.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    paths, _ = host
+    monkeypatch.setattr(cmd_tls, "OS_BUNDLES", ())  # offline: no rollback download
+    calls, systemctl = tmp_path / "systemctl.calls", tmp_path / "systemctl"
+    systemctl.write_text(f"#!/bin/sh\necho \"$*\" >>'{calls}'\n")
+    systemctl.chmod(0o755)
+    monkeypatch.setattr(cmd_selfupdate, "SYSTEMCTL", str(systemctl))
+    package = build_release(tmp_path / "usb", signer, "98.0.0", b"pkg")
+    sums, sig = package.with_name("SHA256SUMS"), package.with_name("SHA256SUMS.sig")
+    argv = ["self-update", "--yes", "--file", str(package), "--sums", str(sums), "--sig", str(sig)]
+    assert main(argv) == 0
+    assert not calls.exists()
+    (paths.opt_dir / "venv/bin/vakr").write_text('#!/bin/sh\n[ "$1" = check ] && exit 2\nexit 0\n')
+    assert main(argv) == 1  # CRITICAL health: rolled back
+    assert calls.read_text() == "try-restart vakr.target\n"
+
+
 def test_usage_and_environment_errors(
     host: tuple[InstallPaths, FakeInstaller],
     monkeypatch: pytest.MonkeyPatch,

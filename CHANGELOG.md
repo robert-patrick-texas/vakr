@@ -8,6 +8,7 @@ All notable changes to vakr are recorded here. Versions follow Semantic Versioni
 
 - `vakr self-update` restarts the collector and the API once, not twice (UPD-002, Appendix E.36 decision 6). The package's install script already restarts `vakr.target`, and a post-install hook restarted it again, so collection paused twice, about 3 seconds each in the resilience test. The hook is gone; only a rollback restarts after restoring the configuration and the database. The installed release's updater runs an update, so updating *to* this release from an earlier one still restarts twice. Updates from this release on restart once.
 - `vakr self-update --version X` or `--file` with the version already installed now reinstalls it, as the update guide says, so it repairs a damaged install (UPD-004, Appendix E.36 decision 7). Before, `apt-get` reported "already the newest version" and changed nothing, and self-update still reported success.
+- The package now depends on `tzdata` (TIME-002, TIME-003). The bundled Python finds time zones only in the host's database. On a host without it, such as a minimal or container image, the display zone fell back to UTC, and a configured timezone or a site's timezone in the inventory was rejected as "not an IANA timezone". A full Ubuntu Server install normally has `tzdata` already.
 
 ### Changed
 

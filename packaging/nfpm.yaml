@@ -91,6 +91,9 @@ overrides:
       # openssl cms encrypts field bundles (FIELD-006, ADR-028).
       - openssl
       - systemd
+      # The bundled Python's zoneinfo reads the host's tz database and has no
+      # fallback, so without it display and site timezones fail (TIME-002, TIME-003).
+      - tzdata
       # Bundled interpreter and wheels need at least this glibc; build.sh
       # fails if any packaged ELF file needs a newer symbol version.
       - libc6 (>= 2.34)

@@ -66,7 +66,7 @@ Both commands must succeed: `ssh-keygen` prints `Good "vakr-release" signature`,
 sudo apt install ./vakr_${debver}_amd64.deb
 ```
 
-`apt` installs the dependencies: `ca-certificates`, `openssh-client` (which provides `ssh-keygen` for release verification), `openssl` (field-kit encryption), and `systemd`. It also installs the recommended `snmp` tools and `iputils-ping`, which the [field kit](field-data.md) uses, unless you pass `--no-install-recommends`.
+`apt` installs the dependencies: `ca-certificates`, `openssh-client` (which provides `ssh-keygen` for release verification), `openssl` (field-kit encryption), `systemd`, and `tzdata` (the time zone database, for display and site time zones). It also installs the recommended `snmp` tools and `iputils-ping`, which the [field kit](field-data.md) uses, unless you pass `--no-install-recommends`.
 
 ## What the package installs
 

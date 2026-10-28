@@ -60,9 +60,12 @@ assert "%d.%d" % sys.version_info[:2] == sys.argv[1]
 assert sys.base_prefix == "/opt/vakr/python"' "$PYTHON_MINOR"
     check "no dpkg conffiles (CFGM-005)" equals "$(dpkg-query -W -f='${Conffiles}' vakr)" ""
     local dep
-    for dep in ca-certificates openssh-client openssl systemd; do
+    for dep in ca-certificates openssh-client openssl systemd tzdata; do
         check "depends on $dep" grep -qw "$dep" <<<"$(dpkg-query -W -f='${Depends}' vakr)"
     done
+    # ubuntu:26.04 ships without tzdata, so this fails if the dependency goes.
+    check "the bundled Python resolves an IANA zone (TIME-002, TIME-003)" \
+        /opt/vakr/venv/bin/python3 -c 'import zoneinfo; zoneinfo.ZoneInfo("America/Chicago")'
     check "recommended snmp is installed" installed snmp
     check "release signers file is installed" test -s /opt/vakr/share/release-signers
     check "ssh-keygen is available for signature checks" command -v ssh-keygen

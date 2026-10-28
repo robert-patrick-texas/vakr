@@ -120,7 +120,7 @@ def test_nfpm_version_and_dependencies() -> None:
     spec = (PKG / "nfpm.yaml").read_text(encoding="utf-8")
     assert "version: ${VAKR_DEB_VERSION}\n" in spec
     assert "version_schema: none\n" in spec
-    for dep in ("ca-certificates", "openssh-client", "openssl", "systemd", "libc6 (>= "):
+    for dep in ("ca-certificates", "openssh-client", "openssl", "systemd", "tzdata", "libc6 (>= "):
         assert f"      - {dep}" in spec
     assert "      - snmp\n" in spec
 

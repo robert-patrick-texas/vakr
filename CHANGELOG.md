@@ -2,6 +2,12 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## Unreleased
+
+### Added
+
+- Documentation: [a feature list](docs/features.md) of what vakr does, by functional area, with what is planned after the MVP, what is out of scope, and a comparison with MRTG and SmokePing. The README now links to it, and its status line describes MVP acceptance instead of "pre-alpha".
+
 ## 0.6.3 - 2026-10-28
 
 Fix release. `vakr self-update` restarts the services once instead of twice, installing the version already installed really reinstalls it, and the package depends on `tzdata`. It changes no database schema and adds no options, so the update timer installs it, and `sudo vakr self-update --rollback` returns to 0.6.2. The update to 0.6.3 itself still restarts the services twice, because the installed 0.6.2 updater runs it; updates from 0.6.3 on restart once. From this release on, releases are normal GitHub releases, never marked pre-release.

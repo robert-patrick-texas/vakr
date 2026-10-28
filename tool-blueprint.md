@@ -2314,6 +2314,7 @@ The repository shall include:
 ### 18.1 Required documents
 
 - `README.md` — mission, quick start, scope, screenshots, supported profiles.
+- `docs/features.md` — features of the current release by functional area, what is planned, and a comparison with MRTG and SmokePing (owner, 2026-10-28).
 - `docs/architecture/overview.md` — processes, boundaries, data flow.
 - `docs/architecture/storage.md` — repository ports and backend semantics.
 - `docs/architecture/scheduler.md` — phases, cadence, no-overlap behavior.

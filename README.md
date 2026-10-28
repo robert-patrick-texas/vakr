@@ -8,10 +8,12 @@
 - modern web dashboards and a terminal UI;
 - collection that keeps running through database outages and network partitions.
 
-> **Status:** pre-alpha. The design is complete and implementation is starting. Nothing here is ready to monitor a network yet.
+> **Status:** MVP acceptance (milestone M6). Released packages install, collect, and serve the web UI. Acceptance on a production network, including a 14-day parallel run beside MRTG and SmokePing, is still to come.
 
 ## Documents
 
+- [Features](docs/features.md): what vakr does today, area by area, what is planned, and how it compares with MRTG and SmokePing.
+- [Installation](docs/operations/install.md)
 - [Blueprint](tool-blueprint.md): the authoritative requirements, architecture, test plan, and roadmap. Start with [section 27, the MVP definition](tool-blueprint.md#27-mvp-definition).
 - [Changelog](CHANGELOG.md)
 - [md2html](tools/md2html/README.md): the portable Markdown-to-HTML tool that publishes these documents.

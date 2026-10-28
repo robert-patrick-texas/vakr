@@ -128,7 +128,7 @@ Netmasks, loopback, multicast, counters, and time ticks are left alone. The walk
 
 **Keywords.** The words `ISP`, `WAN`, `UPLINK`, and `TRANSIT` are kept, matched as whole words and ignoring case. They are the labels vakr's description classifier looks for ([META-012](../../tool-blueprint.md#82-metadata-sites-interface-annotations-and-ownership), [Appendix E.15](../../tool-blueprint.md#e15-interface-description-keywords-meta-012)). For example, `WAN-ISP_Carrier ckt 77123` becomes `WAN-ISP_x3fa9c1 x91be02 x0c44d7`. Add your own keywords with `--keep-keyword WORD`, repeated as needed.
 
-**The key.** Pseudonyms come from an HMAC key kept at `~/.config/vakr-fieldkit/pseudonym.key` (mode 0600). The kit creates the key on the first run and reuses it afterwards, so the same router has the same pseudonym in every bundle. The key never leaves this host, and the developers cannot reverse the pseudonyms.
+**The key.** Pseudonyms come from an HMAC key kept at `~/.config/vakr-fieldkit/pseudonym.key` (mode 0600). The kit creates the key on the first run and reuses it afterwards, so the same router has the same pseudonym in every bundle. The key never leaves the production hosts of the collection, and the developers cannot reverse the pseudonyms. The run's final line ends with `pseudonym key id <16 hex digits>`, a one-way id of the key, not the key itself.
 - If the file is deleted, later bundles use new pseudonyms.
 - If someone else can read it, the run stops.
 
@@ -225,14 +225,14 @@ sudo vakr field collect --profile acceptance,vakr --pseudonymize --max-bytes 107
 
 On the vakr node, the export then covers every interface and device, because the kit can't see MRTG's configuration there. To limit it, give it a list with `--acceptance-targets FILE`. Each line is `interface DEVICE[|ALIAS...] ifindex=N` (or `ifname=`, `ifdescr=`, `ip=`, `mac=`, `all`), or `icmp DEVICE`.
 
-**Pseudonyms across two hosts.** The developers join MRTG's targets with vakr's devices by name and address. With `--pseudonymize` that works only when both hosts use the same pseudonym key. Copy it once from the first host to the second before the first pseudonymized run there:
+**Pseudonyms across two hosts.** The developers join MRTG's targets with vakr's devices by name and address. With `--pseudonymize` that works only when every host uses the same pseudonym key, so the key is part of the collection: every host that collects for it, primary or secondary (the vakr nodes and the MRTG and SmokePing host), uses the one key. Copy it once from the first host to each of the others before their first pseudonymized run:
 
 ```sh
 install -d -m 700 ~/.config/vakr-fieldkit
 install -m 600 pseudonym.key ~/.config/vakr-fieldkit/pseudonym.key   # copied from the first host
 ```
 
-The key path is relative to the account that runs the kit. With `sudo`, that's root's home directory. The report on the development host says when two bundles were made with different keys.
+The key path is relative to the account that runs the kit. With `sudo`, that's root's home directory. After the first run on each host, check that every host's final line shows the same `pseudonym key id`. The report on the development host also says when two bundles were made with different keys, but only after the bundles arrive.
 
 **Running it from a timer.** A daily systemd timer or cron entry that runs the command above is fine. Each run writes a new bundle file into `--output-dir`; send them all.
 

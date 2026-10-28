@@ -75,7 +75,7 @@ Devices match when any alias is shared. On vakr's side the aliases are the name,
 
 ## Pseudonymized bundles
 
-Every table member (MRTG targets, SmokePing targets, vakr's devices and interfaces) is pseudonymized column by column with the run's keyed rules. Hosts and each alias become host pseudonyms, addresses map into the pseudonym ranges, and labels keep only the classification keywords. The same name therefore gets the same pseudonym on any host that uses the same key, and the joins above still work. With MRTG and SmokePing on a second host, copy the pseudonym key there (see the operator guide). The report says when bundles were made with different keys, because then nothing joins across them.
+Every table member (MRTG targets, SmokePing targets, vakr's devices and interfaces) is pseudonymized column by column with the run's keyed rules. Hosts and each alias become host pseudonyms, addresses map into the pseudonym ranges, and labels keep only the classification keywords. The same name therefore gets the same pseudonym on any host that uses the same key, and the joins above still work. The key belongs to the collection (E.34 decision 7): with MRTG and SmokePing on a second host, or a second vakr position collecting too, copy the pseudonym key to each of them (see the operator guide). The report says when bundles were made with different keys, because then nothing joins across them.
 
 ## Committing the evidence
 

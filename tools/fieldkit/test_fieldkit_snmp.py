@@ -192,6 +192,40 @@ def test_pseudonymized_bundle_hides_identities_and_is_stable(snmp_env: dict[str,
     assert key.stat().st_mode & 0o777 == 0o600
 
 
+def test_e34_final_line_shows_the_pseudonym_key_id(
+    snmp_env: dict[str, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Every host of one collection must show one key id; a clear run shows none (FIELD-005).
+
+    The owner decided on 2026-10-27 that the pseudonym key belongs to the
+    collection: every host that pseudonymizes for it, primary or secondary,
+    uses the same key (E.34 decision 7). The id on the final line lets the
+    operator check that on site, before days of bundles fail to join.
+
+    Args:
+        snmp_env: Fake SNMP environment.
+        capsys: Captures the final line.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+    assert collect(snmp_env, "--pseudonymize")[0] == 0
+    (line,) = capsys.readouterr().out.splitlines()
+    manifest = json.loads(members(snmp_env["out"])["manifest.json"])
+    shown = manifest["pseudonymization"]["key_id"]
+    assert len(shown) == 16
+    assert f"; pseudonym key id {shown}; next: " in line
+    key = Path(os.environ["HOME"]) / ".config" / "fieldkit" / "pseudonym.key"
+    assert key.read_text(encoding="ascii").strip() not in line
+    for bundle in snmp_env["out"].glob("*.tar.gz"):
+        bundle.unlink()
+    assert collect(snmp_env)[0] == 0
+    assert "pseudonym key" not in capsys.readouterr().out
+
+
 def test_unprotected_community_file_is_refused(
     snmp_env: dict[str, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:

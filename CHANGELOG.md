@@ -2,6 +2,12 @@
 
 All notable changes to vakr are recorded here. Versions follow Semantic Versioning, and the version itself lives only in [`VERSION`](VERSION). Until MVP acceptance, minor releases may contain breaking changes; each one is listed here along with the migration that handles it.
 
+## Unreleased
+
+### Changed
+
+- Field kit: a pseudonymized run's final line now ends with `pseudonym key id <16 hex digits>`, a one-way id of the pseudonym key (FIELD-005, FIELD-009). The key belongs to the collection: every host that pseudonymizes for it, the vakr nodes and the MRTG and SmokePing host alike, must use the same key, or the parallel-run report cannot join their bundles (Appendix E.34 decision 7). After the first run on each host, check that they all show the same id.
+
 ## 0.6.2 - 2026-10-27
 
 Fix release. Editing a down interface's annotation or tags no longer restarts its stale countdown. Metadata migration `0007_interface_inactive_since.sql` adds one column; self-update backs up `metadata.db` first and restores it on rollback, so this release carries no manual-update marker, the update timer installs it, and `sudo vakr self-update --rollback` returns to 0.6.1. On two positions, update the peer right after the primary, as for every release: the metadata pull requires both to have the same schema. No options are added.

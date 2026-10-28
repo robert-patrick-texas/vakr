@@ -15,6 +15,7 @@ Dependencies:
     fieldkit_run: Bounded command execution.
     secrets: Generates the production-side pseudonym key (FIELD-005), the
         only file the field kit writes outside its output directory.
+    hashlib: The key's public id (``key_id``).
 
 Safety:
     Output files are created with umask 077. ``openssl cms -decrypt`` writes
@@ -28,6 +29,7 @@ Example:
     (3, 5, 5)
 """
 
+import hashlib
 import os
 import re
 import secrets
@@ -228,3 +230,22 @@ def load_or_create_key(path: Path) -> bytes:
     with os.fdopen(fd, "w", encoding="ascii") as handle:
         handle.write(key.hex() + "\n")
     return key
+
+
+def key_id(key: bytes | None) -> str | None:
+    """Name the pseudonym key without revealing it (FIELD-005, E.34 decision 7).
+
+    Every host of one collection uses the same key, so every host shows the
+    same id: the manifest carries it for the report, and the final line for
+    the operator, who can compare the hosts on site.
+
+    Args:
+        key: The pseudonym key, or ``None`` without ``--pseudonymize``.
+
+    Returns:
+        str | None: 16 hex digits of a domain-separated hash, or ``None``.
+
+    Raises:
+        None
+    """
+    return hashlib.sha256(b"fieldkit key id\0" + key).hexdigest()[:16] if key else None

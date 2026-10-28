@@ -28,7 +28,6 @@ Example:
 """
 
 import argparse
-import hashlib
 import platform
 import socket
 import sys
@@ -44,7 +43,7 @@ from fieldkit_app import collect_app
 from fieldkit_bundle import FORMAT_VERSION, BundleError, BundleWriter, safe_label, utc_stamp
 from fieldkit_compare import compare_hosts, redactable
 from fieldkit_context import Context, make_scrub_hook
-from fieldkit_crypto import CryptoError, encrypt
+from fieldkit_crypto import CryptoError, encrypt, key_id
 from fieldkit_host import collect_host
 from fieldkit_mrtg import collect_mrtg
 from fieldkit_paths import collect_paths, ping_target
@@ -145,7 +144,6 @@ def _manifest(ctx: Context, plan: Plan, bundle_id: str, when: datetime) -> dict[
         None
     """
     args, info, scrubber = ctx.args, ctx.info, ctx.scrubber
-    key_id = hashlib.sha256(b"fieldkit key id\0" + plan.key).hexdigest()[:16] if plan.key else None
     return {
         "format": FORMAT_VERSION,
         "bundle_id": bundle_id,
@@ -164,7 +162,7 @@ def _manifest(ctx: Context, plan: Plan, bundle_id: str, when: datetime) -> dict[
         },
         "pseudonymization": {
             "enabled": scrubber is not None,
-            "key_id": key_id,
+            "key_id": key_id(plan.key),
             "keep_keywords": sorted({*info.keep_keywords, *args.keep_keyword}) if scrubber else [],
             "ipv4_collisions": scrubber.p.collisions if scrubber else 0,
         },
@@ -216,7 +214,8 @@ def _collect(args: argparse.Namespace, info: BuildInfo, plan: Plan) -> tuple[Pat
     return path, len(steps.errors())
 
 
-def final_line(info: BuildInfo, path: Path, errors: int, encrypted: bool) -> str:
+def final_line(info: BuildInfo, path: Path, errors: int, encrypted: bool,
+               key: str | None = None) -> str:  # fmt: skip
     """Compose the one line that ends every successful run (FIELD-009).
 
     Args:
@@ -224,6 +223,7 @@ def final_line(info: BuildInfo, path: Path, errors: int, encrypted: bool) -> str
         path: Output file.
         errors: Number of failed steps.
         encrypted: Whether ``path`` is the encrypted bundle.
+        key: The pseudonym key id with ``--pseudonymize``, else ``None``.
 
     Returns:
         str: ``<tool>: wrote <file>...; next: <step>``.
@@ -232,6 +232,7 @@ def final_line(info: BuildInfo, path: Path, errors: int, encrypted: bool) -> str
         None
     """
     note = f" ({errors} step errors are listed in manifest.json)" if errors else ""
+    note += f"; pseudonym key id {key}" if key else ""
     if encrypted:
         nxt = f"scp it to {info.inbox_hint} or put it at an HTTPS URL and send the link"
         return f"{info.tool_name}: wrote {path}{note}; next: {nxt}"
@@ -269,7 +270,7 @@ def run_collect(args: argparse.Namespace, info: BuildInfo) -> int:
             print(f"{tool}: failed: {exc}; no bundle was written")
             return 1
         if args.no_encrypt or plan.recipient is None:
-            print(final_line(info, path, errors, encrypted=False))
+            print(final_line(info, path, errors, encrypted=False, key=key_id(plan.key)))
             return 0
         encrypted = path.with_name(path.name + ".p7m")
         try:
@@ -279,5 +280,5 @@ def run_collect(args: argparse.Namespace, info: BuildInfo) -> int:
             return 1
     if not args.keep_plaintext:
         path.unlink(missing_ok=True)
-    print(final_line(info, encrypted, errors, encrypted=True))
+    print(final_line(info, encrypted, errors, encrypted=True, key=key_id(plan.key)))
     return 0

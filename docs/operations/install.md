@@ -22,7 +22,7 @@ You need:
 - `curl` and `ssh-keygen` for the download and signature check. Minimal images may lack them: `sudo apt install curl openssh-client`. The package itself depends on `openssh-client`, so later self-updates need nothing extra;
 - outbound HTTPS to `github.com` and GitHub's download hosts (`*.githubusercontent.com`), directly or through a proxy. A host without GitHub access can install files you copy to it.
 
-Releases are listed at <https://github.com/robert-patrick-texas/vakr/releases>. Until MVP acceptance every release is marked *pre-release*.
+Releases are listed at <https://github.com/robert-patrick-texas/vakr/releases>. Every release is a normal release, not marked *pre-release*.
 
 ## 1. Download a release
 
@@ -42,7 +42,7 @@ curl -fL -O "$base/vakr_${debver}_amd64.deb" -O "$base/SHA256SUMS" -O "$base/SHA
 
 Tags are the version as written in `VERSION` (`v1.4.0`, `v1.4.0-rc.1`). The package file uses the Debian form, where `-rc.N` becomes `~rc.N`. With the GitHub CLI, `gh release download v$version --repo $repo` fetches the same files.
 
-**Why not GitHub's "latest" links.** `/releases/latest`, `/releases/latest/download/FILE`, and `gh release download` without a tag all skip pre-releases. Every vakr release is a pre-release until MVP acceptance, so today they answer 404 or "release not found". They would also need file names without a version, and the package's name carries one. The release list above works in both cases.
+**Why not GitHub's "latest" links.** `/releases/latest/download/FILE` needs a file name without a version, and the package's name carries one. The latest links and `gh release download` without a tag also skip any release marked pre-release. The release list above works in every case.
 
 ## 2. Verify the download
 

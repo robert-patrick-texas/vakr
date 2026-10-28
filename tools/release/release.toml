@@ -52,6 +52,8 @@ optional_artifacts = ["dist/{package}-fieldkit.pyz"]
 # Where SHA256SUMS, SHA256SUMS.sig, the notes, and copies of the artifacts go.
 output_dir = "dist/release/{tag}"
 
-# GitHub pre-release marking: "rc-or-major-zero" (the MVP rule: every -rc and
-# every 0.x release), "rc", "always", or "never".
-prerelease = "rc-or-major-zero"
+# GitHub pre-release marking: "rc-or-major-zero" (every -rc and every 0.x
+# release), "rc", "always", or "never". No vakr release is marked pre-release
+# unless the owner asks for it: every packaged version must download as a
+# normal release, and GitHub's latest links skip pre-releases (owner, 2026-10-28).
+prerelease = "never"

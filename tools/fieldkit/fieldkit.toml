@@ -14,7 +14,7 @@ inbox_hint = "~/vakr-inbox/ on the development host"
 keep_keywords = ["ISP", "WAN", "UPLINK", "TRANSIT"]
 # GitHub reachability test (FIELD-010): one GET of the release API, one HEAD of the releases page.
 # The GET lists releases the way self-update does: /releases/latest answers 404
-# while every release is a pre-release.
+# when every release is marked pre-release, as they all were until 2026-10-28.
 egress_get = ["https://api.github.com/repos/robert-patrick-texas/vakr/releases?per_page=1"]
 egress_head = ["https://github.com/robert-patrick-texas/vakr/releases"]
 

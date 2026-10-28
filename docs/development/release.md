@@ -70,7 +70,7 @@ The tool reads all project-specific values from `tools/release/release.toml` (se
 3. Copies the artifacts into `dist/release/v<version>/` and writes `SHA256SUMS` there in `sha256sum` format, with one `<sha256>  <file name>` line per artifact.
 4. Signs it: `ssh-keygen -Y sign -f ~/.config/vakr-release/release_ed25519 -n vakr-release SHA256SUMS`, producing `SHA256SUMS.sig`.
 5. Verifies that signature against `packaging/release-signers` with `ssh-keygen -Y verify`, exactly as production self-update will, and stops if it fails.
-6. Creates the annotated tag `v<version>`, pushes it, and runs `gh release create` with the changelog section as notes. Under the MVP rule, a release is marked `--prerelease` if `VERSION` has `-rc` or the major version is 0.
+6. Creates the annotated tag `v<version>`, pushes it, and runs `gh release create` with the changelog section as notes. No release is marked `--prerelease`: `prerelease = "never"` in `tools/release/release.toml`, because every packaged version must download as a normal release (owner, 2026-10-28). Mark one only when the owner asks, by setting `prerelease` for that release or with `gh release edit v<version> --prerelease` afterwards.
 
 ## Dry run
 

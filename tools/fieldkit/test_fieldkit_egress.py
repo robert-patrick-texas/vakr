@@ -353,8 +353,9 @@ def test_strict_confirmation_sends_nothing() -> None:
 def test_release_api_target_sees_pre_releases() -> None:
     """FIELD-010: the GET target lists releases, as self-update does.
 
-    ``/releases/latest`` ignores pre-releases, so while every release is one
-    it answers 404 and the report reads like a failure on a healthy host.
+    ``/releases/latest`` ignores pre-releases, so when every release is one
+    (as until 2026-10-28) it answers 404 and the report reads like a failure
+    on a healthy host.
 
     Args:
         None

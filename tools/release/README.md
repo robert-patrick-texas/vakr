@@ -48,7 +48,7 @@ A real release stops at the first failed preflight check, before building. A dry
 | `build_command` | `["make", "deb"]` | Argument list; never run through a shell |
 | `artifacts`, `optional_artifacts` | `["dist/{package}_{deb_version}_amd64.deb"]` | Glob patterns relative to the root, with placeholders `{package}`, `{version}`, `{pep440}`, `{deb_version}`, `{tag}` |
 | `output_dir` | `dist/release/{tag}` | Where `SHA256SUMS`, the signature, notes, and artifact copies go |
-| `prerelease` | `rc-or-major-zero` | `rc-or-major-zero`, `rc`, `always`, or `never` |
+| `prerelease` | `never` | `rc-or-major-zero`, `rc`, `always`, or `never` |
 | `build_tools` (optional) | `["node", "npm"]` | Programs the release host must have; each is run with `--version` in preflight. Absent or empty: no check |
 | `node_version_file` (optional) | `web/.node-version` | The installed `node` must be on the version this file names. Absent or empty: no check |
 | `ci_ignore_checks` (optional) | `["Dependabot"]` | Check-run names the CI check disregards, such as Dependabot's update jobs on a commit that changes `.github/dependabot.yml`. Absent or empty: every check run counts |

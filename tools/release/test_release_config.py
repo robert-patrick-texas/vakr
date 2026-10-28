@@ -45,7 +45,7 @@ def test_shipped_config_is_valid_and_uses_vakr_release_namespace() -> None:
     assert (cfg.namespace, cfg.identity) == ("vakr-release", "vakr-release")
     assert cfg.allowed_signers == root / "packaging/release-signers"
     assert cfg.signing_key == Path("~/.config/vakr-release/release_ed25519").expanduser()
-    assert cfg.prerelease == "rc-or-major-zero"
+    assert cfg.prerelease == "never"  # owner, 2026-10-28
     assert cfg.build_command == ("make", "deb")
     assert cfg.ci_ignore_checks == ("Dependabot",)
     assert ReleaseConfig.from_mapping(EXAMPLE, root).ci_ignore_checks == ()

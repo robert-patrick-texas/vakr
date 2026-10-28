@@ -3330,7 +3330,7 @@ interest = "primary"
 
 [update]
 repository = "robert-patrick-texas/vakr"
-channel = "prerelease"      # stable | prerelease; MVP iterations are pre-releases
+channel = "prerelease"      # stable | prerelease; prerelease also takes -rc builds
 # hold_version = "0.4.2"    # pin; the update timer will not go past it
 ```
 
@@ -3458,7 +3458,7 @@ Whenever development needs information from production, a collection tool is bui
 1. Run `tools/check-updates` (TOOLS-001). Apply every update, whatever its age. Hold one back only when it fails vakr's tests, as a recorded exception listed in the changelog (TOOLS-002, TOOLS-004).
 2. Bump `VERSION`, and update `CHANGELOG.md` with breaking changes, migrations, and new options.
 3. Confirm CI is green on `main`.
-4. Run `tools/release`. Its preflight runs `tools/check-updates --gate` again, so a dependency released since step 1 stops the release until it is applied or held (TOOLS-005). It builds the `.deb` in a clean container, writes `SHA256SUMS`, signs it with the release SSH key (`ssh-keygen -Y sign -n vakr-release`), tags `v<version>`, and creates the GitHub release. Releases are marked pre-release until MVP acceptance unless declared stable.
+4. Run `tools/release`. Its preflight runs `tools/check-updates --gate` again, so a dependency released since step 1 stops the release until it is applied or held (TOOLS-005). It builds the `.deb` in a clean container, writes `SHA256SUMS`, signs it with the release SSH key (`ssh-keygen -Y sign -n vakr-release`), tags `v<version>`, and creates the GitHub release. No release is marked pre-release on GitHub unless the owner asks for it: every packaged version must be available as a normal download, and GitHub's latest links skip pre-releases (owner, 2026-10-28; until then every 0.x release was marked).
 5. Smoke-test a self-update from the previous release in a container (UPD-T01).
 6. Documentation publishes to GitHub Pages automatically.
 

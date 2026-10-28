@@ -100,7 +100,7 @@ choices = ["stable", "prerelease"]
 default = "prerelease"
 since = "0.1.0"
 reload = "live"
-description = "Release channel for self-update. MVP iterations are pre-releases, so prerelease is the default until MVP acceptance."
+description = "Release channel for self-update. prerelease also accepts release candidates and releases marked pre-release on GitHub; it is the default until MVP acceptance."
 
 [[options]]
 key = "update.hold_version"

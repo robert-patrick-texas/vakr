@@ -1,15 +1,18 @@
 #!/bin/bash
 # `make resilience-test`: the resilience system tests of MVP-ACC-06 (blueprint
 # 27.6, Appendix E.36). Opt-in, never part of `make check`. Needs docker with
-# privileged containers, uv, curl, and outbound HTTPS (Ubuntu archive, PyPI).
+# privileged containers, uv, curl, git, ssh-keygen, and outbound HTTPS (Ubuntu
+# archive, PyPI, and GitHub for S0).
 #
 #  1. Builds the .deb (or takes DEB), writes a simulated IOS XE fleet, and
 #     starts snmpsim on one address per device (vakr-acc06-sim).
 #  2. Boots a systemd ubuntu:26.04 node (vakr-acc06-node), installs the
-#     package, runs `vakr setup` non-interactively, stores the credentials,
-#     applies the inventory (every device at 30 s), and enables
-#     vakr-collector, vakr-api, and vakr.target as the setup checklist says.
-#  3. Runs the scenarios: a service restart, a host reboot, the telemetry
+#     package (with S0: the release before it, from GitHub), runs `vakr setup`
+#     non-interactively, stores the credentials, applies the inventory (every
+#     device at 30 s), and enables vakr-collector, vakr-api, and vakr.target
+#     as the setup checklist says.
+#  3. Runs the scenarios: a self-update to the package while collecting
+#     (MVP-ACC-07, update.sh), a service restart, a host reboot, the telemetry
 #     store unavailable, and an abrupt power loss; each checks
 #     `vakr check health` and the status views at every stage.
 #  4. Accounts for every poll the schedule expected (accounting.py): each is
@@ -21,7 +24,9 @@
 #   DEB                an already-built package (default: build one)
 #   RESIL_DEVICES      simulated devices, 2 to 50 (default 8)
 #   RESIL_OUTAGE       seconds the telemetry store stays unavailable (default 180)
-#   RESIL_SCENARIOS    comma list of restart, reboot, storage, power (default all)
+#   RESIL_SCENARIOS    comma list of update, restart, reboot, storage, power (default all)
+#   RESIL_FROM         the release S0 updates from (default: the newest published
+#                      release before the package)
 #   RESIL_KEEP         1 keeps the containers after the run, for debugging
 #   RESIL_NET_PREFIX   the device network's first three octets (default 172.29.86.)
 # See docs/development/resilience-tests.md.
@@ -32,10 +37,12 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || exit 2
 . packaging/container/testlib.sh
 # shellcheck source=tests/system/resilience/lib.sh
 . tests/system/resilience/lib.sh
+# shellcheck source=tests/system/resilience/update.sh
+. tests/system/resilience/update.sh
 
 devices=${RESIL_DEVICES:-8}
 outage=${RESIL_OUTAGE:-180}
-scenarios=${RESIL_SCENARIOS:-restart,reboot,storage,power}
+scenarios=${RESIL_SCENARIOS:-update,restart,reboot,storage,power}
 wants() { [[ ",$scenarios," == *",$1,"* ]]; }
 
 cleanup() {
@@ -52,9 +59,14 @@ if [ -z "$deb" ]; then
     deb=$(find "$WORK" -maxdepth 1 -name 'vakr_*_amd64.deb' | sort | tail -1)
 fi
 [ -f "$deb" ] || { echo "resilience: no package at '${deb}'"; exit 2; }
+installed_deb=/work/vakr.deb
+if wants update; then
+    prepare_update "$deb" || exit 2
+    installed_deb=/work/from/$FROM_DEB
+fi
 [ "$(realpath "$deb")" = "$(realpath "$WORK/vakr.deb" 2>/dev/null)" ] || cp "$deb" "$WORK/vakr.deb"
 rm -rf "$WORK/fleet" "$WORK/wheels" "$WORK/logs" "$EVENTS" "$WORK/powercut.txt" "$WORK/polls.tsv" \
-    "$WORK/incidents.jsonl"
+    "$WORK/incidents.jsonl" "$WORK/update-journal.json" "$WORK/update-runs.tsv"
 uv run --quiet python -m tests.system.mpos.simdata "$WORK/fleet" \
     --devices "$devices" --prefix "$NET_PREFIX" --interval 30s || exit 2
 mkdir -p "$WORK/wheels"
@@ -94,8 +106,8 @@ docker run --detach --name "$NODE" --hostname acc06 --privileged --cgroupns=priv
     --tmpfs /run --tmpfs /run/lock --network "$NETWORK" --ip "$NODE_IP" \
     "${mounts[@]}" vakr-systemd-test >/dev/null
 check "the node boots systemd" wait_systemd
-check "the package installs" on_sh "export DEBIAN_FRONTEND=noninteractive; apt-get -qq update && \
-    cp /work/vakr.deb /tmp/ && chmod 0644 /tmp/vakr.deb && \
+check "the package installs (${installed_deb##*/})" on_sh "export DEBIAN_FRONTEND=noninteractive; \
+    apt-get -qq update && cp $installed_deb /tmp/vakr.deb && chmod 0644 /tmp/vakr.deb && \
     apt-get -qq install -y --no-install-recommends /tmp/vakr.deb >/tmp/apt.log 2>&1"
 # The password is made here, piped in, and never printed or written to a file.
 password="acc06-$(head -c 18 /dev/urandom | base64 | tr -d '/+=')"
@@ -119,6 +131,7 @@ event window_start "$(now_us)" "after warm-up"
 # shellcheck source=tests/system/resilience/scenarios.sh
 . tests/system/resilience/scenarios.sh
 baseline
+wants update && scenario_update
 wants restart && scenario_restart
 wants reboot && scenario_reboot
 wants storage && scenario_storage "$outage"

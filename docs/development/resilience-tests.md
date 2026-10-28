@@ -13,7 +13,7 @@ Contents:
 
 ## Running it
 
-You need Docker with privileged containers (systemd as PID 1), uv, curl, and outbound HTTPS to the Ubuntu archive and PyPI.
+You need Docker with privileged containers (systemd as PID 1), uv, curl, git, `ssh-keygen`, and outbound HTTPS to the Ubuntu archive, PyPI, and GitHub (S0 downloads the previous release).
 
 ```console
 $ make resilience-test                                         # builds the package first
@@ -26,7 +26,8 @@ $ make resilience-test DEB=... RESIL_SCENARIOS=restart,power   # some scenarios 
 | `DEB` | build one with `packaging/build-deb.sh dist/resilience-test` | The package to test |
 | `RESIL_DEVICES` | 8 | Simulated devices (2 to 50), every one polled at 30 s |
 | `RESIL_OUTAGE` | 180 | Seconds the telemetry store stays unavailable in S3 |
-| `RESIL_SCENARIOS` | `restart,reboot,storage,power` | Which scenarios run; they always run in this order |
+| `RESIL_SCENARIOS` | `update,restart,reboot,storage,power` | Which scenarios run; they always run in this order. Without `update`, the node installs the package under test directly. |
+| `RESIL_FROM` | the newest published release before the package | The release S0 installs first and updates from |
 | `RESIL_KEEP` | 0 | 1 keeps the containers afterwards, to look inside with `docker exec` |
 | `RESIL_NET_PREFIX` | `172.29.86.` | The device network's first three octets |
 
@@ -42,6 +43,8 @@ Each check prints `PASS` or `FAIL`, as the package tests do, the accounting prin
 
 The fleet comes from the two-position harness's `tests/system/mpos/simdata.py` with `--interval 30s`, the shortest interval the product allows (E.18). The communities exist only in the credentials file (mode 0600 on the host, 0640 `root:vakr` on the node) and in the data file names, never on a command line or in output.
 
+With S0 selected (the default), the node first installs the previous published release, downloaded from GitHub and checked against this checkout's release key, and S0 updates it to the package under test; otherwise the node installs the package under test directly.
+
 Setup follows the first-run checklist: `vakr setup --username acc06-admin` with a password generated for the run and piped in twice (never printed or stored), the credentials file, `vakr credentials check`, `vakr inventory apply`, and `systemctl enable --now vakr-collector.service vakr-api.service vakr.target`. Nothing is started by hand after that: the reboot and power-loss scenarios check that systemd brings both services back.
 
 Three helpers run inside the node with the package's own interpreter:
@@ -56,6 +59,7 @@ Before any fault, a baseline: `vakr check health` is OK, nothing waits in the sp
 
 | Scenario | What the harness does | What it checks |
 |---|---|---|
+| S0 self-update while collecting | Waits until a poll is under way on the previous release, then runs `vakr self-update --yes --file` with the package under test, as an operator does with a release copied to the host, while vakr-collector and vakr-api run (MVP-ACC-07). | The node runs the new version; the update record says success, so the health check did not roll it back (UPD-006); both databases are at the current schema; the package's release signers replaced the test key; every collector stop during the update was clean (PID 1's journal, `journal.py`) and the previous release's run logged `collector.stopped`; no incident; vakr-api answers again. The runs read from the journal join the run log, so the accounting covers the update. |
 | S1 service restart | Waits until a poll is under way, then `systemctl restart vakr-collector vakr-api`. | A new collector run starts; the old one logged `collector.stopped`; no incident; vakr-api answers on its socket again. |
 | S2 host reboot | `systemctl reboot` inside the node; a container's systemd exits when it reboots, so `docker start` is the power coming back. | The node shuts down cleanly within 120 s; systemd starts vakr-collector and vakr-api by itself; no incident. |
 | S3 telemetry store unavailable | Holds the telemetry database's write lock for `RESIL_OUTAGE` seconds; restarts the collector once in the middle; then releases the lock. | `vakr check health` says the database is not accepting writes and then counts ingestion behind as a second problem (`+1 more`, `spool_oldest_s` past 60 s), WARNING and never CRITICAL; polling keeps reaching the spool, before and after the restart; no device is Down, and once their data is stale every device reads "Unknown — …" (E.2 row 3); after the release the backlog drains. |
@@ -86,13 +90,15 @@ The run also fails on:
 
 These were decided with the harness (2026-10-27):
 
-1. **Opt-in.** A booted node, a reboot, a held lock, and three kills take about 14 minutes, need privileged Docker, and reach the Ubuntu archive and PyPI. `make check` stays hermetic; the accounting's rules run there as unit tests.
+1. **Opt-in.** A booted node, an update, a reboot, a held lock, and three kills take about 14 minutes, need privileged Docker, and reach the Ubuntu archive, PyPI, and GitHub. `make check` stays hermetic; the accounting's rules run there as unit tests.
 2. **"Unavailable" is a held write lock.** The store becomes unavailable to writers while it stays readable, as during a long backup or a stuck maintenance job: every write fails after the adapter's 5 s busy timeout (E.20) with a `StorageError`, exactly the path a full or failing disk takes in the ingester. A full filesystem was not used: in the Compact profile the spool and `telemetry.db` share `/var/lib/vakr` (the collector unit may write only there), so filling it fills the spool too, which is the separate `rejected_full` path (6.4, SPOOL-T07, unit-tested).
 3. **A process kill cannot lose the page cache, so S4c simulates it.** `docker kill` stops every process at once, but the host's kernel keeps whatever reached the page cache, and recovery fsyncs it (E.24 "Unclean stop"). S4a and S4b therefore prove the incident and that nothing beyond the E.8 window goes missing, but lose nothing themselves. S4c removes what a real power cut could take: the records appended in the last fsync interval that ingestion had not acknowledged, cut at a frame boundary, plus a torn half frame. It freezes the collector right after an append, so those records exist; the accounting then requires each poll it removed to be missing inside the E.8 window.
 4. **Real intervals.** The collector's test-only interval override is settable from code only, so the inventory sets every device to 30 s, as the two-position tests do.
 5. **When a run starts.** A run starts when systemd records `READY=1`: the scheduler starts just before it, and no slot is polled before it.
 6. **Fixed names.** Containers and the network have literal names with the prefix `vakr-acc06-`, removed before a run and in its exit trap.
 7. **Found and fixed with the harness: the unclean-stop incident under bursty appends** (SPOOL-T08). Poll results reach the spool in bursts. S4c removed one poll's 43 records, appended about 2 s after a quiet spell, and recovery reported 13 records in a range that ended 1 s after the last durable record, so it missed the lost burst. The incident now counts the busiest fsync interval among the newest records and runs from the last durable record to the recovery that found it (Appendix E.24 "Unclean stop", E.36 decision 4).
+8. **S0 signs the package under test with a throwaway key.** The release key has a passphrase and signs only published releases, and a pre-release test must not wait for publication. The harness makes an ed25519 key outside the mounted work directory, signs the package's `SHA256SUMS` with it, deletes the private half, and appends its public half to the previous release's `/opt/vakr/share/release-signers` on the node only. The package under test ships the release key alone, so the test key is gone once the update lands, and the scenario checks that. The previous release itself is verified with the real key. Updating with `--file` runs the same verification, backup, install, hooks, and rollback as an online update; `make github-update-test` covers the download after publication (E.36 decision 5).
+9. **Found with S0, not fixed yet: a self-update restarts the collector twice.** The package's `postinst` restarts `vakr.target`, and then self-update's own post-install hook restarts it again (`cmd_selfupdate._updater`). On the first S0 run (2026-10-27) the new collector ran 1.7 s before the second stop, and the two restarts cost about 3 s of collection each. Both stops are clean and the accounting finds no loss, so S0 counts restarts but does not fail on two (E.36 decision 6).
 
 ## When it fails
 

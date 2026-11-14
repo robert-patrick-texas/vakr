@@ -216,7 +216,9 @@ def test_export_states_and_names() -> None:
     assert "core9" not in text  # disabled, and API-managed: nothing of it is governed
     assert 'name = "edge1.example.net"' in text  # disabled, but inventory.toml governs Gi0/0/0
     assert "Gi0/0/1" not in text
-    assert "bad" not in text
+    # The full name, raw or TOML-escaped: a bare "bad" also matches random UUID hex ("bade").
+    assert "bad\tname" not in text
+    assert "bad\\tname" not in text
     assert plan_text(store.factory, text.encode(), "export.toml") == ["export.toml: no changes"]
 
 

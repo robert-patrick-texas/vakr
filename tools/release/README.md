@@ -69,7 +69,7 @@ An optional `[notes]` table sets the layout the changelog section must follow an
 | `summary_sentences` (optional) | `3` | The section must open with a summary paragraph of 1 to this many sentences. Default 3 |
 | `held_file`, `held_section` (optional) | `"tools/check-updates/update-exceptions.toml"`, `"Additional Notes"` | Every `[[exception]] item` in the file must be named in that topic |
 | `loc_command` (optional) | `["cloc"]` | cloc, run with `--version` and with `--list-file=<list> --json --quiet`. Default `["cloc"]` |
-| `loc_exclude` (optional) | `["uv.lock"]` | `fnmatch` patterns of tracked files that are not first-party content |
+| `loc_exclude` (optional) | `["uv.lock"]` | `fnmatch` patterns of tracked files not to count, such as lockfiles and other generated files |
 | `[[notes.versions]]` | see below | Rows of the versions table, in order |
 
 **Lines of code.** cloc is given exactly the files `git ls-files` lists, minus `loc_exclude`, so untracked files (virtual environments, `node_modules`, build output) never reach it. The table has one row per language and a bold total. The statement under it names the cloc version and the excluded patterns, and says that no dependencies or external components are counted.

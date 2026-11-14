@@ -120,9 +120,5 @@ def render_loc(
         "content only. No dependencies or external components are included: nothing vendored, "
         "installed, or downloaded at build time is counted"
     )
-    statement += (
-        f", and the generated files that record third-party packages ({left_out}) are left out."
-        if exclude
-        else "."
-    )
+    statement += f". Generated files are left out too: {left_out}." if exclude else "."
     return [*lines, "", statement]

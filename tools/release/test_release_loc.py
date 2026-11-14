@@ -152,4 +152,6 @@ def test_ver_t02_table_totals_and_statement() -> None:
     assert "cloc](https://github.com/AlDanial/cloc) 2.06" in statement
     assert "first-party content only" in statement
     assert "No dependencies or external components" in statement
-    assert "(`uv.lock`, `web/package-lock.json`) are left out." in statement
+    assert statement.endswith(
+        "counted. Generated files are left out too: `uv.lock`, `web/package-lock.json`."
+    )

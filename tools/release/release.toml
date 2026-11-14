@@ -71,10 +71,17 @@ summary_sentences = 3
 held_file = "tools/check-updates/update-exceptions.toml"
 held_section = "Additional Notes"
 # cloc counts the files git tracks, which are all first-party: nothing is
-# vendored. These tracked files are generated records of third-party packages,
-# not vakr's own content, so they are left out.
+# vendored. Generated files are left out, so the count is code people wrote:
+# the lockfiles and hash pins that record third-party packages, the OpenAPI
+# document `make openapi` writes, and the ADR-021 benchmark digests.
 loc_command = ["cloc"]
-loc_exclude = ["uv.lock", "web/package-lock.json", "packaging/build-constraints.txt"]
+loc_exclude = [
+    "uv.lock",
+    "web/package-lock.json",
+    "packaging/build-constraints.txt",
+    "docs/api/openapi.json",
+    "docs/performance/*.json",
+]
 
 # Rows of the versions table, in order. The previous release's published
 # table supplies the old column, so a row's name must not change. Each row reads

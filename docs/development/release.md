@@ -7,6 +7,7 @@ A release is a GitHub release holding the `.deb`, the field kit `vakr-fieldkit.p
 - [One-time setup (project owner)](#one-time-setup-project-owner)
 - [Cutting a release](#cutting-a-release)
 - [What tools/release does](#what-toolsrelease-does)
+- [Release notes](#release-notes)
 - [Dry run](#dry-run)
 - [Versions](#versions)
 - [Building and testing packages locally](#building-and-testing-packages-locally)
@@ -36,13 +37,14 @@ A release is a GitHub release holding the `.deb`, the field kit `vakr-fieldkit.p
 3. **Authenticate the GitHub CLI** with `gh auth login`. The release tool uses `gh` to read CI status and create releases.
 
 4. **Install Node.js and npm** (the exact release `web/.node-version` names, 24.22.1 today) on the development host. The web UI is built and checked with them (ADR-035): `make check` runs its lint, type, and unit checks, and the release preflight stops if `node` or `npm` is missing or `node` is on another line. The package itself is built in a container that brings its own Node, and production hosts never need it.
+5. **Install cloc** (`sudo apt install cloc`). The release counts its lines of code with it for the release notes (VER-006), and the preflight stops if `cloc --version` fails.
 
 Until step 2 is done, the shipped signers file is a placeholder, every signature check fails closed, and `tools/release` refuses to publish.
 
 ## Cutting a release
 
-1. Run `make updates` and apply every update, however recently it was published (TOOLS-002, ADR-036). A release that fails vakr's tests is held as a recorded exception and listed in the changelog (TOOLS-004); nothing else is a reason to stay behind. [Keeping tools and dependencies current](updates.md#release-time-policy-tools-002) has the procedure. Step 5 checks again.
-2. Bump `VERSION` (`MAJOR.MINOR.PATCH`, or `MAJOR.MINOR.PATCH-rc.N` for a candidate). Add a `## <version> - <date>` section to `CHANGELOG.md` listing breaking changes, migrations, and new options (VER-004). That section becomes the release notes.
+1. **Check for the latest version of every component and dependency, and update to it.** Run `make updates` and apply every update, however recently it was published: Python, Go, Node.js, uv, the builder images, every locked Python and npm package, and the GitHub Actions (TOOLS-002, ADR-036). Hold one back on its last-known-good version only when the new release fails vakr's tests and there is no simple fix. Record the hold as an exception (TOOLS-004), name the obstacle under **Additional Notes** in the release notes, and test again when that component publishes its next release. Nothing else, such as a release's age, is a reason to stay behind. [Keeping tools and dependencies current](updates.md#release-time-policy-tools-002) has the procedure. Step 5 checks again.
+2. Bump `VERSION` (`MAJOR.MINOR.PATCH`, or `MAJOR.MINOR.PATCH-rc.N` for a candidate). Add a `## <version> - <date>` section to `CHANGELOG.md` in the [release-notes layout](#release-notes): a summary of one to three sentences, then the topics New, Changed, Fixed, and Additional Notes, listing breaking changes, migrations, and new options (VER-004, VER-005). That section becomes the release notes. Do not write the lines-of-code or versions tables; the release tool generates both.
 3. Commit, push to `main`, and wait until every CI check for that commit is green, including the *Package* workflow.
 4. Run `make release-dry-run` and read its report (see [Dry run](#dry-run)).
 5. Run the release. Its preflight runs `check-updates --gate` again (TOOLS-005), so a dependency published since step 1, even the same day, stops it: apply it (or hold it after a failed test), commit, and wait for CI again. `ssh-keygen` asks for the key's passphrase:
@@ -65,12 +67,30 @@ Until step 2 is done, the shipped signers file is a placeholder, every signature
 
 The tool reads all project-specific values from `tools/release/release.toml` (see [its README](../../tools/release/README.md)). In order, it:
 
-1. Checks that `VERSION_OVERRIDE` is unset, the tree is clean, `HEAD` is on `main`, the tag `v<version>` exists neither locally nor on `origin`, every GitHub check run for `HEAD` passed (except Dependabot's update jobs, `ci_ignore_checks`), `CHANGELOG.md` has a section for the version, `packaging/release-signers` lists a key, `node` and `npm` answer `--version`, `node` is the release `web/.node-version` pins, and `check-updates --gate` passes (`update_check`): every dependency is on its newest release or held by a recorded exception, and every item could be checked. A real release stops at the first failed check, before building anything.
+1. Checks that `VERSION_OVERRIDE` is unset, the tree is clean, `HEAD` is on `main`, the tag `v<version>` exists neither locally nor on `origin`, every GitHub check run for `HEAD` passed (except Dependabot's update jobs, `ci_ignore_checks`), `CHANGELOG.md` has a section for the version, `packaging/release-signers` lists a key, `node` and `npm` answer `--version`, `node` is the release `web/.node-version` pins, `cloc` answers `--version`, the changelog section follows the release-notes layout, and `check-updates --gate` passes (`update_check`): every dependency is on its newest release or held by a recorded exception, and every item could be checked. A real release stops at the first failed check, before building anything.
 2. Builds with `make deb`, in a clean `ubuntu:26.04` container.
 3. Copies the artifacts into `dist/release/v<version>/` and writes `SHA256SUMS` there in `sha256sum` format, with one `<sha256>  <file name>` line per artifact.
 4. Signs it: `ssh-keygen -Y sign -f ~/.config/vakr-release/release_ed25519 -n vakr-release SHA256SUMS`, producing `SHA256SUMS.sig`.
 5. Verifies that signature against `packaging/release-signers` with `ssh-keygen -Y verify`, exactly as production self-update will, and stops if it fails.
-6. Creates the annotated tag `v<version>`, pushes it, and runs `gh release create` with the changelog section as notes. No release is marked `--prerelease`: `prerelease = "never"` in `tools/release/release.toml`, because every packaged version must download as a normal release (owner, 2026-10-28). Mark one only when the owner asks, by setting `prerelease` for that release or with `gh release edit v<version> --prerelease` afterwards.
+6. Writes the release notes to `release-notes.txt` in the output directory: the changelog section, then the lines-of-code table and the versions table (see [Release notes](#release-notes)).
+7. Creates the annotated tag `v<version>`, pushes it, and runs `gh release create` with those notes. No release is marked `--prerelease`: `prerelease = "never"` in `tools/release/release.toml`, because every packaged version must download as a normal release (owner, 2026-10-28). Mark one only when the owner asks, by setting `prerelease` for that release or with `gh release edit v<version> --prerelease` afterwards.
+
+## Release notes
+
+Every release's notes on GitHub have the same layout (owner, 2026-11-14), in this order:
+
+1. **Summary.** One to three sentences that say what the release is.
+2. **Topics,** as `###` headings in this order: **New**, **Changed**, **Fixed**, **Additional Notes**. Leave out any topic with nothing in it, so a release with a single bug fix shows only Fixed. Additional Notes holds what operators and developers should know that is not a change itself: notes for operators updating, and every dependency held back on a known-good version (TOOLS-004), with what failed and that it is tested again when the dependency publishes its next release.
+3. **Lines of code** (VER-006), generated. cloc counts the files git tracks at the release commit, by language. Only first-party content counts: vakr vendors nothing, so no dependency or external component is in the repository, and the generated files that record third-party packages (`uv.lock`, `web/package-lock.json`, `packaging/build-constraints.txt`) are left out (`loc_exclude` in `tools/release/release.toml`). A statement under the table says so and names the cloc version.
+4. **Versions** (VER-007), generated. Python and the prominent components and dependencies, each with its version in this release. The interpreter version is read from the built package, locked packages from `uv.lock` and `web/package-lock.json`, and toolchain pins from the files that pin them. The rows are the `[[notes.versions]]` tables in `release.toml`; add one there when a component becomes prominent, and never rename one, because the name matches it to the previous release's row. From the second release with a table on, it has two columns, old (the previous release's published table) and new, and every version that changed is in bold, as are rows added or removed.
+
+You write items 1 and 2 in `CHANGELOG.md`; the release tool appends 3 and 4. The preflight stops a release whose section breaks the layout: no summary or one longer than three sentences, a topic that is unknown, out of order, repeated, or empty, or a held dependency in `tools/check-updates/update-exceptions.toml` that Additional Notes does not name (VER-005). The latest release when this rule was made (2026-11-14) was the first to get the tables: its notes were regenerated from its tag and package and edited on GitHub. Earlier releases have no tables.
+
+To see the notes a release would publish, after `make deb` has built the package for `VERSION`:
+
+```sh
+uv run tools/release/release.py --print-notes
+```
 
 ## Dry run
 

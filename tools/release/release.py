@@ -19,14 +19,17 @@ yet tagged, and green in CI, and that the host has the configured build
 tools (Node and npm, ADR-035); runs the configured clean-container build;
 checksums and SSH-signs the artifacts; verifies that signature against the
 signers file the package ships; and only then tags, pushes, and creates the
-GitHub release with notes from the changelog. Everything project-specific
-comes from ``release.toml`` (section 29).
+GitHub release with notes from the changelog, checked against the
+configured layout and followed by generated lines-of-code and versions
+tables (VER-005..007). Everything project-specific comes from
+``release.toml`` (section 29).
 
 Dependencies:
     release_config, release_checks, release_artifacts, release_publish,
-    release_version, release_proc: Sibling modules; standard library only.
-    External: git, gh (authenticated), ssh-keygen, the build command, and
-        the ``build_tools`` the configuration names.
+    release_notes, release_version, release_proc: Sibling modules;
+        standard library only.
+    External: git, gh (authenticated), ssh-keygen, the build command, cloc
+        when ``[notes]`` is configured, and the ``build_tools`` it names.
 
 Safety:
     ``--dry-run`` runs every check and step except tag, push, and release,
@@ -36,6 +39,7 @@ Safety:
 
 Example:
     $ uv run tools/release/release.py --dry-run
+    $ uv run tools/release/release.py --print-notes
     $ uv run tools/release/release.py --print-version deb
     7.2.0~rc.1
 """
@@ -50,7 +54,9 @@ from pathlib import Path
 import release_artifacts as artifacts
 import release_checks as checks
 import release_currency as currency
+import release_notes
 from release_config import ConfigError, ReleaseConfig, load_config
+from release_notes_config import NotesError
 from release_proc import CommandError, Runner
 from release_publish import changelog_notes, publish, publish_commands
 from release_version import VERSION_FORMS, ReleaseVersion, VersionError, read_version_file
@@ -98,6 +104,7 @@ def preflight(
             entries > 0,
             f"{entries} signer(s)" if entries else "placeholder only; add the release public key",
         ),
+        *([release_notes.layout_outcome(cfg, notes)] if cfg.notes else []),
         *checks.toolchain(runner, cfg.build_tools, cfg.node_version_file),
         *([currency.updates_current(runner, cfg.update_check)] if cfg.update_check else []),
     ]
@@ -176,10 +183,18 @@ def release(
     try:
         with tempfile.TemporaryDirectory(prefix="release-") as tmp:
             files = build_sign_verify(cfg, runner, version, dry_run=dry_run, workdir=Path(tmp))
-        notes = files[-1].with_name("release-notes.txt")
-        notes.write_text(changelog_notes(_read(cfg.changelog), version.semver) or "", "utf-8")
+            notes = files[-1].with_name("release-notes.txt")
+            notes.write_text(release_notes.notes_text(cfg, runner, version, Path(tmp)), "utf-8")
+        print(f"notes: {notes}")
         publish(runner, publish_commands(cfg, version, notes, files), dry_run=dry_run)
-    except (CommandError, artifacts.ArtifactError, ConfigError, VersionError, OSError) as exc:
+    except (
+        CommandError,
+        artifacts.ArtifactError,
+        ConfigError,
+        VersionError,
+        NotesError,
+        OSError,
+    ) as exc:
         print(f"{mode}: FAILED: {exc}")
         return 1
     if blocked:
@@ -226,6 +241,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="no tag, push, or release")
     parser.add_argument("--print-version", choices=VERSION_FORMS, metavar="FORM")
     parser.add_argument("--version", help="version to print instead of reading VERSION")
+    parser.add_argument(
+        "--print-notes", action="store_true", help="print notes from built artifacts"
+    )
     args = parser.parse_args(argv)
     try:
         if args.print_version:
@@ -233,7 +251,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(ReleaseVersion.parse(source).render(args.print_version))
             return 0
         cfg = load_config(args.config, args.root.resolve())
+        if args.print_notes:
+            with tempfile.TemporaryDirectory(prefix="release-") as tmp:
+                version = read_version_file(cfg.version_file)
+                print(release_notes.notes_text(cfg, Runner(cfg.root), version, Path(tmp)), end="")
+            return 0
         return release(cfg, Runner(cfg.root), dry_run=args.dry_run, environ=os.environ)
+    except NotesError as exc:
+        print(f"release: {exc}", file=sys.stderr)
+        return 1
     except (ConfigError, VersionError, OSError) as exc:
         print(f"release: {exc}", file=sys.stderr)
         return 2

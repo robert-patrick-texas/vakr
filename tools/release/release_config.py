@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from release_notes_config import NotesConfig, NotesError, parse_notes
 from release_version import PRERELEASE_RULES, ReleaseVersion
 
 _STRINGS = (
@@ -44,9 +45,9 @@ _STRINGS = (
     "prerelease",
 )
 _LISTS = ("build_command", "artifacts", "optional_artifacts")
-_OPTIONAL = ("build_tools", "node_version_file", "ci_ignore_checks", "update_check")
-"""Keys that may be absent: build-host tools, a Node pin, check runs that never block, and
-the dependency currency command."""
+_OPTIONAL = ("build_tools", "node_version_file", "ci_ignore_checks", "update_check", "notes")
+"""Keys that may be absent: build-host tools, a Node pin, check runs that never block, the
+dependency currency command, and the release-note layout and tables (VER-005..007)."""
 
 EXAMPLE: dict[str, Any] = {
     **{key: key for key in _STRINGS},
@@ -94,6 +95,8 @@ class ReleaseConfig:
         update_check: Command run in preflight that must exit 0, so every
             dependency is current at release time or held by a recorded
             exception (TOOLS-005); empty skips the check.
+        notes: Release-note layout and generated tables; ``None`` publishes
+            the changelog section unchecked and unchanged.
     """
 
     root: Path
@@ -116,6 +119,7 @@ class ReleaseConfig:
     node_version_file: Path | None = None
     ci_ignore_checks: tuple[str, ...] = ()
     update_check: tuple[str, ...] = ()
+    notes: NotesConfig | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any], root: Path) -> ReleaseConfig:
@@ -130,7 +134,7 @@ class ReleaseConfig:
 
         Raises:
             ConfigError: On unknown, missing, or mistyped keys, an unknown
-                prerelease rule, or a malformed ``repo``.
+                prerelease rule, a malformed ``repo``, or a bad ``[notes]``.
         """
         unknown = sorted(set(data) - set(_STRINGS) - set(_LISTS) - set(_OPTIONAL))
         if unknown:
@@ -147,6 +151,10 @@ class ReleaseConfig:
         ignore = _string_list(data, "ci_ignore_checks") if "ci_ignore_checks" in data else ()
         pin = _string(data, "node_version_file") if data.get("node_version_file") else None
         updates = _string_list(data, "update_check") if data.get("update_check") else ()
+        try:
+            notes = parse_notes(data["notes"], root) if "notes" in data else None
+        except NotesError as exc:
+            raise ConfigError(str(exc)) from exc
         return cls(
             root=root,
             repo=text["repo"],
@@ -168,6 +176,7 @@ class ReleaseConfig:
             node_version_file=_resolve(root, pin) if pin else None,
             ci_ignore_checks=ignore,
             update_check=updates,
+            notes=notes,
         )
 
     def placeholders(self, version: ReleaseVersion) -> dict[str, str]:

@@ -62,16 +62,16 @@ vakr stays on the newest release of everything, and the release gate enforces it
 
 1. Run `make updates` and `make audit` on an up-to-date `main`.
 2. Apply every `update available` row (see [Applying updates](#applying-updates)), in the release branch or on `main`, then run `make check`, and `make package-test` when anything in the package or its builder moved. How new the release is does not matter. A release published the same morning is applied like any other.
-3. When an update **fails vakr's tests**, and only then. A release that cannot be installed or built at all counts as a failure too, for example a CPython patch release that uv offers no download for yet, or a tool release with no Linux build:
+3. When an update **fails vakr's tests** and there is no simple fix, and only then. A failure that a small change in vakr fixes is fixed, and the update taken. A release that cannot be installed or built at all counts as a failure too, for example a CPython patch release that uv offers no download for yet, or a tool release with no Linux build:
    1. Go back to the last-known-good version, the one CURRENT shows. If a newer release exists on that line (6.0.4 while 7.0.2 fails), try it and keep it if it passes.
    2. Record an exception in [`tools/check-updates/update-exceptions.toml`](../../tools/check-updates/update-exceptions.toml): the ITEM as printed, the failing `version`, the `reason` (which test or command failed, with the error), and the `recorded` date.
    3. Make the hold stick. For a PyPI package, add `NAME<VERSION` (the first failing version) to `constraint-dependencies` under `[tool.uv]` in `pyproject.toml`, so `uv lock --upgrade` keeps the last-known-good version. For an npm package nothing more is needed, because `web/package.json` pins exact versions. For a toolchain or image pin, leave the pin. Close any Dependabot pull request for the failing version with the Close button and no comment command; Dependabot then skips that release only and proposes the next one (see [Dependabot](#dependabot) for why not `@dependabot ignore this version`).
-   4. List the hold in the release's `CHANGELOG.md` section under `### Held dependencies (TOOLS-004)`, naming the item, the version kept, the version that failed, and why:
+   4. Note the hold in the release's `CHANGELOG.md` section under `### Additional Notes` (VER-005), naming the item, the version kept, the version that failed, why, and that it is tested again when the dependency publishes its next release. The release preflight stops until every item in the exceptions file is named there:
 
       ```markdown
-      ### Held dependencies (TOOLS-004)
+      ### Additional Notes
 
-      - **TypeScript 7.0.2** (staying on 6.0.3): typescript-eslint 8.72.0 refuses TS 7.0, and SvelteKit 3.1.0 crashes loading `tsconfig.json`, so lint, svelte-check, the unit tests, and the build fail. Revisited with the next TypeScript release.
+      - **TypeScript 7.0.2** (staying on 6.0.3): typescript-eslint 8.72.0 refuses TS 7.0, and SvelteKit 3.1.0 crashes loading `tsconfig.json`, so lint, svelte-check, the unit tests, and the build fail (TOOLS-004). Tested again with the next TypeScript release.
       ```
 4. Revisit every exception when the dependency publishes its next release. check-updates shows the row as `update available` again as soon as one appears, and the gate fails until it is dealt with. Test the new release. If it passes, apply it and delete the exception and any constraint. If it fails, move the exception's `version` to the new release and update the reason. A test failure caused by another package (TypeScript 7 waiting for SvelteKit) is still revisited when the held package publishes, and also whenever the package that blocked it moves.
 5. Resolve every `unknown` row. Re-run after a network failure; fix the config when a pin moved.

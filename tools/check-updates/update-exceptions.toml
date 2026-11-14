@@ -12,7 +12,8 @@
 # The CURRENT column of `make updates` is the last-known-good version. Keep
 # it there: a held PyPI package also needs a `NAME<VERSION` entry in
 # [tool.uv] constraint-dependencies, so `uv lock --upgrade` leaves it alone.
-# Copy each entry into the release's CHANGELOG "Held dependencies" list.
+# Name each held item under "### Additional Notes" in the release's CHANGELOG
+# section, with what failed; the release preflight checks it (VER-005).
 # docs/development/updates.md has the whole procedure.
 
 # Microsoft's 7.0 announcement: "Projects using Vue, MDX, Astro, Svelte, and

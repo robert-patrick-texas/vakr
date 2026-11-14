@@ -29,8 +29,9 @@ allowed_signers = "packaging/release-signers"
 # Builds the artifacts in a clean container. Runs with VERSION_OVERRIDE removed.
 build_command = ["make", "deb"]
 # Programs the release host must have; preflight runs `<tool> --version` for
-# each. The web UI is built and checked with Node and npm (ADR-035).
-build_tools = ["node", "npm"]
+# each. The web UI is built and checked with Node and npm (ADR-035); cloc
+# counts the lines of code for the release notes (VER-006).
+build_tools = ["node", "npm", "cloc"]
 # The installed node must be on the line this file pins (major only, e.g. 24).
 # Empty or absent skips the check.
 node_version_file = "web/.node-version"
@@ -57,3 +58,167 @@ output_dir = "dist/release/{tag}"
 # unless the owner asks for it: every packaged version must download as a
 # normal release, and GitHub's latest links skip pre-releases (owner, 2026-10-28).
 prerelease = "never"
+
+# Release notes (owner, 2026-11-14). The changelog section opens with a summary
+# of one to three sentences, then these topics in this order, skipping any with
+# nothing in it: a release with one bug fix shows only Fixed (VER-005). Every
+# dependency held back after a failed test is named under Additional Notes
+# (TOOLS-004). The tool then appends a lines-of-code table (VER-006) and a
+# versions table (VER-007) to what it publishes.
+[notes]
+sections = ["New", "Changed", "Fixed", "Additional Notes"]
+summary_sentences = 3
+held_file = "tools/check-updates/update-exceptions.toml"
+held_section = "Additional Notes"
+# cloc counts the files git tracks, which are all first-party: nothing is
+# vendored. These tracked files are generated records of third-party packages,
+# not vakr's own content, so they are left out.
+loc_command = ["cloc"]
+loc_exclude = ["uv.lock", "web/package-lock.json", "packaging/build-constraints.txt"]
+
+# Rows of the versions table, in order. The previous release's published
+# table supplies the old column, so a row's name must not change. Each row reads
+# one source: `file` + `regex` (a pin in the repository), `lock` + `package`
+# (uv.lock or a package-lock.json), or `deb` + `member` + `regex` (a file
+# inside the built package). The regex's first group is the version.
+
+# Runtime: what the package ships.
+[[notes.versions]]
+name = "Python (bundled CPython)"
+deb = "dist/{package}_{deb_version}_amd64.deb"
+member = "./opt/vakr/python/lib/python3.*/_sysconfig_vars_*.json"
+regex = '"py_version": "([^"]+)"'
+
+[[notes.versions]]
+name = "python-build-standalone"
+deb = "dist/{package}_{deb_version}_amd64.deb"
+member = "./opt/vakr/python/BUILD"
+regex = '(\d{8})'
+
+[[notes.versions]]
+name = "FastAPI"
+lock = "uv.lock"
+package = "fastapi"
+
+[[notes.versions]]
+name = "Starlette"
+lock = "uv.lock"
+package = "starlette"
+
+[[notes.versions]]
+name = "Uvicorn"
+lock = "uv.lock"
+package = "uvicorn"
+
+[[notes.versions]]
+name = "Pydantic"
+lock = "uv.lock"
+package = "pydantic"
+
+[[notes.versions]]
+name = "PySNMP"
+lock = "uv.lock"
+package = "pysnmp"
+
+[[notes.versions]]
+name = "Textual"
+lock = "uv.lock"
+package = "textual"
+
+[[notes.versions]]
+name = "cryptography"
+lock = "uv.lock"
+package = "cryptography"
+
+[[notes.versions]]
+name = "argon2-cffi"
+lock = "uv.lock"
+package = "argon2-cffi"
+
+[[notes.versions]]
+name = "tomlkit"
+lock = "uv.lock"
+package = "tomlkit"
+
+[[notes.versions]]
+name = "platformdirs"
+lock = "uv.lock"
+package = "platformdirs"
+
+# Web UI: bundled into the package by the build.
+[[notes.versions]]
+name = "Svelte"
+lock = "web/package-lock.json"
+package = "svelte"
+
+[[notes.versions]]
+name = "SvelteKit"
+lock = "web/package-lock.json"
+package = "@sveltejs/kit"
+
+[[notes.versions]]
+name = "ECharts"
+lock = "web/package-lock.json"
+package = "echarts"
+
+[[notes.versions]]
+name = "uPlot"
+lock = "web/package-lock.json"
+package = "uplot"
+
+[[notes.versions]]
+name = "TanStack Svelte Query"
+lock = "web/package-lock.json"
+package = "@tanstack/svelte-query"
+
+# Build: the toolchain that produces the package.
+[[notes.versions]]
+name = "Node.js (web build)"
+file = "web/.node-version"
+regex = '^(\S+)'
+
+[[notes.versions]]
+name = "Vite"
+lock = "web/package-lock.json"
+package = "vite"
+
+[[notes.versions]]
+name = "TypeScript"
+lock = "web/package-lock.json"
+package = "typescript"
+
+[[notes.versions]]
+name = "uv (package builder)"
+file = "packaging/Dockerfile"
+regex = 'astral-sh/uv:(\d+\.\d+\.\d+)@'
+
+[[notes.versions]]
+name = "Go (builds nfpm)"
+file = "packaging/Dockerfile"
+regex = 'FROM golang:(\d+\.\d+\.\d+)@'
+
+[[notes.versions]]
+name = "nfpm"
+file = "packaging/Dockerfile"
+regex = 'nfpm/v2/cmd/nfpm@v(\S+)'
+
+# Development: the checks every change passes.
+[[notes.versions]]
+name = "Ruff"
+lock = "uv.lock"
+package = "ruff"
+
+[[notes.versions]]
+name = "ty"
+lock = "uv.lock"
+package = "ty"
+
+[[notes.versions]]
+name = "pytest"
+lock = "uv.lock"
+package = "pytest"
+
+[[notes.versions]]
+name = "Playwright"
+lock = "web/package-lock.json"
+package = "@playwright/test"

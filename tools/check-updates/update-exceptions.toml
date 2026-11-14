@@ -24,8 +24,10 @@
 # support the 7.x API. The @typescript/typescript6 alias passes, but every tool
 # would still run 6.0.3 (7.0.2 only re-checks the .ts files, not the .svelte
 # ones), and check-updates cannot read npm aliases, so it is not used.
+# Retested 2026-11-14 with typescript-eslint 8.72.2, which still refuses TS 7.0;
+# openapi-typescript 7.13.0 (check:api) now fails too.
 [[exception]]
 item = "typescript"
 version = "7.0.2"
-reason = "TS 7.0 has no JavaScript API until 7.1: typescript-eslint 8.72.1 refuses it (lint) and SvelteKit 3.1.0 crashes in ts.readConfigFile (svelte-check, vitest, build); 6.0.3 passes all"
-recorded = 2026-10-27
+reason = "TS 7.0 has no JavaScript API until 7.1: typescript-eslint 8.72.2 refuses it (lint), SvelteKit 3.1.0 crashes in ts.readConfigFile (svelte-check, vitest, build), and openapi-typescript 7.13.0 crashes (check:api); 6.0.3 passes all"
+recorded = 2026-11-14

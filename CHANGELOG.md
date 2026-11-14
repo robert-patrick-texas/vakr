@@ -15,10 +15,11 @@ Each release's section becomes its GitHub release notes. From 0.6.4 on, a sectio
 
 - Release notes follow one layout from this release on: a summary of one to three sentences, then New, Changed, Fixed, and Additional Notes, skipping empty topics, then the two tables (VER-005, owner 2026-11-14). The release preflight stops a release whose changelog section breaks the layout. Dependencies held back after a failed test are named under Additional Notes, which replaces "Held dependencies" and "Notes for operators". The preflight also stops when a hold in `tools/check-updates/update-exceptions.toml` is not named there (TOOLS-004).
 - The release checklist starts with checking for, and updating to, the latest version of every component and dependency. A dependency is held back on its known-good version only when its new release fails vakr's tests and there is no simple fix. The release notes name the obstacle, and the dependency is tested again when it publishes its next release (TOOLS-002, TOOLS-004).
+- Developers: typescript-eslint 8.72.2 (8.72.1) (TOOLS-002).
 
 ### Additional Notes
 
-- **TypeScript 7.0.2 is held back; the web UI stays on TypeScript 6.0.3** (TOOLS-004, recorded 2026-10-27). TypeScript 7.0 has no JavaScript API until 7.1, so typescript-eslint 8.72.1 refuses it (lint) and SvelteKit 3.1.0 crashes in `ts.readConfigFile` (svelte-check, the unit tests, and the build). 6.0.3 passes all of them. TypeScript 7 is tested again when TypeScript publishes its next release, and whenever SvelteKit or typescript-eslint adds support for the 7.x API.
+- **TypeScript 7.0.2 is held back; the web UI stays on TypeScript 6.0.3** (TOOLS-004, first recorded 2026-10-27, retested 2026-11-14). TypeScript 7.0 has no JavaScript API until 7.1. typescript-eslint 8.72.2 refuses it (lint), SvelteKit 3.1.0 crashes in `ts.readConfigFile` (svelte-check, the unit tests, and the build), and openapi-typescript 7.13.0 crashes generating the API types (`check:api`). 6.0.3 passes all of them. TypeScript 7 is tested again when TypeScript publishes its next release, and whenever SvelteKit or typescript-eslint adds support for the 7.x API.
 
 ## 0.6.3 - 2026-10-28
 

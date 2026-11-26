@@ -30,8 +30,8 @@ Example: `<RankingTables kind="utilization" view={ranking} />`
 
 {#snippet coverage(c: { valid: number; expected: number })}
 	{c.valid} of {c.expected}{#if c.valid < c.expected}<strong class="partial">
-			(partial)</strong
-		>{/if}
+			(partial)
+		</strong>{/if}
 {/snippet}
 
 {#snippet subject(ref: { interface_id: string; device: string; name: string })}
@@ -57,12 +57,12 @@ Example: `<RankingTables kind="utilization" view={ranking} />`
 					<tr>
 						<td class="num">{r.rank}</td>
 						<td>{@render subject(r.interface)}</td>
-						<td class="num"
-							>{percent(r.in_p95_pct)} <span class="muted">{bitRate(r.in_p95_bps)}</span></td
-						>
-						<td class="num"
-							>{percent(r.out_p95_pct)} <span class="muted">{bitRate(r.out_p95_bps)}</span></td
-						>
+						<td class="num">
+							{percent(r.in_p95_pct)} <span class="muted">{bitRate(r.in_p95_bps)}</span>
+						</td>
+						<td class="num">
+							{percent(r.out_p95_pct)} <span class="muted">{bitRate(r.out_p95_bps)}</span>
+						</td>
 						<td>{bitRate(r.capacity_bps)} <span class="muted">({r.capacity_source})</span></td>
 						<td>{@render coverage(r.coverage)}</td>
 					</tr>

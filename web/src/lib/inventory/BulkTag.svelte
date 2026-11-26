@@ -88,28 +88,25 @@ Example: `<BulkTag rows={page.rows} {selected} onSelectPage={all} onClear={clear
 			if (ready) apply.mutate();
 		}}
 	>
-		<label
-			><input
+		<label>
+			<input
 				type="checkbox"
 				checked={allOnPage}
 				disabled={rows.length === 0}
 				onchange={(e) => onSelectPage(e.currentTarget.checked)}
 			/>
-			Select all {rows.length} on this page</label
-		>
-		<label
-			>Tags to add <input bind:value={add} maxlength="4096" aria-describedby="bulk-note" /></label
-		>
-		<label
-			>Tags to remove <input
-				bind:value={remove}
-				maxlength="4096"
-				aria-describedby="bulk-note"
-			/></label
-		>
+			Select all {rows.length} on this page
+		</label>
+		<label>
+			Tags to add <input bind:value={add} maxlength="4096" aria-describedby="bulk-note" />
+		</label>
+		<label>
+			Tags to remove <input bind:value={remove} maxlength="4096" aria-describedby="bulk-note" />
+		</label>
 		<button type="submit" disabled={!ready || apply.isPending}>Apply to {selected.length}</button>
-		<button type="button" onclick={onClear} disabled={selected.length === 0}>Clear selection</button
-		>
+		<button type="button" onclick={onClear} disabled={selected.length === 0}>
+			Clear selection
+		</button>
 	</form>
 	<p id="bulk-note" class="muted note">
 		Comma-separated vakr tags. Tags from descriptions are not changed. At most {MAX} interfaces per change.

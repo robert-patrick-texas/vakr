@@ -79,9 +79,9 @@ Example: `<AppNav current="/devices" />`
 		<ul>
 			{#each items as item (item.href)}
 				<li>
-					<a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}
-						>{item.label}</a
-					>
+					<a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+						{item.label}
+					</a>
 				</li>
 			{/each}
 		</ul>

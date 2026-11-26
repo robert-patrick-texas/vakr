@@ -79,7 +79,7 @@ direct_dependencies = true
 extra = []
 # Packages compared with the newest release on another pin's major line
 # instead of npm's `latest`. Node's type definitions describe the Node the
-# build runs (24 LTS), not the newest Current release (ADR-036).
+# build runs (26 LTS), not the newest Current release (ADR-036).
 lines = { "@types/node" = "web/.node-version" }
 
 [actions]

@@ -64,8 +64,9 @@ Example: `<InterfaceGraphCard row={row} range={{ range: '24h' }} />`
 <article class="card graph-card" bind:this={card} data-interface={row.ref.name}>
 	<h3>
 		<Link href={interfaceHref(row.ref.interface_id, range)}>{row.ref.name}</Link>
-		{#each row.ref.markers as m (m)}<span class="tag">{m === 'primary' ? 'High priority' : m}</span
-			>{/each}
+		{#each row.ref.markers as m (m)}<span class="tag">
+				{m === 'primary' ? 'High priority' : m}
+			</span>{/each}
 	</h3>
 	{#if row.ref.alias}<p class="muted alias">{row.ref.alias}</p>{/if}
 	<p class="now">

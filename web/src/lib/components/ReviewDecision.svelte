@@ -74,8 +74,10 @@ Example: `<ReviewDecision review={r} />`
 						decision: 'map',
 						interfaceId: c.interface_id,
 						text: `ifIndex ${review.if_index} is ${c.name}`
-					})}>It is {c.name}</button
+					})}
 			>
+				It is {c.name}
+			</button>
 		{/each}
 		{#if review.candidates.length > 0}
 			<button
@@ -85,8 +87,10 @@ Example: `<ReviewDecision review={r} />`
 						decision: 'new',
 						interfaceId: review.candidates[0]?.interface_id ?? '',
 						text: `ifIndex ${review.if_index} is a new interface`
-					})}>It is a new interface</button
+					})}
 			>
+				It is a new interface
+			</button>
 		{:else}
 			<p class="muted">No candidate: decide with <code>vakr interface review</code> on the node.</p>
 		{/if}
@@ -97,11 +101,13 @@ Example: `<ReviewDecision review={r} />`
 		<button
 			type="button"
 			disabled={decide.isPending}
-			onclick={() => pending && decide.mutate(pending)}>Confirm</button
+			onclick={() => pending && decide.mutate(pending)}
 		>
-		<button type="button" disabled={decide.isPending} onclick={() => (pending = null)}
-			>Cancel</button
-		>
+			Confirm
+		</button>
+		<button type="button" disabled={decide.isPending} onclick={() => (pending = null)}>
+			Cancel
+		</button>
 	{/if}
 	{#if outcome}<p role="status" data-testid="decision-outcome">{outcome}</p>{/if}
 </div>

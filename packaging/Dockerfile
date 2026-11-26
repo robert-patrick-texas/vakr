@@ -11,18 +11,18 @@
 
 ARG BASE_IMAGE=ubuntu:26.04
 
-# nfpm v2.48.0, built statically. `go install` verifies every module against
+# nfpm v2.49.0, built statically. `go install` verifies every module against
 # the Go checksum database, so a tampered module fails the build.
-FROM golang:1.27.3@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b AS nfpm
-RUN CGO_ENABLED=0 GOBIN=/out go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.48.0
+FROM golang:1.27.4@sha256:5f1b98fa02fe396ebce2a0227a0e08309e11792915b9dd2e1f71053d7e7e6666 AS nfpm
+RUN CGO_ENABLED=0 GOBIN=/out go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.49.0
 
-# uv 0.13.6, pinned by image digest.
-FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
+# uv 0.13.10, pinned by image digest.
+FROM ghcr.io/astral-sh/uv:0.13.10@sha256:a3ea1357342c1a4bf9a0c53a3deb1b55379aefa037338d8113d5771efa01774f AS uv
 
-# Node.js 24.22.1 and its npm 11.19.1, pinned by image digest: the LTS line of
+# Node.js 26.13.1 and its npm 11.20.0, pinned by image digest: the LTS line of
 # web/.node-version. They only build the web UI (ADR-035); the package ships
 # the built files and never Node. Change with web/.node-version and engines.
-FROM node:24.22.1-trixie-slim@sha256:43b9ba1142b8dcf33fa8f922ca1be85714adc444e0586c7cf7726daaeabc1bea AS node
+FROM node:26.13.1-trixie-slim@sha256:abe7e5a82b61a8ef67b315b85497c9e65173387ccf2f4a029248184b8e020be5 AS node
 
 FROM ${BASE_IMAGE}
 # binutils provides readelf for the glibc symbol-version gate in build.sh.

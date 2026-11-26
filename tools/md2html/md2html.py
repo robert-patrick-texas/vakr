@@ -3,8 +3,8 @@
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
-#     "markdown-it-py==4.2.0",
-#     "mdit-py-plugins==0.6.1",
+#     "markdown-it-py==4.3.0",
+#     "mdit-py-plugins==0.7.0",
 # ]
 # ///
 """Build a static HTML site from every Markdown file in a directory tree.

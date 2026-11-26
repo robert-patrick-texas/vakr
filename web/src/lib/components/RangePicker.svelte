@@ -77,15 +77,19 @@ Example: `<RangePicker range={range} zone="America/Chicago" onChange={(r) => set
 			onclick={() => {
 				onChange({ preset });
 				announce(`Range ${preset}`);
-			}}>{preset}</button
+			}}
 		>
+			{preset}
+		</button>
 	{/each}
 	<button
 		type="button"
 		aria-pressed={range.preset === null}
 		aria-expanded={open}
-		onclick={openCustom}>Custom…</button
+		onclick={openCustom}
 	>
+		Custom…
+	</button>
 </div>
 {#if open}
 	<form class="custom row" onsubmit={apply}>

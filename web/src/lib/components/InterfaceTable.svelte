@@ -67,8 +67,9 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 {#snippet indicators(r: InterfaceListRow)}
 	{#each r.ref.markers as m (m)}<span class="tag">{MARKER_WORDS[m] ?? m}</span>{/each}
 {/snippet}
-{#snippet device(r: InterfaceListRow)}<Link href={deviceHref(r.ref.device_id)}>{r.ref.device}</Link
-	>{/snippet}
+{#snippet device(r: InterfaceListRow)}<Link href={deviceHref(r.ref.device_id)}>
+		{r.ref.device}
+	</Link>{/snippet}
 {#snippet name(r: InterfaceListRow)}
 	<Link href={interfaceHref(r.ref.interface_id, keep)}>{r.ref.name}</Link>
 	{#if r.ref.alias}<div class="muted small">{r.ref.alias}</div>{/if}
@@ -99,9 +100,9 @@ Example: `<InterfaceTable rows={page.rows} sort="priority" onSort={setSort} show
 		reading={r.current.capacity}
 		compact
 	/>{/snippet}
-{#snippet addresses(r: InterfaceListRow)}<span class="mono small"
-		>{r.addresses.join(', ') || '—'}</span
-	>{/snippet}
+{#snippet addresses(r: InterfaceListRow)}<span class="mono small">
+		{r.addresses.join(', ') || '—'}
+	</span>{/snippet}
 {#snippet age(r: InterfaceListRow)}<ReadingText reading={r.current.age} compact />{/snippet}
 
 <DataTable

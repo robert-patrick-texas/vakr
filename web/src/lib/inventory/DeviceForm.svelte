@@ -184,8 +184,9 @@ Example: `<DeviceForm record={null} />` (add) or `<DeviceForm {record} onReload=
 						>
 							{#if field === 'site'}
 								<option value="">No site</option>
-								{#each options.value.sites as s (s.id)}<option value={s.name}>{s.name}</option
-									>{/each}
+								{#each options.value.sites as s (s.id)}<option value={s.name}>
+										{s.name}
+									</option>{/each}
 							{/if}
 							{#each choices ?? [] as [value, text] (value)}<option {value}>{text}</option>{/each}
 							{#if field === 'admin_state' && before.admin_state === 'retired'}
@@ -217,12 +218,12 @@ Example: `<DeviceForm record={null} />` (add) or `<DeviceForm {record} onReload=
 		</div>
 	{/if}
 	<div class="row">
-		{#if editable}<button type="submit" disabled={save.isPending}
-				>{current ? 'Save changes' : 'Add device'}</button
-			>{/if}
-		<a href={current ? deviceHref(current.id) : '/devices'}
-			>{current ? 'Back to the device' : 'Cancel'}</a
-		>
+		{#if editable}<button type="submit" disabled={save.isPending}>
+				{current ? 'Save changes' : 'Add device'}
+			</button>{/if}
+		<a href={current ? deviceHref(current.id) : '/devices'}>
+			{current ? 'Back to the device' : 'Cancel'}
+		</a>
 	</div>
 </form>
 

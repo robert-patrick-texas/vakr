@@ -102,9 +102,9 @@ A link back keeps the list's filters when the user came from a list.
 			<h2 id="identity-h">Identity history</h2>
 			<IdentityHistory interfaceId={id} {zone} />
 			<p class="muted note">
-				Identity reviews and the admin's decision are on the <a href="/identity-reviews"
-					>identity reviews</a
-				> page. Policy explanations are not in API v1 yet.
+				Identity reviews and the admin's decision are on the <a href="/identity-reviews">
+					identity reviews
+				</a> page. Policy explanations are not in API v1 yet.
 			</p>
 		</section>
 	{/snippet}

@@ -44,36 +44,36 @@ Example: `<InterfaceFilters filters={f} options={o} onChange={apply} />`
 >
 	{#if !ranking}
 		<div class="row">
-			<label
-				>Search name, alias, description, provider, circuit
-				<input type="search" maxlength="256" bind:value={search} /></label
-			>
+			<label>
+				Search name, alias, description, provider, circuit
+				<input type="search" maxlength="256" bind:value={search} />
+			</label>
 			<button type="submit">Apply</button>
 		</div>
 	{/if}
 	<div class="row">
 		{#each [['site', 'Site', options.sites], ['tag', 'Tag', options.tags], ['group', 'Group', options.groups], ['collector', 'Values from', options.collectors]] as const as [key, text, list] (key)}
-			<label
-				>{text}
+			<label>
+				{text}
 				<select
 					value={filters[key] ?? ''}
 					onchange={(e) => set({ [key]: e.currentTarget.value || null })}
 				>
 					<option value="">{key === 'collector' ? 'Local collector' : 'Any'}</option>
 					{#each list as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
-				</select></label
-			>
+				</select>
+			</label>
 		{/each}
-		<label
-			>Provider
+		<label>
+			Provider
 			<input
 				value={filters.provider ?? ''}
 				maxlength="256"
 				onchange={(e) => set({ provider: e.currentTarget.value.trim() || null })}
-			/></label
-		>
-		<label
-			>WAN
+			/>
+		</label>
+		<label>
+			WAN
 			<select
 				value={filters.wan === true ? 'true' : filters.wan === false ? 'false' : ''}
 				onchange={(e) => {
@@ -84,10 +84,10 @@ Example: `<InterfaceFilters filters={f} options={o} onChange={apply} />`
 				<option value="">Any</option>
 				<option value="true">WAN circuits only</option>
 				<option value="false">Not WAN circuits</option>
-			</select></label
-		>
-		<label
-			>Interest
+			</select>
+		</label>
+		<label>
+			Interest
 			<select
 				value={filters.interest ?? ''}
 				onchange={(e) =>
@@ -96,46 +96,47 @@ Example: `<InterfaceFilters filters={f} options={o} onChange={apply} />`
 				<option value="">Any</option>
 				<option value="primary">High priority</option>
 				<option value="secondary">Other</option>
-			</select></label
-		>
-		<label
-			>Lifecycle
+			</select>
+		</label>
+		<label>
+			Lifecycle
 			<select
 				value={filters.lifecycle ?? ''}
 				onchange={(e) =>
 					set({ lifecycle: (e.currentTarget.value || null) as InterfaceQuery['lifecycle'] })}
 			>
 				<option value="">Any but retired</option>
-				{#each ['active', 'inactive', 'stale', 'retired'] as l (l)}<option value={l}>{l}</option
-					>{/each}
-			</select></label
-		>
-		<label
-			><input
+				{#each ['active', 'inactive', 'stale', 'retired'] as l (l)}<option value={l}>
+						{l}
+					</option>{/each}
+			</select>
+		</label>
+		<label>
+			<input
 				type="checkbox"
 				checked={filters.include_retired}
 				onchange={(e) => set({ include_retired: e.currentTarget.checked })}
-			/> Include retired</label
-		>
+			/> Include retired
+		</label>
 		{#if classify}
-			<label
-				><input
+			<label>
+				<input
 					type="checkbox"
 					checked={filters.unclassified === true}
 					onchange={(e) => set({ unclassified: e.currentTarget.checked || undefined })}
-				/> Only not yet classified</label
-			>
+				/> Only not yet classified
+			</label>
 		{/if}
 		{#if !ranking}
-			<label
-				>Rows per page
+			<label>
+				Rows per page
 				<select
 					value={String(filters.limit)}
 					onchange={(e) => set({ limit: Number(e.currentTarget.value) })}
 				>
 					{#each PAGE_SIZES as n (n)}<option value={String(n)}>{n}</option>{/each}
-				</select></label
-			>
+				</select>
+			</label>
 		{/if}
 	</div>
 </form>

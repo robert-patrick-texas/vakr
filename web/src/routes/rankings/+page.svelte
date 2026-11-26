@@ -89,17 +89,17 @@ so while it waits. Exports are the API's bounded CSV and JSON files.
 <div class="row">
 	<div class="row" role="group" aria-label="Window">
 		{#each WINDOWS as w (w)}
-			<button type="button" aria-pressed={w === window} onclick={() => apply({ window: w })}
-				>{w}</button
-			>
+			<button type="button" aria-pressed={w === window} onclick={() => apply({ window: w })}>
+				{w}
+			</button>
 		{/each}
 	</div>
-	<label
-		>Rows
+	<label>
+		Rows
 		<select value={String(rows)} onchange={(e) => apply({ rows: Number(e.currentTarget.value) })}>
 			{#each ROWS as n (n)}<option value={String(n)}>{n}</option>{/each}
-		</select></label
-	>
+		</select>
+	</label>
 </div>
 {#if window === '24h'}
 	<p class="muted">

@@ -35,7 +35,7 @@ def names(client: object, **params: object) -> list[str]:
     Raises:
         None
     """
-    answer = client.get("/api/v1/devices", params=params)  # ty: ignore[unresolved-attribute]
+    answer = client.get("/api/v1/devices", params=params)  # ty: ignore[missing-attribute]
     assert answer.status_code == 200
     return [row["name"] for row in answer.json()["rows"]]
 

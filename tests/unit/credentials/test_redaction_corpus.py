@@ -262,7 +262,7 @@ def test_cred_002_exception_with_credential_in_scope(install: Install, fake: Fak
     dsn = provider.secret("metadata-dsn")
     seen = [failure_text(lambda c=c: _poll(c)) for c in (v2c, v3, dsn)]
     seen.append(failure_text(lambda: v2c.community == fake.community))
-    seen.append(failure_text(lambda: Secret(fake.community).missing))  # ty: ignore[unresolved-attribute]
+    seen.append(failure_text(lambda: Secret(fake.community).missing))  # ty: ignore[missing-attribute]
     seen.append(failure_text(lambda: setattr(v3, "username", "x")))
     assert "Secret('***')" in seen[0]
     assert_no_secret("\n".join(seen), fake.values())

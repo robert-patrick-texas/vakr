@@ -38,15 +38,15 @@ Example: `<OverviewPanels overview={data} />`
 <section class="card" aria-labelledby="summary-h">
 	<h2 id="summary-h">Device state</h2>
 	<p class="row">
-		<Link href={devicesHref({ bucket: ['attention'] })}
-			>Attention: <strong>{d.counts.attention}</strong></Link
-		>
-		<Link href={devicesHref({ bucket: ['active'] })}
-			>Active: <strong>{d.counts.active}</strong></Link
-		>
-		<Link href={devicesHref({ bucket: ['offline'] })}
-			>Offline/Retired: <strong>{d.counts.offline}</strong></Link
-		>
+		<Link href={devicesHref({ bucket: ['attention'] })}>
+			Attention: <strong>{d.counts.attention}</strong>
+		</Link>
+		<Link href={devicesHref({ bucket: ['active'] })}>
+			Active: <strong>{d.counts.active}</strong>
+		</Link>
+		<Link href={devicesHref({ bucket: ['offline'] })}>
+			Offline/Retired: <strong>{d.counts.offline}</strong>
+		</Link>
 		<span class="muted">of {d.total}{d.truncated ? ' (truncated)' : ''}</span>
 	</p>
 	<ul class="plain">
@@ -77,11 +77,13 @@ Example: `<OverviewPanels overview={data} />`
 				{#each feed.rows as e, i (i)}
 					<li>
 						{formatInstant(e.at, zone)}
-						{#if e.device_id}<Link href={deviceHref(e.device_id)}>{e.subject}</Link
-							>{:else}{e.subject}{/if}:
+						{#if e.device_id}<Link href={deviceHref(e.device_id)}>
+								{e.subject}
+							</Link>{:else}{e.subject}{/if}:
 						{e.text}
-						{#if feed.kind === 'identity_review' && !kiosk}<a href="/identity-reviews">review</a
-							>{/if}
+						{#if feed.kind === 'identity_review' && !kiosk}<a href="/identity-reviews">
+								review
+							</a>{/if}
 					</li>
 				{/each}
 			</ul>
@@ -99,8 +101,9 @@ Example: `<OverviewPanels overview={data} />`
 		{#if overview.filters.providers.length > 0}
 			<h3>Providers</h3>
 			<p class="row">
-				{#each overview.filters.providers as p (p)}<a href={interfacesHref({ provider: p })}>{p}</a
-					>{/each}
+				{#each overview.filters.providers as p (p)}<a href={interfacesHref({ provider: p })}>
+						{p}
+					</a>{/each}
 			</p>
 		{/if}
 		{#each [['Sites', 'site', overview.filters.sites], ['Tags', 'tag', overview.filters.tags], ['Groups', 'group', overview.filters.groups]] as const as [title, key, list] (key)}

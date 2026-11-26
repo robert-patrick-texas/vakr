@@ -17,7 +17,7 @@ The web UI is a static SvelteKit app in `web/`, built to plain files that `vakr-
 
 | Tool | Version | Where it is pinned |
 |---|---|---|
-| Node.js | 24.22.1 (24 LTS), exact | `web/.node-version` (read by CI's `setup-node` and the release preflight), `engines` in `web/package.json` (`engine-strict` in `web/.npmrc`), and the builder image in `packaging/Dockerfile`, which a test keeps equal to `web/.node-version` |
+| Node.js | 26.13.1 (26 LTS), exact | `web/.node-version` (read by CI's `setup-node` and the release preflight), `engines` in `web/package.json` (`engine-strict` in `web/.npmrc`), and the builder image in `packaging/Dockerfile`, which a test keeps equal to `web/.node-version` |
 | npm | 11.19 or newer | `engines` |
 | Packages | exact versions | `web/package.json` (no ranges) and `web/package-lock.json` |
 
@@ -129,8 +129,8 @@ $ make web-e2e                                  # builds, then runs Playwright
 On a host without Chromium's system libraries (and without root to install them), run the browser in the Playwright container and point the tests at it; the test servers stay on the host:
 
 ```console
-$ docker run --rm --network host --init mcr.microsoft.com/playwright:v1.64.1-noble \
-    /bin/sh -c "cd /tmp && npx -y playwright@1.64.1 run-server --port 3123 --host 127.0.0.1" &
+$ docker run --rm --network host --init mcr.microsoft.com/playwright:v1.65.1-noble \
+    /bin/sh -c "cd /tmp && npx -y playwright@1.65.1 run-server --port 3123 --host 127.0.0.1" &
 $ cd web && PW_WS_ENDPOINT=ws://127.0.0.1:3123/ npx playwright test
 ```
 

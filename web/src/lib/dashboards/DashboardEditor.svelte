@@ -135,9 +135,9 @@ Example: `<DashboardEditor initial={newDraft()} id={null} version={null} names={
 			bind:value={draft.description}></textarea>
 		<label for="d-refresh">Refresh every</label>
 		<select id="d-refresh" bind:value={draft.refresh_s}>
-			{#each REFRESH_CHOICES as s (s)}<option value={s}
-					>{s < 60 ? `${s} s` : `${s / 60} min`}</option
-				>{/each}
+			{#each REFRESH_CHOICES as s (s)}<option value={s}>
+					{s < 60 ? `${s} s` : `${s / 60} min`}
+				</option>{/each}
 		</select>
 	</div>
 
@@ -156,14 +156,17 @@ Example: `<DashboardEditor initial={newDraft()} id={null} version={null} names={
 	<div class="row">
 		<label for="d-add">Add a widget</label>
 		<select id="d-add" bind:value={adding}>
-			{#each Object.entries(KIND_NAMES) as [kind, name] (kind)}<option value={kind}>{name}</option
-				>{/each}
+			{#each Object.entries(KIND_NAMES) as [kind, name] (kind)}<option value={kind}>
+					{name}
+				</option>{/each}
 		</select>
 		<button
 			type="button"
 			disabled={draft.widgets.length >= LIMITS.widgets}
-			onclick={() => (draft.widgets = [...draft.widgets, emptyWidget(adding)])}>Add</button
+			onclick={() => (draft.widgets = [...draft.widgets, emptyWidget(adding)])}
 		>
+			Add
+		</button>
 	</div>
 
 	{#if found.length > 0}
@@ -184,8 +187,9 @@ Example: `<DashboardEditor initial={newDraft()} id={null} version={null} names={
 		{/if}
 	</div>
 	{#if outcome}<p role="status" data-testid="editor-outcome">{outcome}</p>{/if}
-	{#if conflict && onReload}<button type="button" onclick={onReload}>Reload the dashboard</button
-		>{/if}
+	{#if conflict && onReload}<button type="button" onclick={onReload}>
+			Reload the dashboard
+		</button>{/if}
 </form>
 
 <style>

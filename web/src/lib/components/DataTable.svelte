@@ -103,9 +103,9 @@ Example:
 						<th scope="col" aria-sort={ariaSort(column, sort)} class:num={column?.numeric}>
 							{#if column?.sortKey !== undefined && onSort}
 								<button type="button" class="sort" onclick={() => choose(column)}>
-									{column.header}<span class="arrow" aria-hidden="true"
-										>{column.sortKey === sort ? '▾' : '↕'}</span
-									>
+									{column.header}<span class="arrow" aria-hidden="true">
+										{column.sortKey === sort ? '▾' : '↕'}
+									</span>
 								</button>
 							{:else}
 								<FlexRender {header} />

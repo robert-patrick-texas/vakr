@@ -60,14 +60,14 @@ Example: `<RetireDevice record={record} />`
 			can restore it later.
 		</p>
 		{#if asking}
-			<button type="button" onclick={() => retire.mutate()} disabled={retire.isPending}
-				>Yes, retire {record.name}</button
-			>
+			<button type="button" onclick={() => retire.mutate()} disabled={retire.isPending}>
+				Yes, retire {record.name}
+			</button>
 			<button type="button" onclick={() => (asking = false)}>Keep it</button>
 		{:else}
-			<button type="button" onclick={() => (asking = true)} disabled={!record.editable}
-				>Retire device</button
-			>
+			<button type="button" onclick={() => (asking = true)} disabled={!record.editable}>
+				Retire device
+			</button>
 		{/if}
 	{/if}
 	{#if refused}<p class="notice notice-red" role="alert">{refused}</p>{/if}

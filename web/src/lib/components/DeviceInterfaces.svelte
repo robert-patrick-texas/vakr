@@ -89,16 +89,16 @@ Example: `<DeviceInterfaces deviceId={id} total={detail.interfaces_total} view="
 		>
 			<label>Find an interface <input type="search" maxlength="256" bind:value={search} /></label>
 			<button type="submit">Search</button>
-			<label
-				><input
+			<label>
+				<input
 					type="checkbox"
 					checked={unclassified}
 					onchange={(e) => {
 						unclassified = e.currentTarget.checked;
 						other.reset();
 					}}
-				/> Only not yet classified</label
-			>
+				/> Only not yet classified
+			</label>
 		</form>
 		<PageStatus
 			state={pageState(rest, { isEmpty })}

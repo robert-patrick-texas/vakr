@@ -45,9 +45,9 @@ Example: `<KioskHeader title="WAN circuits" updatedAt={query.dataUpdatedAt} refr
 			{position.current} of {position.total} · next: {position.nextTitle}
 			{paused ? '(paused)' : `in ${position.nextInS} s`}
 			{#if onPause}
-				<button type="button" onclick={onPause} aria-pressed={paused}
-					>{paused ? 'Resume rotation' : 'Pause rotation'}</button
-				>
+				<button type="button" onclick={onPause} aria-pressed={paused}>
+					{paused ? 'Resume rotation' : 'Pause rotation'}
+				</button>
 			{/if}
 		</p>
 	{/if}

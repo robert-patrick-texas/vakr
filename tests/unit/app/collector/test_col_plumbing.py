@@ -195,8 +195,8 @@ def test_entry_runs_the_service_with_signals(
             Raises:
                 None
             """
-            await self.parts.spool.close()  # ty: ignore[unresolved-attribute]
-            await self.parts.close()  # ty: ignore[unresolved-attribute]
+            await self.parts.spool.close()  # ty: ignore[missing-attribute]
+            await self.parts.close()  # ty: ignore[missing-attribute]
             return 0
 
     monkeypatch.setattr(entry, "CollectorService", QuickService)

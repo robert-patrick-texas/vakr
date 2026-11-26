@@ -146,5 +146,5 @@ def create_app(context: ApiContext | None = None, *, web: WebMount | None = None
             app.openapi_schema = describe_security(base_openapi(), API_PREFIX, ANONYMOUS_PATHS)
         return app.openapi_schema
 
-    app.openapi = openapi  # ty: ignore[invalid-assignment]
+    app.openapi = openapi
     return app

@@ -54,8 +54,9 @@ decision controls.
 					Candidates:
 					{#each r.candidates as c, i (c.interface_id)}{#if i > 0},
 						{/if}<a href={interfaceHref(c.interface_id)}>{c.name}</a>
-						<span class="muted">(ifIndex {c.if_index ?? '—'}, {c.lifecycle})</span
-						>{:else}none{/each}
+						<span class="muted">
+							(ifIndex {c.if_index ?? '—'}, {c.lifecycle})
+						</span>{:else}none{/each}
 				</p>
 				{#if isAdmin()}<ReviewDecision review={r} />{/if}
 			</article>

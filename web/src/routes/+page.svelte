@@ -82,8 +82,10 @@ state; it never turns into devices being down (UI-014, UI-015).
 					<button
 						type="button"
 						aria-pressed={w === window}
-						onclick={() => goto(`/?window=${w}`, { replace: true, reset: false })}>{w}</button
+						onclick={() => goto(`/?window=${w}`, { replace: true, reset: false })}
 					>
+						{w}
+					</button>
 				{/each}
 				<a href="/rankings?window={window}">Full rankings</a>
 			</div>

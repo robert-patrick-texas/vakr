@@ -79,12 +79,12 @@ devices are not declared down (invariant 2).
 											: 'no health report yet'}
 									/>
 								</td>
-								<td
-									>{#if c.health}<ReadingText reading={c.health.age} /> ago{:else}—{/if}</td
-								>
-								<td
-									>{#if c.health}<ReadingText reading={c.health.spool} />{:else}—{/if}</td
-								>
+								<td>
+									{#if c.health}<ReadingText reading={c.health.age} /> ago{:else}—{/if}
+								</td>
+								<td>
+									{#if c.health}<ReadingText reading={c.health.spool} />{:else}—{/if}
+								</td>
 								<td>{c.enabled ? 'yes' : 'no'}</td>
 								<td><a href={devicesHref({ collector: c.id })}>Devices it has seen</a></td>
 							</tr>

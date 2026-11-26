@@ -48,10 +48,10 @@ Example: `<GraphPanel interfaceId={id} kind="traffic" params={{ range: '24h' }} 
 		{#snippet children(view)}
 			{#if view.available}
 				{#if view.references.length > 0}
-					<label class="refs"
-						><input type="checkbox" bind:checked={references} /> Show
-						{view.references.map((r) => r.label).join(' and ')}</label
-					>
+					<label class="refs">
+						<input type="checkbox" bind:checked={references} /> Show
+						{view.references.map((r) => r.label).join(' and ')}
+					</label>
 				{/if}
 				<TimeSeriesChart {view} showReferences={references} />
 				<p class="muted legend-note">

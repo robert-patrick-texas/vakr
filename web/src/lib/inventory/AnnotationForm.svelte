@@ -164,8 +164,9 @@ Example: `<AnnotationForm annotation={a} onSaved={keep} onReload={refetch} />`
 		<div class="notice notice-red" role="alert" tabindex="-1" bind:this={summary}>
 			<strong>Not saved.</strong>
 			{refusal.summary}
-			{#if refusal.conflict}<button type="button" onclick={onReload}>Reload the annotation</button
-				>{/if}
+			{#if refusal.conflict}<button type="button" onclick={onReload}>
+					Reload the annotation
+				</button>{/if}
 		</div>
 	{/if}
 	{#if !owner}<button type="submit" disabled={save.isPending}>Save annotation</button>{/if}

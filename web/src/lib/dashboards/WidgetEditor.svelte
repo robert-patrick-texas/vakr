@@ -39,14 +39,18 @@ Example: `<WidgetEditor bind:widget={draft.widgets[n]} index={n} count={n2} ... 
 			type="button"
 			disabled={index === 0}
 			onclick={() => onMove(-1)}
-			aria-label="Move widget {index + 1} up">↑</button
+			aria-label="Move widget {index + 1} up"
 		>
+			↑
+		</button>
 		<button
 			type="button"
 			disabled={index === count - 1}
 			onclick={() => onMove(1)}
-			aria-label="Move widget {index + 1} down">↓</button
+			aria-label="Move widget {index + 1} down"
 		>
+			↓
+		</button>
 		<button type="button" onclick={onRemove}>Remove widget</button>
 	</div>
 	{#if widget.kind === 'pinned_interfaces'}

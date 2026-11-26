@@ -165,9 +165,9 @@ Example: `<KioskTokens />`
 								<td>{t.created_by}</td>
 								<td>
 									{#if confirming?.id === t.id}
-										<button type="button" onclick={() => revoke.mutate(t)}
-											>Yes, revoke {t.label}</button
-										>
+										<button type="button" onclick={() => revoke.mutate(t)}>
+											Yes, revoke {t.label}
+										</button>
 										<button type="button" onclick={() => (confirming = null)}>Cancel</button>
 									{:else}
 										<button type="button" onclick={() => (confirming = t)}>Revoke</button>

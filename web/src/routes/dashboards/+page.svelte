@@ -59,9 +59,9 @@ dashboards (UI-007) come in a later release; the page says so.
 				{#each d.rows as b (b.id)}
 					<li>
 						<a href="/dashboards/{b.id}">{b.name}</a>
-						<span class="muted"
-							>{b.widgets} widget{b.widgets === 1 ? '' : 's'} · refreshes every {b.refresh_s} s</span
-						>
+						<span class="muted">
+							{b.widgets} widget{b.widgets === 1 ? '' : 's'} · refreshes every {b.refresh_s} s
+						</span>
 						{#if b.description}<div class="muted">{b.description}</div>{/if}
 					</li>
 				{/each}

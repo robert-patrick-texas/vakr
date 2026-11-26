@@ -71,86 +71,86 @@ Example: `<DeviceFilters filters={f} options={o} onChange={apply} />`
 	<fieldset class="row">
 		<legend>Status</legend>
 		{#each buckets as [value, text] (value)}
-			<label
-				><input
+			<label>
+				<input
 					type="checkbox"
 					checked={filters.bucket?.includes(value)}
 					onchange={() => set({ bucket: toggle(filters.bucket, value) })}
 				/>
-				{text}</label
-			>
+				{text}
+			</label>
 		{/each}
 	</fieldset>
 	<fieldset class="row">
 		<legend>Freshness</legend>
 		{#each freshness as [value, text] (value)}
-			<label
-				><input
+			<label>
+				<input
 					type="checkbox"
 					checked={filters.freshness?.includes(value)}
 					onchange={() => set({ freshness: toggle(filters.freshness, value) })}
 				/>
-				{text}</label
-			>
+				{text}
+			</label>
 		{/each}
 	</fieldset>
 	<div class="row">
 		{#each [['site', 'Site', options.sites], ['tag', 'Tag', options.tags], ['group', 'Group', options.groups], ['collector', 'Collector', options.collectors]] as const as [key, text, list] (key)}
-			<label
-				>{text}
+			<label>
+				{text}
 				<select
 					value={filters[key] ?? ''}
 					onchange={(e) => set({ [key]: e.currentTarget.value || null })}
 				>
 					<option value="">Any</option>
 					{#each list as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
-				</select></label
-			>
+				</select>
+			</label>
 		{/each}
-		<label
-			>Provider
+		<label>
+			Provider
 			<input
 				value={filters.provider ?? ''}
 				maxlength="256"
 				onchange={(e) => set({ provider: e.currentTarget.value.trim() || null })}
-			/></label
-		>
-		<label
-			>Admin state
+			/>
+		</label>
+		<label>
+			Admin state
 			<select
 				value={filters.admin_state ?? ''}
 				onchange={(e) =>
 					set({ admin_state: (e.currentTarget.value || null) as DeviceQuery['admin_state'] })}
 			>
 				<option value="">Any</option>
-				{#each ['enabled', 'maintenance', 'disabled', 'retired'] as s (s)}<option value={s}
-						>{s}</option
-					>{/each}
-			</select></label
-		>
-		<label
-			><input
+				{#each ['enabled', 'maintenance', 'disabled', 'retired'] as s (s)}<option value={s}>
+						{s}
+					</option>{/each}
+			</select>
+		</label>
+		<label>
+			<input
 				type="checkbox"
 				checked={filters.include_retired}
 				onchange={(e) => set({ include_retired: e.currentTarget.checked })}
-			/> Include retired</label
-		>
-		<label
-			>Rows per page
+			/> Include retired
+		</label>
+		<label>
+			Rows per page
 			<select
 				value={String(filters.limit)}
 				onchange={(e) => set({ limit: Number(e.currentTarget.value) })}
 			>
 				{#each PAGE_SIZES as n (n)}<option value={String(n)}>{n}</option>{/each}
-			</select></label
-		>
-		<label
-			><input
+			</select>
+		</label>
+		<label>
+			<input
 				type="checkbox"
 				checked={compact}
 				onchange={(e) => onChange(filters, e.currentTarget.checked)}
-			/> Compact rows</label
-		>
+			/> Compact rows
+		</label>
 	</div>
 </form>
 

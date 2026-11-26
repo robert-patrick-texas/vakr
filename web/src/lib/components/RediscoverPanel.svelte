@@ -108,7 +108,9 @@ Example: `<RediscoverPanel deviceId={id} />`
 	<button
 		type="button"
 		disabled={ask.isPending || (op !== null && isActive(op))}
-		onclick={() => ask.mutate()}>Rediscover now</button
+		onclick={() => ask.mutate()}
 	>
+		Rediscover now
+	</button>
 	{#if refusal}<p class="notice notice-amber" role="alert">{refusal}</p>{/if}
 </section>

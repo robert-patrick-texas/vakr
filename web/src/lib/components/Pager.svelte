@@ -49,8 +49,10 @@ Example:
 			onPrevious();
 			announce(`Page ${pageNumber - 1} of ${noun}`);
 		}}
-		disabled={pageNumber <= 1}>Previous</button
+		disabled={pageNumber <= 1}
 	>
+		Previous
+	</button>
 	<button type="button" onclick={next} disabled={page.next_cursor === null}>Next</button>
 </nav>
 

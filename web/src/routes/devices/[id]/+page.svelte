@@ -79,8 +79,9 @@ reviews. Facts from stale evidence say so.
 				<dd><ReadingText reading={d.row.site} /></dd>
 				<dt>Tags</dt>
 				<dd>
-					{#each d.row.tags as t (t)}<a class="tag" href={devicesHref({ search: t })}>{t}</a
-						>{:else}—{/each}
+					{#each d.row.tags as t (t)}<a class="tag" href={devicesHref({ search: t })}>
+							{t}
+						</a>{:else}—{/each}
 				</dd>
 				<dt>Admin state</dt>
 				<dd>{d.row.admin_state}</dd>
@@ -136,13 +137,17 @@ reviews. Facts from stale evidence say so.
 				<button
 					type="button"
 					aria-pressed={view === 'table'}
-					onclick={() => navigate(null, 'table')}>Table</button
+					onclick={() => navigate(null, 'table')}
 				>
+					Table
+				</button>
 				<button
 					type="button"
 					aria-pressed={view === 'graphs'}
-					onclick={() => navigate(null, 'graphs')}>Graphs</button
+					onclick={() => navigate(null, 'graphs')}
 				>
+					Graphs
+				</button>
 			</div>
 			<DeviceInterfaces deviceId={id} {view} range={params} />
 		</section>

@@ -52,19 +52,25 @@ Example: `<PinPicker bind:interfaces={w.interfaces} {names} idPrefix="w0" />`
 					type="button"
 					aria-label="Move {names[id] ?? 'interface'} up"
 					disabled={n === 0}
-					onclick={() => (interfaces = move(interfaces, n, -1))}>↑</button
+					onclick={() => (interfaces = move(interfaces, n, -1))}
 				>
+					↑
+				</button>
 				<button
 					type="button"
 					aria-label="Move {names[id] ?? 'interface'} down"
 					disabled={n === interfaces.length - 1}
-					onclick={() => (interfaces = move(interfaces, n, 1))}>↓</button
+					onclick={() => (interfaces = move(interfaces, n, 1))}
 				>
+					↓
+				</button>
 				<button
 					type="button"
 					aria-label="Unpin {names[id] ?? 'interface'}"
-					onclick={() => (interfaces = interfaces.filter((x) => x !== id))}>Unpin</button
+					onclick={() => (interfaces = interfaces.filter((x) => x !== id))}
 				>
+					Unpin
+				</button>
 			</li>
 		{/each}
 	</ol>
@@ -82,9 +88,9 @@ Example: `<PinPicker bind:interfaces={w.interfaces} {names} idPrefix="w0" />`
 				term = typed.trim();
 			}}
 		/>
-		<button type="button" disabled={typed.trim() === ''} onclick={() => (term = typed.trim())}
-			>Search</button
-		>
+		<button type="button" disabled={typed.trim() === ''} onclick={() => (term = typed.trim())}>
+			Search
+		</button>
 	</div>
 	{#if term && found.data}
 		{#if hits.length === 0}
@@ -98,8 +104,10 @@ Example: `<PinPicker bind:interfaces={w.interfaces} {names} idPrefix="w0" />`
 						<button
 							type="button"
 							disabled={interfaces.includes(id) || interfaces.length >= LIMITS.pinned}
-							onclick={() => add(id, h.label)}>{interfaces.includes(id) ? 'Pinned' : 'Pin'}</button
+							onclick={() => add(id, h.label)}
 						>
+							{interfaces.includes(id) ? 'Pinned' : 'Pin'}
+						</button>
 					</li>
 				{/each}
 			</ul>

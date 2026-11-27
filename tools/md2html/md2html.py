@@ -10,7 +10,8 @@
 """Build a static HTML site from every Markdown file in a directory tree.
 
 Documentation in a repository is written for a Git forge, where ``.md`` links
-and heading anchors just work. md2html renders each ``*.md`` under SRC_DIR to
+and heading anchors just work. md2html renders each ``*.md`` under SRC_DIR,
+except those git ignores, to
 HTML at the same relative path in OUT_DIR, adds ``index.html`` for directory
 READMEs and an ``all-docs.html`` listing, and wraps every page in the
 responsive light/dark ``template.html`` with a sidebar index of every page,
@@ -26,13 +27,16 @@ Dependencies:
         GitHub-compatible heading slugs and link resolution.
     md2html_nav: Sibling module with the per-page sidebar index and the
         top-bar repository link.
+    md2html_git: Sibling module that names the files git ignores, so private
+        notes beside the tree never become pages.
     markdown-it-py, mdit-py-plugins: Pinned in the inline script metadata
         above so ``uv run`` builds a matching environment on demand.
 
 Safety considerations:
     Files are written only beneath OUT_DIR and images are copied only from
-    inside SRC_DIR. OUT_DIR is never emptied, so files left by earlier runs
-    remain until the caller removes them. No timestamps are emitted, so
+    inside SRC_DIR. Markdown files git ignores are never rendered. OUT_DIR is
+    never emptied, so files left by earlier runs remain until the caller
+    removes them. No timestamps are emitted, so
     reruns produce byte-identical output.
 
 Example:
@@ -51,6 +55,7 @@ from pathlib import Path, PurePosixPath
 from string import Template
 from urllib.parse import quote
 
+import md2html_git
 from md2html_nav import Folder, build_tree, render_nav, repo_link
 from md2html_render import Page, make_parser, ref_ok, render_page
 
@@ -79,6 +84,9 @@ def is_excluded(rel: str, globs: list[str]) -> bool:
 def discover(src: Path, out: Path, globs: list[str]) -> list[str]:
     """Find the Markdown files to render, pruning excluded directories early.
 
+    Files git ignores are left out (``md2html_git``), so private notes kept
+    beside the tree never become pages.
+
     Args:
         src (Path): Directory searched recursively.
         out (Path): Output directory, skipped when it lies inside ``src``.
@@ -103,7 +111,8 @@ def discover(src: Path, out: Path, globs: list[str]) -> list[str]:
         )
         names = (str(here / f) for f in files if f.endswith(".md"))
         found += [name for name in names if not is_excluded(name, globs)]
-    return sorted(found)
+    private = md2html_git.ignored(src, found)
+    return sorted(name for name in found if name not in private)
 
 
 def listing(pages: list[Page]) -> Page:

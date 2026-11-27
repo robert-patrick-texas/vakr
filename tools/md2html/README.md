@@ -81,7 +81,7 @@ cp -r path/to/this/repo/tools/md2html your-project/tools/
 uv run your-project/tools/md2html/md2html.py your-project _site --check
 ```
 
-The directory holds `md2html.py` (the entry point, site assembly, and command line), `md2html_render.py` (page rendering, heading slugs, and link resolution), `md2html_nav.py` (the page index and the repository link), `template.html`, the tests, and this README. Change the look by editing `template.html`. Its `${...}` placeholders are filled with Python's `string.Template`.
+The directory holds `md2html.py` (the entry point, site assembly, and command line), `md2html_render.py` (page rendering, heading slugs, and link resolution), `md2html_nav.py` (the page index and the repository link), `md2html_git.py` (which files git ignores), `template.html`, the tests, and this README. Change the look by editing `template.html`. Its `${...}` placeholders are filled with Python's `string.Template`.
 
 **Portability rule:** md2html must never import anything from the project that hosts it, and must never hard-code anything about that project. Every project-specific value (title, repository URL, branch, exclusions) comes from the command line. Keep it that way when you change it, so the directory can be copied between projects unchanged.
 
@@ -100,6 +100,7 @@ When you bump a dependency, change the pin in `md2html.py`'s inline metadata and
 - Links inside raw HTML (`<a href>`, `<img src>`) are neither rewritten nor checked.
 - Footer source paths are computed from the Git checkout that contains `SRC_DIR`. Without a `.git` directory they are relative to `SRC_DIR`.
 - Only lowercase `.md` files are rendered.
+- In a git work tree, Markdown files git ignores are not rendered, so private notes kept beside the tree (listed in `.gitignore`) never become pages. A tracked file always renders, and so does a new file git doesn't ignore. Outside a work tree, or without git, every file is rendered.
 - The page index is repeated in every page, adding roughly 100 bytes per listed page to each one.
 - Without JavaScript, the sidebar cannot scroll itself to the current page. On a very long index the current page can sit below the sidebar's fold, although its group is open.
 

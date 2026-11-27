@@ -6,7 +6,7 @@ vakr builds and ships with the newest release of every tool and dependency: the 
 |---|---|---|
 | `make updates` | Lists every pinned toolchain (Python, Go, Node), PyPI and npm dependency, action, builder-image pin, and tool version next to the latest stable release, with release-notes links. | TOOLS-001 |
 | `make updates UPDATES_FLAGS=--gate` | The release gate: exits 1 unless every item is current or held by a recorded exception. `tools/release` runs it in preflight. | TOOLS-005 |
-| `make audit` | Fails if any locked runtime or development dependency has a known vulnerability. | QG-008 |
+| `make audit` | Fails if any locked runtime or development dependency has a known vulnerability. `make check` runs it last. | QG-008 |
 | Dependabot | Opens weekly pull requests for GitHub Actions, `uv`, and npm dependencies, with no waiting period. | TOOLS-002 (supplement only) |
 
 ## Running the update check
@@ -54,6 +54,7 @@ Some items appear twice on purpose:
 
 - `markdown-it-py` appears once as a locked dev dependency and once as a pin in `tools/md2html`'s inline script metadata. The two pins are independent and both must move.
 - `uv` appears for the developer host and for the package builder image. Both must move.
+- `packaging` and `tomlkit` appear as locked dependencies and again as `NAME (packaging/build-constraints.txt)`: with hatchling, they are the package build's hash-pinned build backend, which `uv.lock` does not cover (`[pypi] requirements`). Both must move.
 - The row `uv.lock (all packages)` summarises what `uv lock --upgrade` would change. It adds rows only for packages that are not already listed by name, which are usually transitive dependencies. Its command passes a far-future `--exclude-newer`, which overrides any `exclude-newer` a developer's `uv.toml` or `UV_EXCLUDE_NEWER` sets, so a cutoff on one host cannot hide a new release.
 
 ## Release-time policy (TOOLS-002)
@@ -95,6 +96,7 @@ Dependabot pull requests are welcome between releases, but they do not replace t
 | An action with a tag pin (`@v7`) | Change the major version when a new one is released, after reading its release notes. |
 | An action with a commit pin | Replace the SHA and the `# vX.Y.Z` comment together. `gh api repos/OWNER/REPO/commits/vX.Y.Z --jq .sha` prints the commit a tag points to. |
 | md2html inline pins | Edit the pins in `tools/md2html/md2html.py` and the test command in its README together. |
+| The package build backend | Regenerate `packaging/build-constraints.txt` with the `uv pip compile` command in its header and keep the header, then run `make package-test`. Each pin there has its own row, `NAME (packaging/build-constraints.txt)`. |
 | pip-audit | Edit `PIP_AUDIT` in the `Makefile`. |
 | An npm package of the web UI | In `web/`: `npm install --save-exact --ignore-scripts NAME@VERSION` (add `--save-dev` for a development tool), which updates `package.json` and `package-lock.json` together; then `make check`. A major update of a bundled package needs its release notes read and the bundle-size budget in Appendix E.31 re-measured. |
 | Node.js | Install the new LTS on development hosts and the release machine, and move `web/.node-version` and the `node` builder image (tag and digest) in `packaging/Dockerfile` together; a packaging test keeps them equal. A new major line also moves `engines` in `web/package.json`, and `@types/node` follows it to the new line. |
@@ -120,7 +122,7 @@ Re-run `make updates` afterwards. The Python rows should all be `current`.
 
 ## Dependency vulnerability audit (QG-008)
 
-`make audit` exports the locked runtime and development dependencies (`uv export --frozen --format requirements-txt --all-groups`) and scans them with [pip-audit](https://pypi.org/project/pip-audit/), pinned in the `Makefile` and run through `uvx`. Because the export has hashes for every package, pip-audit installs nothing. `--strict` makes a package that cannot be audited a failure too. The CI `audit` job runs the same command on every push and pull request.
+`make audit` exports the locked runtime and development dependencies (`uv export --frozen --format requirements-txt --all-groups`) and scans them with [pip-audit](https://pypi.org/project/pip-audit/), pinned in the `Makefile` and run through `uvx`. Because the export has hashes for every package, pip-audit installs nothing. `--strict` makes a package that cannot be audited a failure too. `make check` runs it as its last gate, so a local check finds a vulnerability before CI does; it is the one gate that needs network access, to read the vulnerability database. The CI `audit` job runs the same command on every push and pull request, as does the `gates` job through `make check`.
 
 When a vulnerability is reported, upgrade the package (`uv lock --upgrade-package NAME`) if a fixed version exists. Only when the vulnerability provably cannot affect vakr, or no fix exists yet, add its ID to [`tools/check-updates/audit-ignore.txt`](../../tools/check-updates/audit-ignore.txt):
 

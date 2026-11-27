@@ -5,7 +5,10 @@ TY_PATHS := --extra-search-path tools/md2html --extra-search-path tools/snmpsim
 
 .PHONY: check fmt lint types test loc version docs docs-check
 
-check: lint types test loc version docstrings docs-check web-check
+# `audit` (QG-008) runs last, so a newly published vulnerability never hides
+# another gate's result; it is the one gate that needs the network, to read
+# the vulnerability database.
+check: lint types test loc version docstrings docs-check web-check audit
 
 fmt:
 	uv run ruff format .

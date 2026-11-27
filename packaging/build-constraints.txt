@@ -1,9 +1,10 @@
 # Pinned, hashed build backend for `uv build --wheel` in the package build
 # (PKG-004 reproducibility): without it the newest hatchling on PyPI would be
 # used, and the wheel could change between two builds of one commit.
-# Regenerate when pyproject.toml's build-system changes:
+# Regenerate when pyproject.toml's build-system changes, or when check-updates
+# reports a newer release of a pin here (TOOLS-001):
 #   echo 'hatchling>=1.32.4' > /tmp/in.txt
-#   uv pip compile /tmp/in.txt --generate-hashes --no-header \
+#   uv pip compile /tmp/in.txt --generate-hashes --no-header --no-annotate \
 #     --python-version 3.15 --python-platform x86_64-manylinux_2_28 \
 #     -o packaging/build-constraints.txt   (then restore this header)
 hatchling==1.33.0 \

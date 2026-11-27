@@ -12,6 +12,7 @@ check-updates answers one question before a release: *what is out of date, and w
 | Node.js | a version file such as `.node-version` (as written, usually the major line), the `engines.node` floor of `package.json` (major line), `node --version` | the newest LTS release in `nodejs.org/dist/index.json`; the newest Current release is named for information |
 | PyPI packages | `uv.lock`, for every direct dependency, optional extra, and dependency-group member in `pyproject.toml` | PyPI JSON API |
 | The whole lockfile | `uv lock --upgrade --dry-run`, which also covers transitive packages | the resolver |
+| Pinned requirements files | the exact `name==version` lines of each file `[pypi] requirements` names, such as a hash-pinned build-constraints file that `uv.lock` does not cover | PyPI JSON API |
 | npm packages | `package-lock.json`, for every `dependencies` and `devDependencies` entry of `package.json` | the registry's `latest` dist-tag; for a package in `lines`, the newest release on the major line another file pins |
 | GitHub Actions | `uses:` lines in workflows: tag pins (`@v7`) and commit pins with a `# vX.Y.Z` comment | GitHub releases |
 | Tools and other pins | a command's output (`uv --version`), a regex over a file (a Makefile pin, PEP 723 inline metadata), or a literal | PyPI, GitHub releases, or npm |
@@ -125,6 +126,7 @@ pyproject = "pyproject.toml"
 lockfile = "uv.lock"
 direct_dependencies = true
 extra = ["certifi"]                         # more locked names to report
+requirements = ["packaging/build-constraints.txt"]   # exact name==version pins outside uv.lock
 
 [lockfile]
 lockfile = "uv.lock"
@@ -209,7 +211,7 @@ The tests are offline: every request and command is answered from `testdata/` or
 
 ```sh
 uv run --with pytest==9.2.0 pytest tools/check-updates
-uvx ruff@0.17.3 check tools/check-updates && uvx ruff@0.17.3 format --check tools/check-updates
+uvx ruff@0.17.6 check tools/check-updates && uvx ruff@0.17.6 format --check tools/check-updates
 ```
 
 ## Known limitations
@@ -222,7 +224,8 @@ uvx ruff@0.17.3 check tools/check-updates && uvx ruff@0.17.3 format --check tool
 - npm rows show the registry's `latest` release, even when a peer dependency of another package forbids it (TypeScript 7 while the Svelte tools accept 6). There is no whole-lockfile npm row; transitive packages follow from the direct ones, or are named in `extra`.
 - A held row compares only with the latest release. A newer release on the held line (6.0.4 while 7.0.2 is held) is not reported; look for one by hand when recording or revisiting an exception.
 - Node rows are judged against LTS releases only. A new major line counts once nodejs.org promotes it to LTS, usually in October of its release year. `.node-version` aliases such as `lts/*` cannot be compared and show as `unknown`.
-- `[go]`, `[node]`, `[npm]`, and `[exceptions]` reject unknown keys; the other sections check only their section names.
+- Requirements files are read for exact `==` pins only. Ranges, URLs, and `-r` or `-c` includes are skipped, so an included file must be listed itself. A listed file that is missing or has no exact pin is `unknown`.
+- `[go]`, `[node]`, `[npm]`, `[pypi]`, and `[exceptions]` reject unknown keys; the other sections check only their section names.
 
 ## License
 

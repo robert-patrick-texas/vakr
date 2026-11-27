@@ -50,5 +50,7 @@ def test_shipped_config_is_valid_and_plans_offline(
     assert {"Python (.python-version)", "uv", "ruff", "ty", "uv.lock (all packages)"} <= items
     assert {"uv (packaging/Dockerfile)", "Go (packaging/Dockerfile)", "@types/node"} <= items
     assert any(item.startswith("astral-sh/setup-uv@") for item in items)
+    # The hash-pinned build backend is outside uv.lock and must still be checked.
+    assert "hatchling (packaging/build-constraints.txt)" in items
     # Offline, nothing is judged, so no recorded exception can look stale.
     assert report["problems"] == []

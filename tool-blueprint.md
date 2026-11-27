@@ -3484,7 +3484,7 @@ CI may build artifacts for testing but cannot sign releases.
 
 | ID | Requirement |
 |---|---|
-| TOOLS-001 | `tools/check-updates` shall report newer versions of Python, Go, uv, ruff, ty, nfpm, locked Python dependencies, Go modules, pinned GitHub Actions, and the web UI's npm packages and Node release (ADR-035), with links to release notes. |
+| TOOLS-001 | `tools/check-updates` shall report newer versions of Python, Go, uv, ruff, ty, nfpm, locked Python dependencies, Python packages pinned in requirements files outside the lockfile (the package build's hash-pinned build backend), Go modules, pinned GitHub Actions, and the web UI's npm packages and Node release (ADR-035), with links to release notes. |
 | TOOLS-002 | Each release runs `tools/check-updates` and applies every available update, whatever the release's age: a release published the same day is adopted like any other, and no tool may impose a minimum release age (Dependabot's cooldown is turned off, npm's `min-release-age` is 0, and uv's `exclude-newer` is overridden by the check). The only accepted reason to stay behind is a failed vakr test (TOOLS-004). Automated update PRs (Dependabot or Renovate) may supplement this but do not replace it (ADR-036). |
 | TOOLS-003 | Moving to a new Python minor version is a normal release change. `.python-version`, `requires-python`, the bundled interpreter, and the CI matrix change together, and the release notes say so. |
 | TOOLS-004 | When a new release of a dependency fails vakr's tests, vakr stays on the last-known-good version and records an exception in `tools/check-updates/update-exceptions.toml`: the item, the failing version, what failed, and the date. The release's changelog lists every hold under Additional Notes (VER-005). `tools/check-updates` shows the item as `held` while the failing release is the newest, and as `update available` again once a newer release is published, so the hold is retested with every new release of the dependency. An exception that no longer matches the report is an error. |
@@ -3502,6 +3502,7 @@ CI may build artifacts for testing but cannot sign releases.
 | TOOLS-T08 | Unit | Release preflight with a passing, failing, and missing `update_check` command | A non-zero exit or a missing command blocks the release with the command's last line; vakr's `release.toml` runs the gate | TOOLS-005 |
 | TOOLS-T09 | Unit | `@types/node` against the Node pin's major line; a builder image's Go tag; an unpinned tool | The newest stable release of the pinned major is the latest; the image tag is compared with go.dev; the unpinned tool is `reference` | TOOLS-001 |
 | TOOLS-T10 | Unit | Repository settings that could delay a release by its age | Every Dependabot entry excludes all dependencies from its cooldown, `web/.npmrc` sets `min-release-age=0`, and the lockfile check overrides `exclude-newer` | TOOLS-002 |
+| TOOLS-T11 | Unit | Requirements files with hashes, continuations, markers, extras, ranges, and options; a missing file and one with no exact pin | Every exact `name==version` pin is compared with PyPI and an outdated one stops `--gate`; a missing or pin-less file is `unknown`, never absent | TOOLS-001 |
 
 ### 28.9 Documentation publishing
 

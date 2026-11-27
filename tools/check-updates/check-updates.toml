@@ -59,6 +59,10 @@ pyproject = "pyproject.toml"
 lockfile = "uv.lock"
 direct_dependencies = true
 extra = []
+# Requirements files outside uv.lock whose exact `name==version` pins are
+# compared with PyPI one by one: the hash-pinned build backend that the
+# package build installs (PKG-004).
+requirements = ["packaging/build-constraints.txt"]
 
 [lockfile]
 # Everything `uv lock --upgrade` would change, including transitive

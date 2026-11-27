@@ -63,6 +63,7 @@ from updates_node import check_node
 from updates_npm import plan_npm
 from updates_pypi import check_lockfile, plan_pypi
 from updates_report import Result, exit_code, render_json, render_table
+from updates_requirements import plan_requirements
 from updates_upstream import GO_RELEASES_URL, NODE_RELEASES_URL, PYTHON_RELEASES_URL, Upstream
 from updates_versions import UNKNOWN
 
@@ -78,8 +79,8 @@ def plan(ctx: Context, config: Mapping[str, Any]) -> list[Task]:
         config: Validated configuration.
 
     Returns:
-        list[Task]: Python, Go, Node, tools, PyPI, lockfile, npm,
-        actions, then assets; sections absent from the config are skipped.
+        list[Task]: Python, Go, Node, tools, PyPI (with requirements
+        files), lockfile, npm, actions, then assets; sections absent from the config are skipped.
 
     Raises:
         None
@@ -95,7 +96,7 @@ def plan(ctx: Context, config: Mapping[str, Any]) -> list[Task]:
     reported: set[str] = set()
     if "pypi" in config:
         pypi_tasks, reported = plan_pypi(ctx, config["pypi"])
-        tasks += pypi_tasks
+        tasks += pypi_tasks + plan_requirements(ctx, config["pypi"].get("requirements", []))
     if "lockfile" in config:
         lockfile = functools.partial(check_lockfile, ctx, config["lockfile"], reported)
         tasks.append(Task("uv.lock", "lockfile", lockfile))

@@ -41,6 +41,7 @@ _TABLE_KEYS = {
     "go": frozenset({"releases_url", "binary", "go_mod", "modules", "pins"}),
     "node": frozenset({"releases_url", "version_file", "engines", "binary"}),
     "npm": frozenset({"package_json", "lockfile", "direct_dependencies", "extra", "lines"}),
+    "pypi": frozenset({"pyproject", "lockfile", "direct_dependencies", "extra", "requirements"}),
     "exceptions": frozenset({"file"}),
 }
 
@@ -104,7 +105,7 @@ def _validate_table(table: Any, name: str, where: str) -> None:
         raise ConfigError(f"{where}: [{name}] must be a table")
     if unknown := sorted(set(table) - _TABLE_KEYS[name]):
         raise ConfigError(f"{where}: [{name}] unknown key(s) {', '.join(unknown)}")
-    for key in ("binary", "extra", "go_mod"):
+    for key in ("binary", "extra", "go_mod", "requirements"):
         value = table.get(key, [])
         if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
             raise ConfigError(f"{where}: [{name}] '{key}' must be a list of strings")
@@ -156,7 +157,7 @@ def load_config(path: Path) -> dict[str, Any]:
     Raises:
         ConfigError: If the file cannot be read or parsed, names an unknown
             section, or has an invalid tool, asset, ``[go]``, ``[node]``,
-            ``[npm]``, or ``[exceptions]`` entry.
+            ``[npm]``, ``[pypi]``, or ``[exceptions]`` entry.
     """
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))

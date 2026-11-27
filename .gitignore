@@ -46,3 +46,9 @@ credentials.toml
 
 # Hypothesis example database (property tests run derandomized)
 .hypothesis/
+
+# Local notes and status files a developer keeps beside the tree; never committed
+/STATUS.md
+/CLAUDE.local.md
+/local-notes/
+.claude/settings.local.json
